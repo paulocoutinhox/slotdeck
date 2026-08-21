@@ -1,0 +1,2881 @@
+#include "AiConversationView.h"
+#include "ui/Components.h"
+
+#include <QScrollArea>
+#include <QScrollBar>
+
+#include "AiTestSupport.h"
+#include "TestTranslations.h"
+
+namespace slotdeck::plugins::ai {
+
+TEST(CronExpressionTest, ParsesPOSIXFieldsAndCalculatesOccurrencesInTheSelectedTimeZone) {
+    const auto weekdays = CronExpression::parse(QStringLiteral("0 9 * * 1-5"));
+    ASSERT_TRUE(weekdays.hasValue());
+    const QDateTime friday = QDateTime(QDate(2026, 8, 14), QTime(9, 0), QTimeZone::utc()).toUTC();
+    const auto next = weekdays.value().nextAfter(friday, QTimeZone::utc());
+    ASSERT_TRUE(next.hasValue());
+    EXPECT_EQ(next.value(), QDateTime(QDate(2026, 8, 17), QTime(9, 0), QTimeZone::utc()).toUTC());
+
+    const auto sunday = CronExpression::parse(QStringLiteral("30 12 * * 7"));
+    ASSERT_TRUE(sunday.hasValue());
+    EXPECT_TRUE(sunday.value().matches(QDateTime(QDate(2026, 8, 16), QTime(12, 30), QTimeZone::utc())));
+    EXPECT_FALSE(sunday.value().matches(QDateTime(QDate(2026, 8, 17), QTime(12, 30), QTimeZone::utc())));
+}
+
+TEST(CronExpressionTest, AnswersTheWallClockTheCalendarSkipsAndTheOneItRepeats) {
+    const QTimeZone saoPaulo(QByteArrayLiteral("America/Sao_Paulo"));
+    const QTimeZone newYork(QByteArrayLiteral("America/New_York"));
+    ASSERT_TRUE(saoPaulo.isValid());
+    ASSERT_TRUE(newYork.isValid());
+
+    // The clock of New York moves from 02:00 to 03:00 on the eighth of March 2026, so 02:30 is a wall clock that day does not carry.
+    const auto daily = CronExpression::parse(QStringLiteral("30 2 * * *"));
+    ASSERT_TRUE(daily.hasValue());
+    const QDateTime beforeGap = QDateTime(QDate(2026, 3, 7), QTime(12, 0), QTimeZone::utc()).toUTC();
+    const auto afterGap = daily.value().nextAfter(beforeGap, newYork);
+    ASSERT_TRUE(afterGap.hasValue());
+    EXPECT_EQ(afterGap.value().toTimeZone(newYork).date(), QDate(2026, 3, 8));
+    EXPECT_EQ(afterGap.value().toTimeZone(newYork).time(), QTime(3, 0));
+
+    // The clock of New York repeats 01:00 to 02:00 on the first of November 2026, so 01:30 happens twice and the job runs on the first of them.
+    const auto repeated = CronExpression::parse(QStringLiteral("30 1 * * *"));
+    ASSERT_TRUE(repeated.hasValue());
+    const QDateTime beforeRepeat = QDateTime(QDate(2026, 10, 31), QTime(12, 0), QTimeZone::utc()).toUTC();
+    const auto firstOccurrence = repeated.value().nextAfter(beforeRepeat, newYork);
+    ASSERT_TRUE(firstOccurrence.hasValue());
+    EXPECT_EQ(firstOccurrence.value().toTimeZone(newYork).date(), QDate(2026, 11, 1));
+    EXPECT_EQ(firstOccurrence.value().toTimeZone(newYork).time(), QTime(1, 30));
+    EXPECT_EQ(firstOccurrence.value(), QDateTime(QDate(2026, 11, 1), QTime(5, 30), QTimeZone::utc()).toUTC());
+
+    // The occurrence after it is the next day rather than the second turn of the same wall clock.
+    const auto following = repeated.value().nextAfter(firstOccurrence.value(), newYork);
+    ASSERT_TRUE(following.hasValue());
+    EXPECT_EQ(following.value().toTimeZone(newYork).date(), QDate(2026, 11, 2));
+
+    // An expression that matches once a year is answered without walking every minute of that year.
+    const auto yearly = CronExpression::parse(QStringLiteral("0 0 29 2 *"));
+    ASSERT_TRUE(yearly.hasValue());
+    QElapsedTimer spent;
+    spent.start();
+    const auto leapDay = yearly.value().nextAfter(QDateTime(QDate(2026, 3, 1), QTime(0, 0), QTimeZone::utc()).toUTC(), saoPaulo);
+    ASSERT_TRUE(leapDay.hasValue());
+    EXPECT_EQ(leapDay.value().toTimeZone(saoPaulo).date(), QDate(2028, 2, 29));
+    EXPECT_LT(spent.elapsed(), 500);
+}
+
+TEST(CronExpressionTest, AppliesPOSIXDayMatchingAndRejectsExtensionsOrMalformedFields) {
+    const auto expression = CronExpression::parse(QStringLiteral("0 0 1 1 0"));
+    ASSERT_TRUE(expression.hasValue());
+    EXPECT_TRUE(expression.value().matches(QDateTime(QDate(2026, 1, 1), QTime(0, 0), QTimeZone::utc())));
+    EXPECT_FALSE(expression.value().matches(QDateTime(QDate(2026, 2, 1), QTime(0, 0), QTimeZone::utc())));
+    EXPECT_FALSE(expression.value().matches(QDateTime(QDate(2026, 2, 2), QTime(0, 0), QTimeZone::utc())));
+    EXPECT_EQ(CronExpression::parse(QStringLiteral("*/5 * * * *")).error().code, QStringLiteral("ai_tasks_cron_value_invalid"));
+    EXPECT_EQ(CronExpression::parse(QStringLiteral("0 0 * *")).error().code, QStringLiteral("ai_tasks_cron_field_count_invalid"));
+    EXPECT_EQ(CronExpression::parse(QStringLiteral("0 0 31-1 * *")).error().code, QStringLiteral("ai_tasks_cron_range_invalid"));
+    EXPECT_EQ(CronExpression::parse(QStringLiteral("60 * * * *")).error().code, QStringLiteral("ai_tasks_cron_value_invalid"));
+}
+
+TEST(AiTaskRepositoryTest, DeclaresOneCreatingMigrationAndRoundTripsWorkspacesTasksAndQueue) {
+    test::TestPluginHost host;
+    AiTaskRepository repository(host);
+    ASSERT_TRUE(repository.initialize().hasValue());
+    ASSERT_EQ(host.appliedMigrations.size(), 1);
+    EXPECT_EQ(host.appliedMigrations.first().version, 1);
+    for (const auto& statement : host.appliedMigrations.first().statements) {
+        EXPECT_TRUE(statement.startsWith(QStringLiteral("CREATE "))) << statement.toStdString();
+    }
+
+    const AiWorkspace workspace = AiTestsHelper::validWorkspace(0, true);
+    const AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {task.id});
+
+    const auto workspaces = repository.workspaces();
+    ASSERT_TRUE(workspaces.hasValue());
+    ASSERT_EQ(workspaces.value().size(), 1);
+    EXPECT_EQ(workspaces.value().first().name, workspace.name);
+    const auto tasks = repository.tasks();
+    ASSERT_TRUE(tasks.hasValue());
+    ASSERT_EQ(tasks.value().size(), 1);
+    EXPECT_EQ(tasks.value().first().prompt, task.prompt);
+    EXPECT_EQ(tasks.value().first().column, TaskColumn::Todo);
+    const auto queued = repository.queuedTaskIds();
+    ASSERT_TRUE(queued.hasValue());
+    EXPECT_EQ(queued.value(), QStringList{task.id});
+
+    EXPECT_TRUE(test::awaitFuture(repository.createWorkspace(workspace)).hasValue());
+    EXPECT_TRUE(test::awaitFuture(repository.saveTask(task)).hasValue());
+    EXPECT_TRUE(test::awaitFuture(repository.enqueueTask(task.id, QDateTime::currentDateTimeUtc())).hasValue());
+    EXPECT_TRUE(test::awaitFuture(repository.completeTask(task.id, TaskColumn::Done, QDateTime::currentDateTimeUtc())).hasValue());
+    AiSettings settings;
+    settings.connections.append(AiTestsHelper::testConnection());
+    settings.defaultConnectionKey = connectionKey(AiTestsHelper::testConnection());
+    settings.execution.parallelExecutions = 2;
+    EXPECT_TRUE(test::awaitFuture(repository.saveSettings(settings)).hasValue());
+    ASSERT_EQ(host.savedSettings.size(), 1);
+
+    host.settingsDocument = host.savedSettings.first();
+    const AiSettings restored = repository.settings();
+    ASSERT_EQ(restored.connections.size(), 1);
+    EXPECT_EQ(restored.connections.first().providerId, QStringLiteral("openai"));
+    EXPECT_EQ(restored.execution.parallelExecutions, 2);
+    EXPECT_EQ(restored.defaultConnectionKey, QStringLiteral("openai/gpt-4o"));
+
+    TaskExecution execution;
+    execution.id = QStringLiteral("execution-1");
+    execution.taskId = task.id;
+    execution.startedAtUtc = QDateTime::currentDateTimeUtc();
+    EXPECT_TRUE(test::awaitFuture(repository.startExecution(execution)).hasValue());
+    execution.status = ExecutionStatus::Succeeded;
+    execution.finishedAtUtc = execution.startedAtUtc.addSecs(2);
+    execution.inputTokens = 12;
+    execution.outputTokens = 34;
+    execution.content = QStringLiteral("answer");
+    EXPECT_TRUE(test::awaitFuture(repository.finishExecution(execution)).hasValue());
+
+    ExecutionLogEntry entry{QStringLiteral("log-1"), execution.id, 1, QDateTime::currentDateTimeUtc(), ExecutionLogLevel::Info, ExecutionLogKind::Started, QStringLiteral("openai / gpt-4o")};
+    EXPECT_TRUE(test::awaitFuture(repository.appendExecutionLog(entry)).hasValue());
+
+    execution.finishedAtUtc = execution.startedAtUtc.addSecs(-2);
+    EXPECT_EQ(test::awaitFuture(repository.finishExecution(execution)).error().code, QStringLiteral("ai_tasks_execution_invalid"));
+    entry.sequence = -1;
+    EXPECT_EQ(test::awaitFuture(repository.appendExecutionLog(entry)).error().code, QStringLiteral("ai_tasks_execution_invalid"));
+}
+
+TEST(AiTaskRepositoryTest, RejectsInvalidWorkspacesTasksAndSchedules) {
+    test::TestPluginHost host;
+    AiTaskRepository repository(host);
+
+    AiWorkspace workspace = AiTestsHelper::validWorkspace(0, true);
+    workspace.name = QStringLiteral("  ");
+    EXPECT_EQ(test::awaitFuture(repository.createWorkspace(workspace)).error().code, QStringLiteral("ai_tasks_workspace_invalid"));
+
+    AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), QStringLiteral("workspace-0"));
+    task.prompt = QStringLiteral("   ");
+    EXPECT_EQ(test::awaitFuture(repository.saveTask(task)).error().code, QStringLiteral("ai_tasks_task_invalid"));
+    task = AiTestsHelper::makeTask(QStringLiteral("task-1"), QStringLiteral("workspace-0"));
+    task.title = QStringLiteral("  ");
+    EXPECT_EQ(test::awaitFuture(repository.saveTask(task)).error().code, QStringLiteral("ai_tasks_task_invalid"));
+
+    task = AiTestsHelper::makeTask(QStringLiteral("task-1"), QStringLiteral("workspace-0"));
+    TaskSchedule schedule;
+    schedule.kind = ScheduleKind::Interval;
+    schedule.intervalSeconds = 30;
+    schedule.timeZoneId = QTimeZone::systemTimeZoneId();
+    schedule.nextRunAtUtc = QDateTime::currentDateTimeUtc().addSecs(60);
+    task.schedule = schedule;
+    EXPECT_EQ(test::awaitFuture(repository.saveTask(task)).error().code, QStringLiteral("ai_tasks_schedule_invalid"));
+
+    EXPECT_EQ(AiTaskRepository::parseColumn(QStringLiteral("archived")).error().code, QStringLiteral("ai_tasks_column_invalid"));
+    EXPECT_EQ(AiTaskRepository::columns().size(), 5);
+    EXPECT_EQ(AiTaskRepository::columnName(TaskColumn::Blocked), QStringLiteral("blocked"));
+    EXPECT_EQ(AiTaskRepository::columnName(TaskColumn::Review), QStringLiteral("review"));
+}
+
+TEST(AiPluginTest, PublishesCompleteMetadataAndRejectsUnknownRequests) {
+    test::TestPluginHost host;
+    AiTestsHelper::installAiRows(host, {AiTestsHelper::validWorkspace(0, true)}, {}, {});
+    AiPlugin plugin;
+    EXPECT_EQ(plugin.id(), QStringLiteral("ai"));
+    EXPECT_EQ(plugin.dependencies(), QStringList{QStringLiteral("logs")});
+    EXPECT_EQ(plugin.databaseSchemaVersion(), 1);
+    EXPECT_EQ(plugin.navigationItems(host.theme()).size(), 1);
+    EXPECT_EQ(plugin.navigationItems(host.theme()).at(0).id, QStringLiteral("tasks"));
+    EXPECT_FALSE(plugin.styleSheet(host.theme()).isEmpty());
+    const auto catalog = plugin.translations();
+    ASSERT_TRUE(catalog.contains(QStringLiteral("en")));
+    ASSERT_TRUE(catalog.contains(QStringLiteral("pt")));
+    EXPECT_TRUE(catalog.value(QStringLiteral("en")).contains(QStringLiteral("ai.column.blocked")));
+    EXPECT_TRUE(catalog.value(QStringLiteral("en")).contains(QStringLiteral("ai.column.review")));
+
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    EXPECT_EQ(plugin.initialize(host).error().code, QStringLiteral("ai_tasks_already_initialized"));
+    std::optional<utils::Result<QJsonObject>> response;
+    // clang-format off
+    plugin.handleRequest(QStringLiteral("test"), QStringLiteral("ai.unknown"), {}, [&response](utils::Result<QJsonObject> result) { response = std::move(result); });
+    // clang-format on
+    ASSERT_TRUE(response.has_value());
+    EXPECT_EQ(response->error().code, QStringLiteral("ai_tasks_request_invalid"));
+    plugin.shutdown();
+}
+
+TEST(AiPluginTest, ManagesWorkspacesAndKeepsExactlyOneActiveWorkspace) {
+    test::TestPluginHost host;
+    const AiWorkspace workspace = AiTestsHelper::validWorkspace(0, true);
+    AiTestsHelper::installAiRows(host, {workspace}, {}, {});
+    AiPlugin plugin;
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    ASSERT_EQ(plugin.workspaces().size(), 1);
+
+    const auto created = test::awaitFuture(plugin.createWorkspace(QStringLiteral("Product")));
+    ASSERT_TRUE(created.hasValue());
+    ASSERT_EQ(plugin.workspaces().size(), 2);
+    EXPECT_FALSE(plugin.workspaces().at(0).active);
+    EXPECT_TRUE(plugin.workspaces().at(1).active);
+    EXPECT_EQ(plugin.workspaces().at(1).name, QStringLiteral("Product"));
+
+    EXPECT_TRUE(test::awaitFuture(plugin.renameWorkspace(created.value(), QStringLiteral("Platform"))).hasValue());
+    EXPECT_EQ(plugin.workspaces().at(1).name, QStringLiteral("Platform"));
+    EXPECT_TRUE(test::awaitFuture(plugin.activateWorkspace(workspace.id)).hasValue());
+    EXPECT_TRUE(plugin.workspaces().at(0).active);
+    EXPECT_EQ(test::awaitFuture(plugin.createWorkspace(QStringLiteral("   "))).error().code, QStringLiteral("ai_tasks_workspace_invalid"));
+    plugin.shutdown();
+}
+
+TEST(AiPluginTest, StartsWithoutAnyWorkspaceAndOffersTheEmptyStateUntilOneIsCreated) {
+    test::TestPluginHost host;
+    AiTestsHelper::installAiRows(host, {}, {}, {});
+    AiPlugin plugin;
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    EXPECT_TRUE(plugin.workspaces().isEmpty());
+    EXPECT_TRUE(host.databaseTransactions.isEmpty());
+
+    std::unique_ptr<QWidget> view(plugin.createNavigationView(QStringLiteral("tasks"), nullptr));
+    ASSERT_NE(view, nullptr);
+    view->resize(900, 600);
+    view->show();
+    auto* workspaces = view->findChild<ui::TabBar*>(QStringLiteral("aiWorkspaces"));
+    auto* workspaceSeparator = workspaces->parentWidget()->findChild<QWidget*>(QStringLiteral("sharedDivider"));
+    ASSERT_NE(workspaces, nullptr);
+    ASSERT_NE(workspaceSeparator, nullptr);
+    EXPECT_EQ(workspaces->count(), 0);
+    EXPECT_FALSE(workspaces->isVisible());
+    EXPECT_FALSE(workspaceSeparator->isVisible());
+    auto* emptyState = view->findChild<QLabel*>(QStringLiteral("emptyState"));
+    ASSERT_NE(emptyState, nullptr);
+    EXPECT_TRUE(emptyState->isVisible());
+
+    ASSERT_TRUE(test::awaitFuture(plugin.createWorkspace(QStringLiteral("Product"))).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([workspaces]() { return workspaces->count() == 1 && workspaces->isVisible(); }));
+    // clang-format on
+    EXPECT_FALSE(emptyState->isVisible());
+
+    // The strip is followed by exactly one divider, and the board starts immediately below it.
+    EXPECT_TRUE(workspaceSeparator->isVisible());
+    EXPECT_EQ(workspaceSeparator->height(), 1);
+    EXPECT_EQ(workspaceSeparator->mapTo(view.get(), QPoint(0, 0)).y(), workspaces->mapTo(view.get(), QPoint(0, 0)).y() + workspaces->height());
+
+    view.reset();
+    plugin.shutdown();
+}
+
+TEST(AiProviderCatalogTest, DeclaresEveryProviderWithConsistentDescriptors) {
+    const auto& catalog = providerCatalog();
+    ASSERT_FALSE(catalog.isEmpty());
+
+    QSet<QString> identifiers;
+    for (const auto& provider : catalog) {
+        EXPECT_FALSE(provider.id.isEmpty());
+        EXPECT_TRUE(provider.titleKey.startsWith(QStringLiteral("ai.provider.")));
+        EXPECT_FALSE(provider.baseUrl.isEmpty());
+        EXPECT_FALSE(provider.parameters.isEmpty());
+        EXPECT_FALSE(identifiers.contains(provider.id)) << provider.id.toStdString();
+        identifiers.insert(provider.id);
+
+        for (const auto& parameter : provider.parameters) {
+            EXPECT_FALSE(parameter.id.isEmpty());
+            EXPECT_FALSE(parameter.field.isEmpty());
+            if (parameter.type == ParameterType::Enumeration) {
+                EXPECT_FALSE(parameter.options.isEmpty());
+            } else {
+                EXPECT_LT(parameter.minimum, parameter.maximum);
+            }
+        }
+        for (const auto& model : provider.models) {
+            EXPECT_FALSE(model.id.isEmpty());
+            EXPECT_FALSE(model.displayName.isEmpty());
+            EXPECT_GT(model.contextWindow, 0);
+        }
+    }
+
+    EXPECT_NE(findProvider(QStringLiteral("anthropic")), nullptr);
+    EXPECT_NE(findProvider(QStringLiteral("openai")), nullptr);
+    EXPECT_NE(findProvider(QStringLiteral("ollama")), nullptr);
+    EXPECT_EQ(findProvider(QStringLiteral("nonexistent")), nullptr);
+}
+
+TEST(AiProviderCatalogTest, RejectsEveryMalformedCatalogFileInsteadOfLoadingPartOfIt) {
+    QFile providersFile(QStringLiteral(":/slotdeck/ai/assets/providers.json"));
+    ASSERT_TRUE(providersFile.open(QIODevice::ReadOnly));
+    const QJsonObject shipped = QJsonDocument::fromJson(providersFile.readAll()).object();
+    const QByteArray models = QJsonDocument(QJsonObject{{QStringLiteral("providers"), QJsonObject{}}}).toJson(QJsonDocument::Compact);
+
+    // clang-format off
+    const auto document = [](const QJsonObject& value) { return QJsonDocument(value).toJson(QJsonDocument::Compact); };
+    const auto onlyOpenAi = [&shipped](const QJsonObject& replacement) {
+        QJsonObject copy = shipped;
+        copy.insert(QStringLiteral("providers"), QJsonArray{replacement});
+        return copy;
+    };
+    // clang-format on
+
+    const QJsonObject openai = shipped.value(QStringLiteral("providers")).toArray().at(1).toObject();
+    ASSERT_EQ(openai.value(QStringLiteral("id")).toString(), QStringLiteral("openai"));
+    ASSERT_TRUE(loadAiCatalog(document(onlyOpenAi(openai)), models).hasValue());
+
+    EXPECT_EQ(loadAiCatalog(QByteArrayLiteral(""), models).error().code, QStringLiteral("ai_catalog_invalid"));
+    EXPECT_EQ(loadAiCatalog(QByteArrayLiteral("{"), models).error().code, QStringLiteral("ai_catalog_invalid"));
+    EXPECT_EQ(loadAiCatalog(QByteArrayLiteral("[]"), models).error().code, QStringLiteral("ai_catalog_invalid"));
+
+    QJsonObject withoutLimits = shipped;
+    withoutLimits.remove(QStringLiteral("limits"));
+    EXPECT_EQ(loadAiCatalog(document(withoutLimits), models).error().code, QStringLiteral("ai_catalog_invalid"));
+
+    QJsonObject brokenLimits = shipped;
+    QJsonObject limits = brokenLimits.value(QStringLiteral("limits")).toObject();
+    limits.insert(QStringLiteral("repeatedToolCallLimit"), 0);
+    brokenLimits.insert(QStringLiteral("limits"), limits);
+    EXPECT_EQ(loadAiCatalog(document(brokenLimits), models).error().code, QStringLiteral("ai_catalog_invalid"));
+
+    QJsonObject unknownField = openai;
+    unknownField.insert(QStringLiteral("nonexistent"), 1);
+    EXPECT_EQ(loadAiCatalog(document(onlyOpenAi(unknownField)), models).error().code, QStringLiteral("ai_catalog_invalid"));
+
+    QJsonObject unknownProtocol = openai;
+    unknownProtocol.insert(QStringLiteral("protocol"), QStringLiteral("grpc"));
+    EXPECT_EQ(loadAiCatalog(document(onlyOpenAi(unknownProtocol)), models).error().code, QStringLiteral("ai_catalog_invalid"));
+
+    QJsonObject withoutAddress = openai;
+    withoutAddress.insert(QStringLiteral("baseUrl"), QStringLiteral("api.openai.com"));
+    EXPECT_EQ(loadAiCatalog(document(onlyOpenAi(withoutAddress)), models).error().code, QStringLiteral("ai_catalog_invalid"));
+
+    QJsonObject withoutVariable = openai;
+    withoutVariable.insert(QStringLiteral("apiKeyVariable"), QString{});
+    EXPECT_EQ(loadAiCatalog(document(onlyOpenAi(withoutVariable)), models).error().code, QStringLiteral("ai_catalog_invalid"));
+
+    QJsonObject unknownTrait = openai;
+    unknownTrait.insert(QStringLiteral("userDefinedTraits"), QJsonArray{QStringLiteral("telepathy")});
+    EXPECT_EQ(loadAiCatalog(document(onlyOpenAi(unknownTrait)), models).error().code, QStringLiteral("ai_catalog_invalid"));
+
+    QJsonObject withoutToolCalling = openai;
+    withoutToolCalling.insert(QStringLiteral("userDefinedTraits"), QJsonArray{QStringLiteral("sampling")});
+    EXPECT_EQ(loadAiCatalog(document(onlyOpenAi(withoutToolCalling)), models).error().code, QStringLiteral("ai_catalog_invalid"));
+
+    QJsonObject bothKinds = openai;
+    bothKinds.insert(QStringLiteral("userDefinedTraits"), QJsonArray{QStringLiteral("sampling"), QStringLiteral("reasoning"), QStringLiteral("function-calling")});
+    EXPECT_EQ(loadAiCatalog(document(onlyOpenAi(bothKinds)), models).error().code, QStringLiteral("ai_catalog_invalid"));
+
+    QJsonObject emptyFieldPath = openai;
+    QJsonArray parameters = emptyFieldPath.value(QStringLiteral("parameters")).toArray();
+    QJsonObject first = parameters.at(0).toObject();
+    first.insert(QStringLiteral("field"), QStringLiteral("output..effort"));
+    parameters.replace(0, first);
+    emptyFieldPath.insert(QStringLiteral("parameters"), parameters);
+    EXPECT_EQ(loadAiCatalog(document(onlyOpenAi(emptyFieldPath)), models).error().code, QStringLiteral("ai_catalog_invalid"));
+
+    QJsonObject outOfBounds = openai;
+    QJsonArray boundsParameters = outOfBounds.value(QStringLiteral("parameters")).toArray();
+    QJsonObject bounded = boundsParameters.at(0).toObject();
+    bounded.insert(QStringLiteral("default"), -1);
+    boundsParameters.replace(0, bounded);
+    outOfBounds.insert(QStringLiteral("parameters"), boundsParameters);
+    EXPECT_EQ(loadAiCatalog(document(onlyOpenAi(outOfBounds)), models).error().code, QStringLiteral("ai_catalog_invalid"));
+
+    // Two parameters sharing one identifier are accepted only when a model reaches exactly one of them.
+    QJsonObject collidingParameters = openai;
+    QJsonArray colliding = collidingParameters.value(QStringLiteral("parameters")).toArray();
+    QJsonObject repeated = colliding.at(0).toObject();
+    repeated.insert(QStringLiteral("trait"), colliding.at(1).toObject().value(QStringLiteral("trait")));
+    colliding.replace(0, repeated);
+    collidingParameters.insert(QStringLiteral("parameters"), colliding);
+    EXPECT_EQ(loadAiCatalog(document(onlyOpenAi(collidingParameters)), models).error().code, QStringLiteral("ai_catalog_invalid"));
+
+    QJsonObject unknownType = openai;
+    QJsonArray typedParameters = unknownType.value(QStringLiteral("parameters")).toArray();
+    QJsonObject typed = typedParameters.at(0).toObject();
+    typed.insert(QStringLiteral("type"), QStringLiteral("boolean"));
+    typedParameters.replace(0, typed);
+    unknownType.insert(QStringLiteral("parameters"), typedParameters);
+    EXPECT_EQ(loadAiCatalog(document(onlyOpenAi(unknownType)), models).error().code, QStringLiteral("ai_catalog_invalid"));
+
+    QJsonObject enumerationWithoutOptions = openai;
+    QJsonArray enumerationParameters = enumerationWithoutOptions.value(QStringLiteral("parameters")).toArray();
+    enumerationParameters.append(QJsonObject{{QStringLiteral("id"), QStringLiteral("mode")}, {QStringLiteral("title"), QStringLiteral("ai.parameter.mode")}, {QStringLiteral("type"), QStringLiteral("enumeration")}, {QStringLiteral("field"), QStringLiteral("mode")}, {QStringLiteral("default"), QStringLiteral("fast")}});
+    enumerationWithoutOptions.insert(QStringLiteral("parameters"), enumerationParameters);
+    EXPECT_EQ(loadAiCatalog(document(onlyOpenAi(enumerationWithoutOptions)), models).error().code, QStringLiteral("ai_catalog_invalid"));
+
+    QJsonObject duplicated = shipped;
+    duplicated.insert(QStringLiteral("providers"), QJsonArray{openai, openai});
+    EXPECT_EQ(loadAiCatalog(document(duplicated), models).error().code, QStringLiteral("ai_catalog_invalid"));
+
+    QJsonObject empty = shipped;
+    empty.insert(QStringLiteral("providers"), QJsonArray{});
+    EXPECT_EQ(loadAiCatalog(document(empty), models).error().code, QStringLiteral("ai_catalog_invalid"));
+
+    // The model file is validated the same way, so an unknown provider or a model without tool calling rejects the catalog.
+    const QByteArray foreignModels = QJsonDocument(QJsonObject{{QStringLiteral("providers"), QJsonObject{{QStringLiteral("absent"), QJsonArray{}}}}}).toJson(QJsonDocument::Compact);
+    EXPECT_EQ(loadAiCatalog(document(onlyOpenAi(openai)), foreignModels).error().code, QStringLiteral("ai_catalog_invalid"));
+
+    const QJsonObject blindModel{{QStringLiteral("id"), QStringLiteral("m1")}, {QStringLiteral("context"), 1000}, {QStringLiteral("output"), 100}, {QStringLiteral("traits"), QJsonArray{QStringLiteral("sampling")}}};
+    const QByteArray withoutTools = QJsonDocument(QJsonObject{{QStringLiteral("providers"), QJsonObject{{QStringLiteral("openai"), QJsonArray{blindModel}}}}}).toJson(QJsonDocument::Compact);
+    EXPECT_EQ(loadAiCatalog(document(onlyOpenAi(openai)), withoutTools).error().code, QStringLiteral("ai_catalog_invalid"));
+
+    const QJsonObject bothTraits{{QStringLiteral("id"), QStringLiteral("m2")}, {QStringLiteral("context"), 1000}, {QStringLiteral("output"), 100}, {QStringLiteral("traits"), QJsonArray{QStringLiteral("sampling"), QStringLiteral("reasoning"), QStringLiteral("function-calling")}}};
+    const QByteArray contradictory = QJsonDocument(QJsonObject{{QStringLiteral("providers"), QJsonObject{{QStringLiteral("openai"), QJsonArray{bothTraits}}}}}).toJson(QJsonDocument::Compact);
+    EXPECT_EQ(loadAiCatalog(document(onlyOpenAi(openai)), contradictory).error().code, QStringLiteral("ai_catalog_invalid"));
+
+    const QByteArray unknownModelField = QJsonDocument(QJsonObject{{QStringLiteral("providers"), QJsonObject{{QStringLiteral("openai"), QJsonArray{QJsonObject{{QStringLiteral("id"), QStringLiteral("m3")}, {QStringLiteral("cost"), 1}}}}}}}).toJson(QJsonDocument::Compact);
+    EXPECT_EQ(loadAiCatalog(document(onlyOpenAi(openai)), unknownModelField).error().code, QStringLiteral("ai_catalog_invalid"));
+}
+
+// The values a request is written with, which is what every connection opens at.
+constexpr int declaredOutputBudgetTokens = 8192;
+constexpr double declaredTopP = 0.95;
+constexpr double declaredTemperature = 1.0;
+
+TEST(AiProviderCatalogTest, OpensEveryConnectionAtTheValuesARequestIsWrittenWith) {
+    for (const auto& provider : providerCatalog()) {
+        for (const auto& parameter : provider.parameters) {
+            if (parameter.id == QStringLiteral("temperature")) {
+                EXPECT_DOUBLE_EQ(parameter.defaultValue.toDouble(), declaredTemperature) << provider.id.toStdString();
+            }
+            if (parameter.id == QStringLiteral("topP")) {
+                EXPECT_DOUBLE_EQ(parameter.defaultValue.toDouble(), declaredTopP) << provider.id.toStdString();
+            }
+            if (parameter.id == QStringLiteral("maxOutputTokens")) {
+                EXPECT_EQ(parameter.defaultValue.toInteger(), declaredOutputBudgetTokens) << provider.id.toStdString();
+            }
+        }
+    }
+
+    // A model that answers less than that keeps its own maximum, so no connection opens outside the range its model accepts.
+    const ProviderDescriptor* openai = findProvider(QStringLiteral("openai"));
+    ASSERT_NE(openai, nullptr);
+    for (const auto& model : openai->models) {
+        const ModelConnection connection = declaredConnection(*openai, model.id);
+        const qint64 budget = connection.parameters.value(QStringLiteral("maxOutputTokens")).toInteger(-1);
+        EXPECT_EQ(budget, std::min<qint64>(declaredOutputBudgetTokens, model.maximumOutputTokens)) << model.id.toStdString();
+        EXPECT_TRUE(validateConnection(connection).hasValue()) << model.id.toStdString();
+    }
+}
+
+TEST(AiProviderCatalogTest, DeclaresTheOutputBudgetTheConversationFitterReadsByName) {
+    const ProviderDescriptor* openai = findProvider(QStringLiteral("openai"));
+    ASSERT_NE(openai, nullptr);
+
+    const auto sampling = outputBudgetParameter(*openai, QStringLiteral("gpt-4o"));
+    ASSERT_TRUE(sampling.has_value());
+    EXPECT_EQ(sampling->field, QStringLiteral("max_tokens"));
+
+    const auto reasoning = outputBudgetParameter(*openai, QStringLiteral("o3-mini"));
+    ASSERT_TRUE(reasoning.has_value());
+    EXPECT_EQ(reasoning->field, QStringLiteral("max_completion_tokens"));
+
+    // The declared maximum of the model bounds the budget, and a borrowed budget is clamped instead of becoming invalid.
+    const ModelDescriptor* model = findModel(*openai, QStringLiteral("gpt-4o"));
+    ASSERT_NE(model, nullptr);
+    ModelConnection connection = AiTestsHelper::testConnection();
+
+    // A zero asks for everything the model allows, so the maximum that model declares is what reaches the service.
+    ASSERT_TRUE(sampling->modelMaximumWhenZero);
+    connection.parameters.insert(QStringLiteral("maxOutputTokens"), 0);
+    ASSERT_TRUE(validateConnection(connection).hasValue());
+    EXPECT_EQ(outputBudget(connection), model->maximumOutputTokens);
+
+    // clang-format off
+    const QJsonObject wide = buildRequestBody(*openai, {connection, {}, QJsonArray{}, {}}, [](const QString& key) { return key; });
+    // clang-format on
+    EXPECT_EQ(wide.value(QStringLiteral("max_tokens")).toInteger(0), model->maximumOutputTokens);
+
+    // The Anthropic API requires that field, so a zero must never reach it as an absence.
+    const ProviderDescriptor* anthropic = findProvider(QStringLiteral("anthropic"));
+    ASSERT_NE(anthropic, nullptr);
+    const QString claude = QStringLiteral("claude-opus-5");
+    const ModelDescriptor* opus = findModel(*anthropic, claude);
+    ASSERT_NE(opus, nullptr);
+    ModelConnection anthropicConnection = declaredConnection(*anthropic, claude);
+    const auto anthropicBudget = outputBudgetParameter(*anthropic, claude);
+    ASSERT_TRUE(anthropicBudget.has_value());
+    EXPECT_EQ(anthropicConnection.parameters.value(QStringLiteral("maxOutputTokens")).toInteger(-1), anthropicBudget->defaultValue.toInteger());
+    anthropicConnection.parameters.insert(QStringLiteral("maxOutputTokens"), 0);
+    // clang-format off
+    const QJsonObject anthropicBody = buildRequestBody(*anthropic, {anthropicConnection, {}, QJsonArray{}, {}}, [](const QString& key) { return key; });
+    // clang-format on
+    EXPECT_EQ(anthropicBody.value(QStringLiteral("max_tokens")).toInteger(0), opus->maximumOutputTokens);
+
+    connection.parameters.insert(QStringLiteral("maxOutputTokens"), 2048);
+    EXPECT_EQ(outputBudget(connection), 2048);
+    // clang-format off
+    const QJsonObject bounded = buildRequestBody(*openai, {connection, {}, QJsonArray{}, {}}, [](const QString& key) { return key; });
+    // clang-format on
+    EXPECT_EQ(bounded.value(QStringLiteral("max_tokens")).toInteger(0), 2048);
+
+    setOutputBudget(connection, model->maximumOutputTokens + 1000);
+    EXPECT_EQ(outputBudget(connection), model->maximumOutputTokens);
+    EXPECT_TRUE(validateConnection(connection).hasValue());
+
+    // A model the catalog does not declare opens at the declared budget and has no maximum to ask for, so a zero typed by hand is refused.
+    ModelConnection unknown = connection;
+    unknown.modelId = QStringLiteral("z-ai/glm-5.2");
+    unknown.parameters = defaultParameters(*openai, unknown.modelId);
+    EXPECT_EQ(unknown.parameters.value(QStringLiteral("maxOutputTokens")).toInteger(-1), declaredOutputBudgetTokens);
+    EXPECT_TRUE(validateConnection(unknown).hasValue());
+    unknown.parameters.insert(QStringLiteral("maxOutputTokens"), 0);
+    EXPECT_EQ(validateConnection(unknown).error().code, QStringLiteral("ai_output_budget_unknown"));
+
+    unknown.parameters.insert(QStringLiteral("maxOutputTokens"), 32000);
+    ASSERT_TRUE(validateConnection(unknown).hasValue());
+    // clang-format off
+    const QJsonObject typed = buildRequestBody(*openai, {unknown, {}, QJsonArray{}, {}}, [](const QString& key) { return key; });
+    // clang-format on
+    EXPECT_EQ(typed.value(QStringLiteral("max_tokens")).toInteger(0), 32000);
+
+    EXPECT_EQ(connectionProtocol(connection), WireProtocol::OpenAiCompatible);
+    EXPECT_EQ(connectionProtocol(declaredConnection(*findProvider(QStringLiteral("anthropic")), QStringLiteral("claude-opus-5"))), WireProtocol::Anthropic);
+}
+
+TEST(AiProviderCatalogTest, LoadsEveryModelDeclaredByTheCatalogFile) {
+    ASSERT_TRUE(aiCatalogError().hasValue()) << aiCatalogError().error().message.toStdString() << " " << aiCatalogError().error().detail.toStdString();
+
+    QFile file(QStringLiteral(":/slotdeck/ai/assets/models.json"));
+    ASSERT_TRUE(file.open(QIODevice::ReadOnly));
+    const QJsonObject declared = QJsonDocument::fromJson(file.readAll()).object().value(QStringLiteral("providers")).toObject();
+    ASSERT_FALSE(declared.isEmpty());
+
+    // Every provider the file names exists, and every model it declares reached the catalog with its own window.
+    for (auto entry = declared.constBegin(); entry != declared.constEnd(); ++entry) {
+        const ProviderDescriptor* provider = findProvider(entry.key());
+        ASSERT_NE(provider, nullptr) << entry.key().toStdString();
+        for (const auto& value : entry.value().toArray()) {
+            const QJsonObject model = value.toObject();
+            const ModelDescriptor* found = findModel(*provider, model.value(QStringLiteral("id")).toString());
+            ASSERT_NE(found, nullptr) << entry.key().toStdString() << " / " << model.value(QStringLiteral("id")).toString().toStdString();
+            EXPECT_EQ(found->contextWindow, model.value(QStringLiteral("context")).toInt());
+            EXPECT_EQ(found->maximumOutputTokens, model.value(QStringLiteral("output")).toInt());
+            EXPECT_EQ(found->traits.contains(ModelTrait::FunctionCalling), model.value(QStringLiteral("traits")).toArray().contains(QStringLiteral("function-calling")));
+            EXPECT_FALSE(found->displayName.isEmpty());
+        }
+    }
+
+    // The tunable limits come from the catalog as well, each inside the range that keeps it sane.
+    EXPECT_GT(aiLimits().repeatedToolCallLimit, 0);
+    EXPECT_GT(aiLimits().summaryMaximumTokens, 0);
+    EXPECT_GT(aiLimits().toolDeadlineMs, 0);
+    EXPECT_GT(aiLimits().requestTimeoutMs, 0);
+    EXPECT_GT(aiLimits().discoveryTimeoutMs, 0);
+    EXPECT_GT(aiLimits().serverStartTimeoutMs, 0);
+    EXPECT_GT(aiLimits().scheduleWakeupMs, 0);
+    EXPECT_GT(aiLimits().maximumAgentIterations, 0);
+    EXPECT_GT(aiLimits().maximumCommandTimeoutSeconds, 0);
+    EXPECT_GT(aiLimits().maximumParallelExecutions, 0);
+    EXPECT_GT(aiLimits().maximumSamplingTokens, 0);
+
+    const ProviderDescriptor* openAi = findProvider(QStringLiteral("openai"));
+    ASSERT_NE(openAi, nullptr);
+    const ModelDescriptor* recent = findModel(*openAi, QStringLiteral("gpt-5"));
+    ASSERT_NE(recent, nullptr);
+    EXPECT_TRUE(recent->traits.contains(ModelTrait::Reasoning));
+    EXPECT_TRUE(recent->traits.contains(ModelTrait::Vision));
+    EXPECT_GT(recent->contextWindow, 200000);
+
+    // Nothing is offered that cannot be run, so every declared model calls tools and so does every model a provider opens with.
+    for (const auto& provider : providerCatalog()) {
+        for (const auto& model : provider.models) {
+            EXPECT_TRUE(model.traits.contains(ModelTrait::FunctionCalling)) << provider.id.toStdString() << " / " << model.id.toStdString();
+        }
+        for (const auto& preferred : provider.preferredModels) {
+            const ModelDescriptor* model = findModel(provider, preferred);
+            ASSERT_NE(model, nullptr) << provider.id.toStdString() << " / " << preferred.toStdString();
+            EXPECT_TRUE(model->traits.contains(ModelTrait::FunctionCalling)) << provider.id.toStdString() << " / " << preferred.toStdString();
+        }
+    }
+
+    // A self-hosted endpoint accepts the tools field for whatever model it serves, and seeing an image stays with the model.
+    const ProviderDescriptor* selfHosted = findProvider(QStringLiteral("ollama"));
+    ASSERT_NE(selfHosted, nullptr);
+    EXPECT_TRUE(modelTraits(*selfHosted, QStringLiteral("llama3.1")).contains(ModelTrait::FunctionCalling));
+    EXPECT_FALSE(modelTraits(*selfHosted, QStringLiteral("llama3.1")).contains(ModelTrait::Vision));
+}
+
+TEST(AiProviderCatalogTest, SelectsParametersFromTheTraitsOfTheChosenModel) {
+    const ProviderDescriptor* openai = findProvider(QStringLiteral("openai"));
+    ASSERT_NE(openai, nullptr);
+
+    QStringList sampling;
+    for (const auto& parameter : applicableParameters(*openai, QStringLiteral("gpt-4o"))) {
+        sampling.append(parameter.id);
+    }
+    EXPECT_TRUE(sampling.contains(QStringLiteral("temperature")));
+    EXPECT_FALSE(sampling.contains(QStringLiteral("reasoningEffort")));
+
+    QStringList reasoning;
+    for (const auto& parameter : applicableParameters(*openai, QStringLiteral("o3-mini"))) {
+        reasoning.append(parameter.id);
+    }
+    EXPECT_TRUE(reasoning.contains(QStringLiteral("reasoningEffort")));
+    EXPECT_FALSE(reasoning.contains(QStringLiteral("temperature")));
+    EXPECT_TRUE(reasoning.contains(QStringLiteral("maxOutputTokens")));
+
+    // A model outside the catalog keeps the trait set its provider declares instead of an inferred capability.
+    EXPECT_EQ(modelTraits(*openai, QStringLiteral("some-future-model")), openai->userDefinedModelTraits);
+}
+
+TEST(AiModelConnectionTest, ValidatesParametersAgainstTypeBoundsAndDeclaredFields) {
+    const ProviderDescriptor* openai = findProvider(QStringLiteral("openai"));
+    ASSERT_NE(openai, nullptr);
+    const QString model = QStringLiteral("gpt-4o");
+
+    QJsonObject valid = defaultParameters(*openai, model);
+    ASSERT_TRUE(validateParameters(*openai, model, valid).hasValue());
+
+    QJsonObject aboveMaximum = valid;
+    aboveMaximum.insert(QStringLiteral("temperature"), 9.0);
+    EXPECT_EQ(validateParameters(*openai, model, aboveMaximum).error().code, QStringLiteral("ai_parameter_invalid"));
+
+    QJsonObject fractionalInteger = valid;
+    fractionalInteger.insert(QStringLiteral("maxOutputTokens"), 12.5);
+    EXPECT_EQ(validateParameters(*openai, model, fractionalInteger).error().code, QStringLiteral("ai_parameter_invalid"));
+
+    QJsonObject unknownField = valid;
+    unknownField.insert(QStringLiteral("nonexistent"), 1);
+    EXPECT_EQ(validateParameters(*openai, model, unknownField).error().code, QStringLiteral("ai_parameter_unknown"));
+
+    QJsonObject missingField = valid;
+    missingField.remove(QStringLiteral("temperature"));
+    EXPECT_EQ(validateParameters(*openai, model, missingField).error().code, QStringLiteral("ai_parameter_missing"));
+
+    // A sampling field is not declared for a reasoning model, so offering it is rejected instead of silently dropped.
+    QJsonObject reasoningWithTemperature = defaultParameters(*openai, QStringLiteral("o3-mini"));
+    reasoningWithTemperature.insert(QStringLiteral("temperature"), 0.5);
+    EXPECT_EQ(validateParameters(*openai, QStringLiteral("o3-mini"), reasoningWithTemperature).error().code, QStringLiteral("ai_parameter_unknown"));
+
+    const ProviderDescriptor* anthropic = findProvider(QStringLiteral("anthropic"));
+    ASSERT_NE(anthropic, nullptr);
+    QJsonObject anthropicSampling = defaultParameters(*anthropic, QStringLiteral("claude-3-haiku-20240307"));
+    anthropicSampling.insert(QStringLiteral("temperature"), 1.5);
+    EXPECT_EQ(validateParameters(*anthropic, QStringLiteral("claude-3-haiku-20240307"), anthropicSampling).error().code, QStringLiteral("ai_parameter_invalid"));
+}
+
+TEST(AiSecretTest, ResolvesLiteralSecretsAndEnvironmentReferences) {
+    EXPECT_FALSE(isEnvironmentReference(QStringLiteral("sk-literal-value")));
+    EXPECT_TRUE(isEnvironmentReference(QStringLiteral("{env.SLOTDECK_TEST_KEY}")));
+    EXPECT_FALSE(isEnvironmentReference(QStringLiteral("{env.}")));
+    EXPECT_FALSE(isEnvironmentReference(QStringLiteral("prefix {env.NAME}")));
+    EXPECT_EQ(environmentReferenceName(QStringLiteral("{env.SLOTDECK_TEST_KEY}")), QStringLiteral("SLOTDECK_TEST_KEY"));
+
+    EXPECT_EQ(resolveSecret(QStringLiteral("sk-literal-value")).value(), QStringLiteral("sk-literal-value"));
+    EXPECT_EQ(resolveSecret(QStringLiteral("{env.SLOTDECK_ABSENT_KEY}")).error().code, QStringLiteral("ai_secret_environment_missing"));
+
+    qputenv("SLOTDECK_TEST_KEY", QByteArrayLiteral("resolved-secret"));
+    EXPECT_EQ(resolveSecret(QStringLiteral("{env.SLOTDECK_TEST_KEY}")).value(), QStringLiteral("resolved-secret"));
+    qunsetenv("SLOTDECK_TEST_KEY");
+}
+
+TEST(AiModelConnectionTest, RejectsInvalidConnections) {
+    const ProviderDescriptor* openai = findProvider(QStringLiteral("openai"));
+    ASSERT_NE(openai, nullptr);
+    const ModelConnection connection = AiTestsHelper::testConnection();
+    ASSERT_TRUE(validateConnection(connection).hasValue());
+    EXPECT_EQ(connectionKey(connection), QStringLiteral("openai/gpt-4o"));
+    EXPECT_EQ(connectionLabel(connection), QStringLiteral("openai/gpt-4o"));
+
+    ModelConnection named = connection;
+    named.displayName = QStringLiteral("Fast reviewer");
+    EXPECT_EQ(connectionLabel(named), QStringLiteral("Fast reviewer"));
+
+    ModelConnection unknownProvider = connection;
+    unknownProvider.providerId = QStringLiteral("nonexistent");
+    EXPECT_EQ(validateConnection(unknownProvider).error().code, QStringLiteral("ai_provider_unknown"));
+
+    ModelConnection emptyModel = connection;
+    emptyModel.modelId = QStringLiteral("   ");
+    EXPECT_EQ(validateConnection(emptyModel).error().code, QStringLiteral("ai_model_invalid"));
+
+    ModelConnection withoutKey = connection;
+    withoutKey.apiKey.clear();
+    EXPECT_EQ(validateConnection(withoutKey).error().code, QStringLiteral("ai_api_key_missing"));
+
+    ModelConnection withAddress = connection;
+    withAddress.address = QStringLiteral("http://localhost:1234/v1");
+    EXPECT_EQ(validateConnection(withAddress).error().code, QStringLiteral("ai_address_not_configurable"));
+
+    ModelConnection withExtra = connection;
+    withExtra.extraParameters = QJsonObject{{QStringLiteral("seed"), 42}};
+    EXPECT_TRUE(validateConnection(withExtra).hasValue());
+
+    ModelConnection emptyExtraKey = connection;
+    emptyExtraKey.extraParameters = QJsonObject{{QStringLiteral("  "), 1}};
+    EXPECT_EQ(validateConnection(emptyExtraKey).error().code, QStringLiteral("ai_extra_parameter_invalid"));
+
+    // A local runtime declares that it needs no credential and owns its own address.
+    const ProviderDescriptor* ollama = findProvider(QStringLiteral("ollama"));
+    ASSERT_NE(ollama, nullptr);
+    const QString localModel = QStringLiteral("llama3.1");
+    ModelConnection local = declaredConnection(*ollama, localModel);
+    EXPECT_TRUE(local.apiKey.isEmpty());
+    EXPECT_EQ(local.address, ollama->baseUrl);
+    EXPECT_TRUE(validateConnection(local).hasValue());
+    EXPECT_EQ(connectionAddress(local), ollama->baseUrl);
+
+    ModelConnection movedLocal = local;
+    movedLocal.address = QStringLiteral("http://10.0.0.4:11434/v1");
+    ASSERT_TRUE(validateConnection(movedLocal).hasValue());
+    EXPECT_EQ(connectionAddress(movedLocal), QStringLiteral("http://10.0.0.4:11434/v1"));
+
+    ModelConnection withoutAddress = local;
+    withoutAddress.address.clear();
+    EXPECT_EQ(validateConnection(withoutAddress).error().code, QStringLiteral("ai_address_invalid"));
+
+    ModelConnection notAnAddress = local;
+    notAnAddress.address = QStringLiteral("ftp://localhost");
+    EXPECT_EQ(validateConnection(notAnAddress).error().code, QStringLiteral("ai_address_invalid"));
+}
+
+TEST(AiModelConnectionTest, RejectsTwoConnectionsSharingOneKey) {
+    QVector<ModelConnection> connections{AiTestsHelper::testConnection(), AiTestsHelper::testConnection()};
+    connections[1].displayName = QStringLiteral("Second");
+    EXPECT_EQ(validateConnectionSet(connections).error().code, QStringLiteral("ai_connection_duplicate"));
+
+    connections[1].modelId = QStringLiteral("gpt-4o-mini");
+    connections[1].parameters = defaultParameters(*findProvider(QStringLiteral("openai")), QStringLiteral("gpt-4o-mini"));
+    EXPECT_TRUE(validateConnectionSet(connections).hasValue());
+    EXPECT_NE(findConnection(connections, QStringLiteral("openai/gpt-4o-mini")), nullptr);
+    EXPECT_EQ(findConnection(connections, QStringLiteral("openai/absent")), nullptr);
+}
+
+TEST(AiChatClientTest, BuildsTheBodyEachWireProtocolAndModelKindRequires) {
+    const ProviderDescriptor* openai = findProvider(QStringLiteral("openai"));
+    const ProviderDescriptor* anthropic = findProvider(QStringLiteral("anthropic"));
+    ASSERT_NE(openai, nullptr);
+    ASSERT_NE(anthropic, nullptr);
+
+    // The budget is set explicitly, because the declared default leaves it to the service and the field out of the body.
+    ModelConnection sampling{openai->id, QStringLiteral("gpt-4o"), {}, QStringLiteral("sk"), {}, defaultParameters(*openai, QStringLiteral("gpt-4o")), {}};
+    sampling.parameters.insert(QStringLiteral("maxOutputTokens"), 4096);
+    // clang-format off
+    const QJsonObject samplingBody = buildRequestBody(*openai, {sampling, {}, QJsonArray{}, {}}, [](const QString& key) { return key; });
+    // clang-format on
+    EXPECT_EQ(samplingBody.value(QStringLiteral("model")).toString(), QStringLiteral("gpt-4o"));
+    EXPECT_TRUE(samplingBody.contains(QStringLiteral("max_tokens")));
+    EXPECT_TRUE(samplingBody.contains(QStringLiteral("temperature")));
+    EXPECT_FALSE(samplingBody.contains(QStringLiteral("max_completion_tokens")));
+    EXPECT_TRUE(samplingBody.value(QStringLiteral("stream")).toBool());
+
+    ModelConnection reasoning{openai->id, QStringLiteral("o3-mini"), {}, QStringLiteral("sk"), {}, defaultParameters(*openai, QStringLiteral("o3-mini")), {}};
+    reasoning.parameters.insert(QStringLiteral("maxOutputTokens"), 4096);
+    // clang-format off
+    const QJsonObject reasoningBody = buildRequestBody(*openai, {reasoning, {}, QJsonArray{}, {}}, [](const QString& key) { return key; });
+    // clang-format on
+    EXPECT_TRUE(reasoningBody.contains(QStringLiteral("max_completion_tokens")));
+    EXPECT_TRUE(reasoningBody.contains(QStringLiteral("reasoning_effort")));
+    EXPECT_FALSE(reasoningBody.contains(QStringLiteral("temperature")));
+    EXPECT_FALSE(reasoningBody.contains(QStringLiteral("max_tokens")));
+
+    const QString reasoningModel = QStringLiteral("claude-sonnet-5");
+    ModelConnection anthropicReasoning{anthropic->id, reasoningModel, {}, QStringLiteral("sk"), {}, defaultParameters(*anthropic, reasoningModel), {}};
+    anthropicReasoning.parameters.insert(QStringLiteral("maxOutputTokens"), 4096);
+    // clang-format off
+    const QJsonObject anthropicReasoningBody = buildRequestBody(*anthropic, {anthropicReasoning, {}, QJsonArray{}, {}}, [](const QString& key) { return key; });
+    // clang-format on
+
+    // The model controls its thinking through the output configuration and rejects the older thinking block.
+    EXPECT_FALSE(anthropicReasoningBody.contains(QStringLiteral("thinking")));
+    ASSERT_TRUE(anthropicReasoningBody.value(QStringLiteral("output_config")).isObject());
+    EXPECT_EQ(anthropicReasoningBody.value(QStringLiteral("output_config")).toObject().value(QStringLiteral("effort")).toString(), QStringLiteral("medium"));
+    EXPECT_TRUE(anthropicReasoningBody.contains(QStringLiteral("max_tokens")));
+    EXPECT_FALSE(anthropicReasoningBody.contains(QStringLiteral("temperature")));
+
+    EXPECT_EQ(completionPath(*openai), QStringLiteral("/chat/completions"));
+    EXPECT_EQ(completionPath(*anthropic), QStringLiteral("/v1/messages"));
+}
+
+TEST(AiChatClientTest, MergesTheExtraParametersOverTheDeclaredFields) {
+    const ProviderDescriptor* openai = findProvider(QStringLiteral("openai"));
+    const ProviderDescriptor* anthropic = findProvider(QStringLiteral("anthropic"));
+    ASSERT_NE(openai, nullptr);
+    ASSERT_NE(anthropic, nullptr);
+
+    ModelConnection connection{openai->id, QStringLiteral("gpt-4o"), {}, QStringLiteral("sk"), {}, defaultParameters(*openai, QStringLiteral("gpt-4o")), {}};
+    connection.extraParameters = QJsonObject{{QStringLiteral("seed"), 42}, {QStringLiteral("stop"), QJsonArray{QStringLiteral("END")}}, {QStringLiteral("temperature"), 0.25}, {QStringLiteral("top_p"), QJsonValue::Null}, {QStringLiteral("logit_bias.42"), -100}, {QStringLiteral("strict"), true}, {QStringLiteral("user"), QStringLiteral("paulo")}};
+    // clang-format off
+    const QJsonObject body = buildRequestBody(*openai, {connection, {}, QJsonArray{}, {}}, [](const QString& key) { return key; });
+    // clang-format on
+
+    EXPECT_EQ(body.value(QStringLiteral("seed")).toInt(), 42);
+    EXPECT_EQ(body.value(QStringLiteral("stop")).toArray().first().toString(), QStringLiteral("END"));
+    EXPECT_DOUBLE_EQ(body.value(QStringLiteral("temperature")).toDouble(), 0.25);
+    EXPECT_FALSE(body.contains(QStringLiteral("top_p")));
+    EXPECT_EQ(body.value(QStringLiteral("logit_bias")).toObject().value(QStringLiteral("42")).toInt(), -100);
+    EXPECT_TRUE(body.value(QStringLiteral("strict")).toBool());
+    EXPECT_EQ(body.value(QStringLiteral("user")).toString(), QStringLiteral("paulo"));
+
+    // Removing the only field of a nested object leaves no empty object behind it.
+    const QString reasoningModel = QStringLiteral("claude-sonnet-5");
+    ModelConnection anthropicConnection{anthropic->id, reasoningModel, {}, QStringLiteral("sk"), {}, defaultParameters(*anthropic, reasoningModel), {}};
+    anthropicConnection.extraParameters = QJsonObject{{QStringLiteral("output_config.effort"), QJsonValue::Null}};
+    // clang-format off
+    const QJsonObject trimmed = buildRequestBody(*anthropic, {anthropicConnection, {}, QJsonArray{}, {}}, [](const QString& key) { return key; });
+    // clang-format on
+    EXPECT_FALSE(trimmed.contains(QStringLiteral("output_config")));
+}
+
+TEST(AiChatClientTest, LiftsTheInstructionsOutOfTheAnthropicConversation) {
+    const ProviderDescriptor* anthropic = findProvider(QStringLiteral("anthropic"));
+    ASSERT_NE(anthropic, nullptr);
+    const QString model = QStringLiteral("claude-3-haiku-20240307");
+    const ModelConnection connection{anthropic->id, model, {}, QStringLiteral("sk"), {}, defaultParameters(*anthropic, model), {}};
+    const QJsonArray messages{QJsonObject{{QStringLiteral("role"), QStringLiteral("system")}, {QStringLiteral("content"), QStringLiteral("Be brief")}}, QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QStringLiteral("Hello")}}};
+
+    // clang-format off
+    const QJsonObject body = buildRequestBody(*anthropic, {connection, {}, messages, {}}, [](const QString& key) { return key; });
+    // clang-format on
+    EXPECT_EQ(body.value(QStringLiteral("system")).toString(), QStringLiteral("Be brief"));
+    ASSERT_EQ(body.value(QStringLiteral("messages")).toArray().size(), 1);
+    EXPECT_EQ(body.value(QStringLiteral("messages")).toArray().first().toObject().value(QStringLiteral("role")).toString(), QStringLiteral("user"));
+    EXPECT_FALSE(body.contains(QStringLiteral("stream_options")));
+}
+
+TEST(AiPluginTest, RunsTasksThroughTheProviderApiAndRecordsTheExecution) {
+    test::TestPluginHost host;
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+
+    FakeChatClient* client = nullptr;
+    // clang-format off
+    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    ASSERT_TRUE(plugin.defaultConnection().has_value());
+    EXPECT_EQ(plugin.runState(task.id), TaskRunState::Idle);
+    EXPECT_FALSE(plugin.hasLastExecution(task.id));
+
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return client != nullptr && client->sendCalls == 1; }));
+    // clang-format on
+    EXPECT_EQ(plugin.runState(task.id), TaskRunState::Running);
+    EXPECT_EQ(client->sentMessages.last().toObject().value(QStringLiteral("content")).toString(), task.prompt);
+    EXPECT_EQ(client->sentConnection.modelId, QStringLiteral("gpt-4o"));
+
+    client->deliver(QStringLiteral("answer"), {11, 22}, QStringLiteral("stop"));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return plugin.runState(task.id) == TaskRunState::Idle; }));
+    // clang-format on
+    EXPECT_TRUE(plugin.hasLastExecution(task.id));
+    EXPECT_EQ(plugin.lastExecutionStatus(task.id), ExecutionStatus::Succeeded);
+    EXPECT_EQ(plugin.tasks().first().column, TaskColumn::Done);
+    plugin.shutdown();
+}
+
+TEST(AiPluginTest, ReturnsFailedTasksToTodoAndKeepsTheProviderError) {
+    test::TestPluginHost host;
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+
+    FakeChatClient* client = nullptr;
+    // clang-format off
+    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return client != nullptr && client->sendCalls == 1; }));
+    // clang-format on
+
+    client->fail({"ai_request_failed", "The provider rejected the request", QStringLiteral("HTTP 401")});
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return plugin.runState(task.id) == TaskRunState::Idle; }));
+    // clang-format on
+    EXPECT_EQ(plugin.lastExecutionStatus(task.id), ExecutionStatus::Failed);
+    EXPECT_EQ(plugin.tasks().first().column, TaskColumn::Todo);
+    EXPECT_EQ(plugin.lastError(task.id), QStringLiteral("The provider rejected the request"));
+    plugin.shutdown();
+}
+
+TEST(AiPluginTest, StopsARunningTaskAndCancelsItsRequest) {
+    test::TestPluginHost host;
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+
+    FakeChatClient* client = nullptr;
+    // clang-format off
+    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return client != nullptr && client->sendCalls == 1; }));
+    // clang-format on
+
+    ASSERT_TRUE(test::awaitFuture(plugin.stopTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return plugin.runState(task.id) == TaskRunState::Idle; }));
+    // clang-format on
+    EXPECT_EQ(client->cancelCalls, 1);
+    EXPECT_EQ(plugin.lastExecutionStatus(task.id), ExecutionStatus::Cancelled);
+
+    // A stopped task always returns to the first column even when the provider reported no failure.
+    EXPECT_EQ(plugin.tasks().first().column, TaskColumn::Todo);
+    plugin.shutdown();
+}
+
+TEST(AiPluginTest, KeepsTasksQueuedUntilTheParallelLimitFreesCapacity) {
+    test::TestPluginHost host;
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const AiTask first = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTask second = AiTestsHelper::makeTask(QStringLiteral("task-2"), workspace.id);
+    second.position = 1;
+    AiTestsHelper::installAiRows(host, {workspace}, {first, second}, {});
+
+    QVector<FakeChatClient*> clients;
+    // clang-format off
+    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.saveConnections({AiTestsHelper::testConnection()}, connectionKey(AiTestsHelper::testConnection()))).hasValue());
+    EXPECT_EQ(plugin.parallelExecutions(), 1);
+
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(first.id)).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(second.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.size() == 1; }));
+    // clang-format on
+    EXPECT_EQ(plugin.runState(first.id), TaskRunState::Running);
+    EXPECT_EQ(plugin.runState(second.id), TaskRunState::Waiting);
+
+    clients.first()->deliver(QStringLiteral("done"), {1, 2}, QStringLiteral("stop"));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.size() == 2 && plugin.runState(second.id) == TaskRunState::Running; }));
+    // clang-format on
+    plugin.shutdown();
+}
+
+TEST(AiPluginTest, DispatchesADueScheduleAndKeepsSayingWhenItRan) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+
+    AiTask scheduled = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    TaskSchedule schedule;
+    schedule.kind = ScheduleKind::Once;
+    schedule.enabled = true;
+    schedule.onceAtUtc = now.addSecs(-60);
+    schedule.nextRunAtUtc = schedule.onceAtUtc;
+    schedule.timeZoneId = QTimeZone::systemTimeZoneId();
+    scheduled.schedule = schedule;
+    AiTestsHelper::installAiRows(host, {workspace}, {scheduled}, {});
+
+    FakeChatClient* client = nullptr;
+    // clang-format off
+    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    // clang-format on
+    const auto started = plugin.initialize(host);
+    ASSERT_TRUE(started.hasValue()) << qPrintable(started.error().code) << " " << qPrintable(started.error().detail);
+
+    // A schedule that is already due dispatches its task without anyone pressing play.
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return client != nullptr; }));
+    ASSERT_TRUE(test::waitUntil([&]() { return plugin.runState(scheduled.id) == TaskRunState::Running; }));
+    // clang-format on
+    client->deliver(QStringLiteral("done"), {1, 2}, QStringLiteral("stop"));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return plugin.runState(scheduled.id) == TaskRunState::Idle; }));
+    // clang-format on
+
+    // The schedule stops repeating but keeps the date it was given and the moment it ran.
+    // clang-format off
+    const auto stored = std::find_if(plugin.tasks().cbegin(), plugin.tasks().cend(), [&scheduled](const AiTask& candidate) { return candidate.id == scheduled.id; });
+    // clang-format on
+    ASSERT_NE(stored, plugin.tasks().cend());
+    ASSERT_TRUE(stored->schedule.has_value());
+    EXPECT_FALSE(stored->schedule->enabled);
+    EXPECT_EQ(stored->schedule->onceAtUtc, schedule.onceAtUtc);
+    EXPECT_TRUE(stored->schedule->lastTriggeredAtUtc.isValid());
+
+    std::unique_ptr<QWidget> view(plugin.createNavigationView(QStringLiteral("tasks"), nullptr));
+    ASSERT_NE(view, nullptr);
+    view->resize(1100, 700);
+    view->show();
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { for (auto* label : view->findChildren<QLabel*>()) { if (label->text().startsWith(QStringLiteral("Ran on"))) { return true; } } return false; }));
+    // clang-format on
+    view.reset();
+    plugin.shutdown();
+}
+
+TEST(AiPluginTest, RunsEachTaskOnTheProviderAndModelItDeclares) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+
+    ModelConnection mini = AiTestsHelper::testConnection();
+    mini.modelId = QStringLiteral("gpt-4o-mini");
+    mini.parameters = defaultParameters(*findProvider(mini.providerId), mini.modelId);
+    ModelConnection anthropic = declaredConnection(*findProvider(QStringLiteral("anthropic")), QStringLiteral("claude-opus-5"));
+    anthropic.apiKey = QStringLiteral("sk-ant");
+    anthropic.displayName = QStringLiteral("Opus reviewer");
+
+    AiAgent miniAgent = AiTestsHelper::testAgent();
+    miniAgent.connectionKey = connectionKey(mini);
+    AiAgent anthropicAgent = AiTestsHelper::testAgent();
+    anthropicAgent.id = QStringLiteral("opus-reviewer");
+    anthropicAgent.connectionKey = connectionKey(anthropic);
+
+    AiTask onAnotherModel = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    onAnotherModel.agentId = miniAgent.id;
+    AiTask onAnotherProvider = AiTestsHelper::makeTask(QStringLiteral("task-2"), workspace.id);
+    onAnotherProvider.position = 1;
+    onAnotherProvider.agentId = anthropicAgent.id;
+    AiTestsHelper::installAiRows(host, {workspace}, {onAnotherModel, onAnotherProvider}, {}, {mini, anthropic}, {miniAgent, anthropicAgent});
+
+    QVector<FakeChatClient*> clients;
+    // clang-format off
+    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+
+    // A task runs on the connection the agent it was handed to names, with the credential that connection carries.
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(onAnotherModel.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.size() == 1; }));
+    // clang-format on
+    EXPECT_EQ(clients.first()->sentConnection.providerId, QStringLiteral("openai"));
+    EXPECT_EQ(clients.first()->sentConnection.modelId, QStringLiteral("gpt-4o-mini"));
+    EXPECT_EQ(clients.first()->sentConnection.apiKey, AiTestsHelper::testConnection().apiKey);
+    clients.first()->deliver(QStringLiteral("done"), {1, 2}, QStringLiteral("stop"));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return plugin.runState(onAnotherModel.id) == TaskRunState::Idle; }));
+    // clang-format on
+
+    // A provider descriptor opens with the credential reference it officially documents.
+    EXPECT_EQ(declaredConnection(*findProvider(QStringLiteral("anthropic")), QStringLiteral("claude-opus-5")).apiKey, QStringLiteral("{env.ANTHROPIC_API_KEY}"));
+    EXPECT_EQ(plugin.connections().size(), 2);
+
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(onAnotherProvider.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.size() == 2; }));
+    // clang-format on
+    EXPECT_EQ(clients.at(1)->sentConnection.providerId, QStringLiteral("anthropic"));
+    EXPECT_EQ(clients.at(1)->sentConnection.modelId, QStringLiteral("claude-opus-5"));
+    EXPECT_EQ(clients.at(1)->sentConnection.apiKey, QStringLiteral("sk-ant"));
+    clients.at(1)->deliver(QStringLiteral("done"), {1, 2}, QStringLiteral("stop"));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return plugin.runState(onAnotherProvider.id) == TaskRunState::Idle; }));
+    // clang-format on
+    plugin.shutdown();
+}
+
+TEST(AiPluginTest, SummarizesTheTurnsThatNoLongerFitInsteadOfLosingThem) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+
+    QVector<FakeChatClient*> clients;
+    // clang-format off
+    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.saveConnections({AiTestsHelper::testConnection()}, connectionKey(AiTestsHelper::testConnection()))).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.size() == 1; }));
+    // clang-format on
+
+    // The agent turns are filled until the conversation no longer fits the window the model declares.
+    FakeChatClient* agent = clients.first();
+    const QString filler(60000, QLatin1Char('x'));
+    // Each turn asks for a different file, because an agent repeating the same call is stopped as making no progress.
+    const qsizetype limit = fittingTokenLimit(findModel(*findProvider(QStringLiteral("openai")), QStringLiteral("gpt-4o"))->contextWindow, 0);
+    int turns = 0;
+    while (clients.size() == 1 && turns < 40) {
+        ++turns;
+        agent->deliverToolCalls({{QStringLiteral("call-%1").arg(turns), QStringLiteral("write_file"), QJsonObject{{QStringLiteral("path"), QStringLiteral("out-%1.txt").arg(turns)}, {QStringLiteral("content"), filler}}}});
+        // clang-format off
+        ASSERT_TRUE(test::waitUntil([&]() { return agent->sendCalls == turns + 1 || clients.size() == 2; }));
+        // clang-format on
+    }
+
+    // A second client is created for the summary, and the agent conversation is not sent again until it answers.
+    ASSERT_EQ(clients.size(), 2);
+    const int sendsBeforeSummary = agent->sendCalls;
+    FakeChatClient* summarizer = clients.at(1);
+    EXPECT_TRUE(summarizer->sentTools.isEmpty());
+    ASSERT_EQ(summarizer->sentMessages.size(), 1);
+    EXPECT_TRUE(summarizer->sentMessages.first().toObject().value(QStringLiteral("content")).toString().startsWith(host.translate(QStringLiteral("ai.agent.summarize"))));
+
+    summarizer->deliver(QStringLiteral("The agent wrote the report and validated it"), {10, 20}, QStringLiteral("stop"));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return agent->sendCalls == sendsBeforeSummary + 1; }));
+    // clang-format on
+
+    // The compacted conversation keeps the instructions, the task and the summary of everything dropped.
+    ASSERT_GE(agent->sentMessages.size(), 3);
+    const QString compacted = QString::fromUtf8(QJsonDocument(agent->sentMessages).toJson(QJsonDocument::Compact));
+    EXPECT_FALSE(compacted.contains(QStringLiteral("call-1")));
+    EXPECT_TRUE(summarizer->sentMessages.first().toObject().value(QStringLiteral("content")).toString().contains(QStringLiteral("call-1")));
+    EXPECT_LE(estimateTokens(agent->sentMessages), limit);
+    EXPECT_EQ(agent->sentMessages.first().toObject().value(QStringLiteral("role")).toString(), QStringLiteral("system"));
+    EXPECT_TRUE(agent->sentMessages.at(2).toObject().value(QStringLiteral("content")).toString().contains(QStringLiteral("The agent wrote the report and validated it")));
+
+    agent->deliver(QStringLiteral("done"), {1, 2}, QStringLiteral("stop"));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return plugin.runState(task.id) == TaskRunState::Idle; }));
+    // clang-format on
+
+    // The summary joins the conversation as the turn that replaces the ones it summarized, so the next run never summarizes them again.
+    const QVector<ConversationMessage> conversation = plugin.conversation(task.id);
+    // clang-format off
+    const auto summary = std::find_if(conversation.constBegin(), conversation.constEnd(), [](const ConversationMessage& message) { return message.summarizedUntil > 0; });
+    // clang-format on
+    ASSERT_NE(summary, conversation.constEnd());
+    EXPECT_EQ(summary->role, ConversationRole::User);
+    EXPECT_TRUE(summary->content.contains(QStringLiteral("The agent wrote the report and validated it")));
+    EXPECT_LT(summary->summarizedUntil, summary->sequence);
+    plugin.shutdown();
+}
+
+TEST(AiPluginTest, RunsATaskOnItsOwnConnectionEvenWhenTheDefaultMoves) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const ProviderDescriptor* provider = findProvider(QStringLiteral("openai"));
+    ASSERT_NE(provider, nullptr);
+
+    ModelConnection precise = AiTestsHelper::testConnection();
+    precise.parameters.insert(QStringLiteral("temperature"), 0.2);
+    ModelConnection creative = AiTestsHelper::testConnection();
+    creative.modelId = QStringLiteral("gpt-4o-mini");
+    creative.parameters = defaultParameters(*provider, creative.modelId);
+    creative.parameters.insert(QStringLiteral("temperature"), 1.4);
+
+    AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    task.agentId = AiTestsHelper::testAgent().id;
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {}, {precise, creative});
+
+    QVector<FakeChatClient*> clients;
+    // clang-format off
+    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+
+    // The default moves to another connection, and the task keeps running on the one its key names.
+    ASSERT_TRUE(test::awaitFuture(plugin.saveConnections({precise, creative}, connectionKey(creative))).hasValue());
+
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.size() == 1; }));
+    // clang-format on
+    EXPECT_DOUBLE_EQ(clients.first()->sentConnection.parameters.value(QStringLiteral("temperature")).toDouble(), 0.2);
+
+    clients.first()->deliver(QStringLiteral("done"), {1, 2}, QStringLiteral("stop"));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return plugin.runState(task.id) == TaskRunState::Idle; }));
+    // clang-format on
+    plugin.shutdown();
+}
+
+TEST(AiPluginTest, KeepsTwoEditsOfOneTurnFromLandingOnTheSameFileTogether) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    QTemporaryDir root;
+    ASSERT_TRUE(root.isValid());
+    const QString path = QDir(root.path()).filePath(QStringLiteral("notes.txt"));
+
+    // The read never answers on its own, so the test sees exactly how many edits the turn started.
+    QVector<std::shared_ptr<QPromise<utils::Result<QByteArray>>>> reads;
+    QString stored = QStringLiteral("alpha\nbeta\n");
+    // clang-format off
+    host.readFileHandler = [&reads](const QString&, qint64) { auto promise = std::make_shared<QPromise<utils::Result<QByteArray>>>(); promise->start(); reads.append(promise); return promise->future(); };
+    host.writeFileHandler = [&stored](const QString&, const QByteArray& content) { stored = QString::fromUtf8(content); return QtFuture::makeReadyValueFuture(utils::Result<void>::success()); };
+    // clang-format on
+
+    AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    task.workdir = QDir(root.path()).absolutePath();
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+
+    QVector<FakeChatClient*> clients;
+    // clang-format off
+    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.saveConnections({AiTestsHelper::testConnection()}, connectionKey(AiTestsHelper::testConnection()))).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.size() == 1; }));
+    // clang-format on
+
+    FakeChatClient* agent = clients.first();
+    const int sendsBeforeTools = agent->sendCalls;
+    agent->deliverToolCalls({{QStringLiteral("call-1"), QStringLiteral("edit_file"), QJsonObject{{QStringLiteral("path"), QStringLiteral("notes.txt")}, {QStringLiteral("old_text"), QStringLiteral("alpha")}, {QStringLiteral("new_text"), QStringLiteral("first")}}}, {QStringLiteral("call-2"), QStringLiteral("edit_file"), QJsonObject{{QStringLiteral("path"), QStringLiteral("notes.txt")}, {QStringLiteral("old_text"), QStringLiteral("beta")}, {QStringLiteral("new_text"), QStringLiteral("second")}}}});
+
+    // Both edits reach the same file, so the second one waits instead of reading the text the first one is about to replace.
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return reads.size() == 1; }));
+    ASSERT_FALSE(test::waitUntil([&]() { return reads.size() > 1; }, 800));
+    // clang-format on
+
+    reads.first()->addResult(utils::Result<QByteArray>::success(stored.toUtf8()));
+    reads.first()->finish();
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return reads.size() == 2; }));
+    // clang-format on
+    EXPECT_EQ(stored, QStringLiteral("first\nbeta\n"));
+
+    reads.at(1)->addResult(utils::Result<QByteArray>::success(stored.toUtf8()));
+    reads.at(1)->finish();
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return agent->sendCalls == sendsBeforeTools + 1; }));
+    // clang-format on
+    EXPECT_EQ(stored, QStringLiteral("first\nsecond\n"));
+
+    // The results answer in the order the model asked for them, whatever order they finished in.
+    const QString sent = QString::fromUtf8(QJsonDocument(agent->sentMessages).toJson(QJsonDocument::Compact));
+    EXPECT_LT(sent.indexOf(QStringLiteral("call-1")), sent.lastIndexOf(QStringLiteral("call-2")));
+
+    agent->deliver(QStringLiteral("done"), {1, 2}, QStringLiteral("stop"));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return plugin.runState(task.id) == TaskRunState::Idle; }));
+    // clang-format on
+    plugin.shutdown();
+}
+
+TEST(AiPluginTest, DiscardsAToolResultThatBelongsToARunTheCardAlreadyStopped) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    QTemporaryDir root;
+    ASSERT_TRUE(root.isValid());
+    AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    task.workdir = QDir(root.path()).absolutePath();
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+
+    // The write never answers on its own, so the test decides exactly when the stopped run reports back.
+    QVector<std::shared_ptr<QPromise<utils::Result<void>>>> writes;
+    // clang-format off
+    host.writeFileHandler = [&writes](const QString&, const QByteArray&) { auto promise = std::make_shared<QPromise<utils::Result<void>>>(); promise->start(); writes.append(promise); return promise->future(); };
+    QVector<FakeChatClient*> clients;
+    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.saveConnections({AiTestsHelper::testConnection()}, connectionKey(AiTestsHelper::testConnection()))).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.size() == 1; }));
+    // clang-format on
+
+    clients.first()->deliverToolCalls({{QStringLiteral("call-1"), QStringLiteral("write_file"), QJsonObject{{QStringLiteral("path"), QStringLiteral("report.txt")}, {QStringLiteral("content"), QStringLiteral("first run")}}}});
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return writes.size() == 1; }));
+    // clang-format on
+
+    ASSERT_TRUE(test::awaitFuture(plugin.stopTask(task.id)).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.size() == 2; }));
+    // clang-format on
+    FakeChatClient* second = clients.at(1);
+    const int sendsBeforeStaleResult = second->sendCalls;
+
+    writes.first()->addResult(utils::Result<void>::success());
+    writes.first()->finish();
+    // clang-format off
+    ASSERT_FALSE(test::waitUntil([&]() { return second->sendCalls != sendsBeforeStaleResult; }, 800));
+    // clang-format on
+    EXPECT_EQ(second->sendCalls, sendsBeforeStaleResult);
+    EXPECT_EQ(plugin.runState(task.id), TaskRunState::Running);
+
+    second->deliver(QStringLiteral("done"), {1, 2}, QStringLiteral("stop"));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return plugin.runState(task.id) == TaskRunState::Idle; }));
+    // clang-format on
+    plugin.shutdown();
+}
+
+TEST(AiPluginTest, FitsTheConversationToTheModelTheRunDeclaresAndNotToALaterSelection) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+    filesystem::FileSystemService files;
+    host.useFileSystem(files);
+
+    QVector<FakeChatClient*> clients;
+    // clang-format off
+    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.saveConnections({AiTestsHelper::testConnection()}, connectionKey(AiTestsHelper::testConnection()))).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.size() == 1; }));
+    // clang-format on
+
+    // The default moves to a model with a wider window while the run is already speaking to the narrow one.
+    const ProviderDescriptor* provider = findProvider(QStringLiteral("openai"));
+    const QString widerModel = QStringLiteral("o3-mini");
+    ModelConnection wider = AiTestsHelper::testConnection();
+    wider.modelId = widerModel;
+    wider.parameters = defaultParameters(*provider, widerModel);
+    ASSERT_TRUE(test::awaitFuture(plugin.saveConnections({AiTestsHelper::testConnection(), wider}, connectionKey(wider))).hasValue());
+
+    FakeChatClient* agent = clients.first();
+    const QString filler(60000, QLatin1Char('x'));
+    const qint64 runLimit = fittingTokenLimit(findModel(*provider, QStringLiteral("gpt-4o"))->contextWindow, 0);
+    const qint64 widerLimit = fittingTokenLimit(findModel(*provider, widerModel)->contextWindow, 0);
+    int turns = 0;
+    while (clients.size() == 1 && turns < 40) {
+        ++turns;
+        agent->deliverToolCalls({{QStringLiteral("call-%1").arg(turns), QStringLiteral("write_file"), QJsonObject{{QStringLiteral("path"), QStringLiteral("out-%1.txt").arg(turns)}, {QStringLiteral("content"), filler}}}});
+        // clang-format off
+        ASSERT_TRUE(test::waitUntil([&]() { return agent->sendCalls == turns + 1 || clients.size() == 2; }));
+        // clang-format on
+    }
+
+    ASSERT_EQ(clients.size(), 2);
+    EXPECT_GT(widerLimit, runLimit);
+    EXPECT_LT(estimateTokens(clients.at(1)->sentMessages), widerLimit);
+    plugin.shutdown();
+}
+
+TEST(AiTasksViewTest, OffersTheWorkingDirectoryToTheEditorAndTheWebServerOnlyWhenTheTaskDeclaresOne) {
+    QTemporaryDir workdir;
+    ASSERT_TRUE(workdir.isValid());
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    host.availablePlugins = {QStringLiteral("code-editor"), QStringLiteral("web-server")};
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    AiTask located = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    located.workdir = workdir.path();
+    const AiTask homeless = AiTestsHelper::makeTask(QStringLiteral("task-2"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {located, homeless}, {});
+
+    // clang-format off
+    AiPlugin plugin([](AiRequestGate&) { return std::make_unique<FakeChatClient>(); });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    std::unique_ptr<QWidget> view(plugin.createNavigationView(QStringLiteral("tasks"), nullptr));
+    ASSERT_NE(view, nullptr);
+    view->resize(1100, 700);
+    view->show();
+
+    // A task without a working directory has no folder to offer, so neither action exists on its card.
+    const auto openButtons = view->findChildren<QToolButton*>(QStringLiteral("aiTaskOpenWorkdir"));
+    const auto serveButtons = view->findChildren<QToolButton*>(QStringLiteral("aiTaskServeWorkdir"));
+    ASSERT_EQ(openButtons.size(), 2);
+    ASSERT_EQ(serveButtons.size(), 2);
+    // clang-format off
+    const auto shown = [](const QList<QToolButton*>& buttons) { return std::count_if(buttons.cbegin(), buttons.cend(), [](const QToolButton* button) { return !button->isHidden(); }); };
+    // clang-format on
+    EXPECT_EQ(shown(openButtons), 1);
+    EXPECT_EQ(shown(serveButtons), 1);
+
+    QToolButton* openFolder = nullptr;
+    QToolButton* serveFolder = nullptr;
+    for (auto* button : openButtons) {
+        if (!button->isHidden()) {
+            openFolder = button;
+        }
+    }
+    for (auto* button : serveButtons) {
+        if (!button->isHidden()) {
+            serveFolder = button;
+        }
+    }
+    ASSERT_NE(openFolder, nullptr);
+    ASSERT_NE(serveFolder, nullptr);
+
+    // The board never reaches into another plugin, so each action is one asynchronous request carrying the folder.
+    openFolder->click();
+    serveFolder->click();
+    ASSERT_EQ(host.requests.size(), 2);
+    EXPECT_EQ(host.requests.at(0).targetPluginId, QStringLiteral("code-editor"));
+    EXPECT_EQ(host.requests.at(0).topic, QStringLiteral("code-editor.workspace.open"));
+    EXPECT_EQ(host.requests.at(0).payload.value(QStringLiteral("path")).toString(), workdir.path());
+    EXPECT_EQ(host.requests.at(1).targetPluginId, QStringLiteral("web-server"));
+    EXPECT_EQ(host.requests.at(1).topic, QStringLiteral("web-server.instance.create"));
+    EXPECT_EQ(host.requests.at(1).payload.value(QStringLiteral("path")).toString(), workdir.path());
+
+    plugin.shutdown();
+}
+
+TEST(AiTasksViewTest, StopsTheScheduleFromTheCardAndTakesTheActionAwayWithIt) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    AiTask scheduled = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    TaskSchedule schedule;
+    schedule.kind = ScheduleKind::Interval;
+    schedule.intervalSeconds = 3600;
+    schedule.timeZoneId = QByteArrayLiteral("UTC");
+    schedule.nextRunAtUtc = now.addSecs(3600);
+    scheduled.schedule = schedule;
+    const AiTask plain = AiTestsHelper::makeTask(QStringLiteral("task-2"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {scheduled, plain}, {});
+
+    // clang-format off
+    AiPlugin plugin([](AiRequestGate&) { return std::make_unique<FakeChatClient>(); });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    std::unique_ptr<QWidget> view(plugin.createNavigationView(QStringLiteral("tasks"), nullptr));
+    ASSERT_NE(view, nullptr);
+    view->resize(1100, 700);
+    view->show();
+
+    // Only the task that carries a schedule offers the action that stops it.
+    const auto cards = view->findChildren<QToolButton*>(QStringLiteral("aiTaskSchedule"));
+    ASSERT_EQ(cards.size(), 2);
+    // clang-format off
+    const auto visible = std::count_if(cards.cbegin(), cards.cend(), [](const QToolButton* button) { return button->isVisible() || !button->isHidden(); });
+    // clang-format on
+    EXPECT_EQ(visible, 1);
+
+    QToolButton* stopSchedule = nullptr;
+    for (auto* button : cards) {
+        if (!button->isHidden()) {
+            stopSchedule = button;
+        }
+    }
+    ASSERT_NE(stopSchedule, nullptr);
+    ASSERT_TRUE(stopSchedule->isEnabled());
+
+    // A rejected confirmation keeps the schedule exactly as it was.
+    host.confirmation = false;
+    stopSchedule->click();
+    // clang-format off
+    ASSERT_FALSE(test::waitUntil([&]() { return !plugin.tasks().first().schedule.has_value(); }, 600));
+    // clang-format on
+
+    host.confirmation = true;
+    stopSchedule->click();
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return !plugin.tasks().first().schedule.has_value(); }));
+    ASSERT_TRUE(test::waitUntil([&]() { const auto rebuilt = view->findChildren<QToolButton*>(QStringLiteral("aiTaskSchedule")); return std::none_of(rebuilt.cbegin(), rebuilt.cend(), [](const QToolButton* button) { return !button->isHidden(); }); }));
+    // clang-format on
+    plugin.shutdown();
+}
+
+TEST(AiTasksViewTest, KeepsTheCardAliveWhileItsTaskMovesUnderAnOpenDialog) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+    AiTestsHelper::installExecutionRows(host, {}, {});
+
+    FakeChatClient* client = nullptr;
+    // clang-format off
+    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    std::unique_ptr<QWidget> view(plugin.createNavigationView(QStringLiteral("tasks"), nullptr));
+    ASSERT_NE(view, nullptr);
+    view->resize(1100, 700);
+    view->show();
+
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return client != nullptr && client->sendCalls == 1; }));
+    // clang-format on
+
+    auto* badge = view->findChild<QLabel*>(QStringLiteral("aiTaskBadge"));
+    ASSERT_NE(badge, nullptr);
+    const QPointer<QWidget> card = badge->parentWidget();
+    ASSERT_FALSE(card.isNull());
+    auto* information = view->findChild<QToolButton*>(QStringLiteral("aiTaskInfo"));
+    ASSERT_NE(information, nullptr);
+
+    // The dialog is opened without taking the event loop, so the click that opened it returns before anything else happens.
+    QTest::mouseClick(information, Qt::LeftButton);
+    auto* dialog = view->findChild<AiTaskInfoDialog*>();
+    ASSERT_NE(dialog, nullptr);
+    EXPECT_TRUE(dialog->isVisible());
+
+    // The run finishes while that dialog is still up, so the task leaves the column it was in.
+    client->deliver(QStringLiteral("done"), {1, 2}, QStringLiteral("stop"));
+    // clang-format off
+    EXPECT_TRUE(test::waitUntil([&]() { return plugin.runState(task.id) == TaskRunState::Idle; }));
+    // clang-format on
+    EXPECT_FALSE(card.isNull());
+    EXPECT_EQ(plugin.lastExecutionStatus(task.id), ExecutionStatus::Succeeded);
+
+    // Closing it must leave a card that is still there and release the dialog it was showing.
+    const QPointer<AiTaskInfoDialog> shown(dialog);
+    dialog->accept();
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    EXPECT_FALSE(card.isNull());
+    EXPECT_TRUE(shown.isNull());
+
+    view.reset();
+    plugin.shutdown();
+}
+
+// A task that is gone leaves nothing behind, in the database by the cascade its schema declares and in memory by what the plugin forgets.
+TEST(AiPluginTest, LeavesNothingBehindWhenATaskOrItsWorkspaceIsRemoved) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    persistence::StateStore store(directory.filePath(QStringLiteral("slotdeck.sqlite3")));
+    ASSERT_TRUE(store.initialize().hasValue());
+
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    host.useDatabase(store, QStringLiteral("ai"));
+    host.settingsDocument = AiTestsHelper::settingsDocument({AiTestsHelper::testConnection()}, connectionKey(AiTestsHelper::testConnection()));
+
+    AiPlugin plugin;
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.createWorkspace(QStringLiteral("Product"))).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.createWorkspace(QStringLiteral("Doomed"))).hasValue());
+    const QString keptId = plugin.workspaces().first().id;
+    const QString doomedId = plugin.workspaces().last().id;
+
+    AiTask removed = AiTestsHelper::makeTask(QStringLiteral("task-1"), keptId);
+    AiTask inDoomedWorkspace = AiTestsHelper::makeTask(QStringLiteral("task-2"), doomedId);
+    ASSERT_TRUE(test::awaitFuture(plugin.saveTask(removed)).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.saveTask(inDoomedWorkspace)).hasValue());
+
+    AiTaskRepository probe(host);
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    for (const auto& taskId : {removed.id, inDoomedWorkspace.id}) {
+        const TaskExecution execution{QStringLiteral("run-") + taskId, taskId, ExecutionStatus::Failed, now, now.addSecs(1), 1, 2, QStringLiteral("error"), QStringLiteral("it broke"), {}};
+        ASSERT_TRUE(test::awaitFuture(probe.startExecution(execution)).hasValue());
+        ASSERT_TRUE(test::awaitFuture(probe.finishExecution(execution)).hasValue());
+        ASSERT_TRUE(test::awaitFuture(probe.appendExecutionLog({QStringLiteral("log-") + taskId, execution.id, 1, now, ExecutionLogLevel::Error, ExecutionLogKind::Failed, QStringLiteral("detail")})).hasValue());
+    }
+    ASSERT_EQ(probe.lastOutcomes().value().size(), 2);
+    plugin.shutdown();
+
+    // A restart carries what happened into memory, which is the state a removal has to take with it.
+    AiPlugin restarted;
+    ASSERT_TRUE(restarted.initialize(host).hasValue());
+    EXPECT_EQ(restarted.lastError(removed.id), QStringLiteral("it broke"));
+    EXPECT_EQ(restarted.lastError(inDoomedWorkspace.id), QStringLiteral("it broke"));
+
+    // A task that is gone leaves no conversation behind either, in memory or in storage.
+    const ConversationMessage said{QStringLiteral("message-1"), removed.id, 1, ConversationRole::User, QStringLiteral("hello"), {}, {}, {}, {}, 0, now};
+    ASSERT_TRUE(test::awaitFuture(probe.appendConversation({said})).hasValue());
+    ASSERT_TRUE(test::awaitFuture(restarted.loadConversation(removed.id)).hasValue());
+    ASSERT_EQ(restarted.conversation(removed.id).size(), 1);
+
+    // Removing the task takes its runs and their entries with it, and leaves nothing the plugin still answers for.
+    ASSERT_TRUE(test::awaitFuture(restarted.removeTask(removed.id)).hasValue());
+    EXPECT_TRUE(restarted.lastError(removed.id).isEmpty());
+    EXPECT_TRUE(restarted.conversation(removed.id).isEmpty());
+    EXPECT_TRUE(test::awaitFuture(probe.conversation(removed.id, 0, 100)).value().isEmpty());
+    EXPECT_FALSE(restarted.hasLastExecution(removed.id));
+    // clang-format off
+    EXPECT_FALSE(std::ranges::any_of(restarted.tasks(), [&removed](const AiTask& candidate) { return candidate.id == removed.id; }));
+    // clang-format on
+    ASSERT_TRUE(probe.lastOutcomes().hasValue());
+    EXPECT_FALSE(probe.lastOutcomes().value().contains(removed.id));
+    EXPECT_TRUE(test::awaitFuture(probe.executionLogs(QStringLiteral("run-") + removed.id)).value().isEmpty());
+
+    // Removing the workspace takes the tasks it holds and everything those tasks recorded.
+    ASSERT_TRUE(test::awaitFuture(restarted.removeWorkspace(doomedId)).hasValue());
+    EXPECT_TRUE(restarted.lastError(inDoomedWorkspace.id).isEmpty());
+    EXPECT_FALSE(restarted.hasLastExecution(inDoomedWorkspace.id));
+    EXPECT_TRUE(restarted.tasks().isEmpty());
+    ASSERT_TRUE(probe.lastOutcomes().hasValue());
+    EXPECT_TRUE(probe.lastOutcomes().value().isEmpty());
+    EXPECT_TRUE(probe.tasks().value().isEmpty());
+    EXPECT_TRUE(test::awaitFuture(probe.executionLogs(QStringLiteral("run-") + inDoomedWorkspace.id)).value().isEmpty());
+
+    restarted.shutdown();
+}
+
+// The outcome is read from a real database, because what names the newest run of each task is real SQL rather than a double pretending to be one.
+TEST(AiTaskRepositoryTest, ReadsBackWhatHappenedToEachTaskAcrossARestart) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    persistence::StateStore store(directory.filePath(QStringLiteral("slotdeck.sqlite3")));
+    ASSERT_TRUE(store.initialize().hasValue());
+
+    test::TestPluginHost host;
+    host.useDatabase(store, QStringLiteral("ai"));
+    AiTaskRepository repository(host);
+    ASSERT_TRUE(repository.initialize().hasValue());
+
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    ASSERT_TRUE(test::awaitFuture(repository.createWorkspace(workspace)).hasValue());
+    AiTask failing = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTask succeeding = AiTestsHelper::makeTask(QStringLiteral("task-2"), workspace.id);
+    ASSERT_TRUE(test::awaitFuture(repository.saveTask(failing)).hasValue());
+    ASSERT_TRUE(test::awaitFuture(repository.saveTask(succeeding)).hasValue());
+
+    // Nothing ran yet, so nothing is claimed about what happened.
+    ASSERT_TRUE(repository.lastOutcomes().hasValue());
+    EXPECT_TRUE(repository.lastOutcomes().value().isEmpty());
+
+    // Two runs of one task, so the newest is the one a restart has to find.
+    const TaskExecution older{QStringLiteral("run-1"), failing.id, ExecutionStatus::Succeeded, now.addSecs(-60), now.addSecs(-59), 1, 2, QStringLiteral("stop"), {}, QStringLiteral("first")};
+    const TaskExecution newest{QStringLiteral("run-2"), failing.id, ExecutionStatus::Failed, now, now.addSecs(1), 1, 2, QStringLiteral("error"), QStringLiteral("the model refused"), {}};
+    const TaskExecution other{QStringLiteral("run-3"), succeeding.id, ExecutionStatus::Succeeded, now, now.addSecs(1), 3, 4, QStringLiteral("stop"), {}, QStringLiteral("done")};
+    for (const auto& execution : {older, newest, other}) {
+        ASSERT_TRUE(test::awaitFuture(repository.startExecution(execution)).hasValue());
+        ASSERT_TRUE(test::awaitFuture(repository.finishExecution(execution)).hasValue());
+    }
+
+    const auto outcomes = repository.lastOutcomes();
+    ASSERT_TRUE(outcomes.hasValue());
+    EXPECT_EQ(outcomes.value().size(), 2);
+    EXPECT_EQ(outcomes.value().value(failing.id).status, ExecutionStatus::Failed);
+    EXPECT_EQ(outcomes.value().value(failing.id).errorMessage, QStringLiteral("the model refused"));
+    EXPECT_EQ(outcomes.value().value(succeeding.id).status, ExecutionStatus::Succeeded);
+    EXPECT_TRUE(outcomes.value().value(succeeding.id).errorMessage.isEmpty());
+}
+
+TEST(AiPluginTest, TakesBackATurnItCouldNotWriteAndStopsTheRunThatProducedIt) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+
+    FakeChatClient* client = nullptr;
+    // clang-format off
+    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+
+    // The conversation is the source of truth, so a turn that storage refused is taken back instead of living only in memory.
+    // clang-format off
+    host.transactionFutureHandler = [](const QVector<persistence::DatabaseStatement>& statements) {
+        const bool conversation = !statements.isEmpty() && statements.first().statement.contains(QStringLiteral("ai_tasks_messages"));
+        return QtFuture::makeReadyValueFuture(conversation ? utils::Result<void>::failure({"ai_storage_failed", "the disk is full", {}}) : utils::Result<void>::success());
+    };
+    // clang-format on
+    const auto refused = test::awaitFuture(plugin.startTask(task.id));
+    EXPECT_EQ(refused.error().code, QStringLiteral("ai_storage_failed"));
+
+    // Nothing is left behind: no turn in memory, no run started and the reason on the card.
+    EXPECT_TRUE(plugin.conversation(task.id).isEmpty());
+    EXPECT_EQ(plugin.runState(task.id), TaskRunState::Idle);
+    EXPECT_EQ(client, nullptr);
+    EXPECT_EQ(plugin.lastError(task.id), host.translate(QStringLiteral("ai.error.conversation-save")));
+    plugin.shutdown();
+}
+
+TEST(AiPluginTest, KeepsTheConversationAndClaimsAMessageTypedWhileTheTurnIsRunning) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+
+    QVector<FakeChatClient*> clients;
+    // clang-format off
+    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+
+    // Play sends the prompt of the task again, so it is the first turn of the conversation.
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.size() == 1; }));
+    // clang-format on
+    ASSERT_EQ(plugin.conversation(task.id).size(), 1);
+    EXPECT_EQ(plugin.conversation(task.id).first().role, ConversationRole::User);
+    EXPECT_EQ(plugin.conversation(task.id).first().content, task.prompt);
+
+    // A message typed while the turn is running joins the conversation at once instead of waiting for it to end.
+    ASSERT_TRUE(test::awaitFuture(plugin.sendMessage(task.id, QStringLiteral("also check the tests"))).hasValue());
+    ASSERT_EQ(plugin.conversation(task.id).size(), 2);
+    EXPECT_EQ(plugin.conversation(task.id).last().content, QStringLiteral("also check the tests"));
+    EXPECT_EQ(clients.size(), 1);
+
+    // The turn that was running answers with a tool call, and the next iteration carries what was typed meanwhile.
+    clients.first()->deliverToolCalls({{QStringLiteral("call-1"), QStringLiteral("list_directory"), QJsonObject{{QStringLiteral("path"), QString{}}}}});
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.first()->sendCalls == 2; }));
+    // clang-format on
+    const QJsonArray secondTurn = clients.first()->sentMessages;
+    bool carriesTypedMessage = false;
+    for (const auto& value : secondTurn) {
+        carriesTypedMessage = carriesTypedMessage || QJsonDocument(value.toObject()).toJson().contains(QByteArrayLiteral("also check the tests"));
+    }
+    EXPECT_TRUE(carriesTypedMessage);
+
+    // The answer of the turn is kept, so the next run starts from everything that was said.
+    clients.first()->deliver(QStringLiteral("all good"), {1, 2}, QStringLiteral("stop"));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return plugin.runState(task.id) == TaskRunState::Idle; }));
+    // clang-format on
+    ASSERT_GE(plugin.conversation(task.id).size(), 4);
+    EXPECT_EQ(plugin.conversation(task.id).last().role, ConversationRole::Assistant);
+    EXPECT_EQ(plugin.conversation(task.id).last().content, QStringLiteral("all good"));
+
+    // A message that arrives while the turn is giving its final answer was never carried to the model, so it opens the next turn.
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.size() == 2; }));
+    // clang-format on
+    ASSERT_TRUE(test::awaitFuture(plugin.sendMessage(task.id, QStringLiteral("one more thing"))).hasValue());
+    EXPECT_EQ(clients.size(), 2);
+    clients.at(1)->deliver(QStringLiteral("finished"), {1, 2}, QStringLiteral("stop"));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.size() == 3; }));
+    // clang-format on
+
+    clients.at(2)->deliver(QStringLiteral("and that too"), {1, 2}, QStringLiteral("stop"));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return plugin.runState(task.id) == TaskRunState::Idle; }));
+    // clang-format on
+
+    // Resetting returns the task to the state it was created in.
+    ASSERT_TRUE(test::awaitFuture(plugin.resetConversation(task.id)).hasValue());
+    EXPECT_TRUE(plugin.conversation(task.id).isEmpty());
+    plugin.shutdown();
+}
+
+AiTaskInfoDialog* openTaskSurface(QWidget* view, const QString& objectName) {
+    auto* button = view->findChild<QToolButton*>(objectName);
+    if (button == nullptr) {
+        return nullptr;
+    }
+    QTest::mouseClick(button, Qt::LeftButton);
+    return view->findChild<AiTaskInfoDialog*>();
+}
+
+TEST(AiTasksViewTest, EditsATaskNobodyRanYetAndOpensTheSurfaceOfEveryOtherOne) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const AiTask fresh = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTask reviewed = AiTestsHelper::makeTask(QStringLiteral("task-2"), workspace.id);
+    reviewed.column = TaskColumn::Review;
+    AiTestsHelper::installAiRows(host, {workspace}, {fresh, reviewed}, {});
+    AiTestsHelper::installExecutionRows(host, {}, {});
+
+    // clang-format off
+    AiPlugin plugin([](AiRequestGate&) { return std::make_unique<FakeChatClient>(); });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    std::unique_ptr<QWidget> view(plugin.createNavigationView(QStringLiteral("tasks"), nullptr));
+    ASSERT_NE(view, nullptr);
+    view->resize(1100, 700);
+    view->show();
+
+    const auto badges = view->findChildren<QLabel*>(QStringLiteral("aiTaskBadge"));
+    ASSERT_EQ(badges.size(), 2);
+    QWidget* untouched = badges.at(0)->parentWidget();
+    QWidget* alreadyRead = badges.at(1)->parentWidget();
+    ASSERT_NE(untouched, nullptr);
+    ASSERT_NE(alreadyRead, nullptr);
+
+    // A task waiting in To Do that never ran is opened to be written.
+    bool editorOpened = false;
+    // clang-format off
+    QTimer::singleShot(0, view.get(), [&view, &editorOpened]() { if (auto* editor = view->findChild<AiTaskDialog*>(); editor != nullptr) { editorOpened = true; editor->reject(); } });
+    // clang-format on
+    QTest::mouseDClick(untouched, Qt::LeftButton);
+    EXPECT_TRUE(editorOpened);
+    EXPECT_EQ(view->findChild<AiTaskInfoDialog*>(), nullptr);
+
+    // Every other one is opened to be read, which is the surface that answers for the task.
+    QTest::mouseDClick(alreadyRead, Qt::LeftButton);
+    auto* surface = view->findChild<AiTaskInfoDialog*>();
+    ASSERT_NE(surface, nullptr);
+    EXPECT_TRUE(surface->isVisible());
+    EXPECT_EQ(view->findChild<AiTaskDialog*>(), nullptr);
+
+    // The surface is a modal window of its own, so it blocks what is behind it and carries the buttons every window of the platform carries.
+    EXPECT_EQ(surface->windowModality(), Qt::ApplicationModal);
+    EXPECT_EQ(surface->windowTitle(), reviewed.title);
+    surface->reject();
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+
+    // The card opens the conversation directly, which is the same surface on its first tab.
+    auto* chat = alreadyRead->findChild<QToolButton*>(QStringLiteral("aiTaskChat"));
+    ASSERT_NE(chat, nullptr);
+    EXPECT_TRUE(chat->isVisible());
+    QTest::mouseClick(chat, Qt::LeftButton);
+    auto* opened = view->findChild<AiTaskInfoDialog*>();
+    ASSERT_NE(opened, nullptr);
+    auto* conversation = opened->findChild<AiConversationView*>();
+    ASSERT_NE(conversation, nullptr);
+    EXPECT_EQ(conversation->taskId(), reviewed.id);
+    opened->reject();
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+
+    view.reset();
+    plugin.shutdown();
+}
+
+TEST(AiTasksViewTest, RendersTheBoardWithStatusBadgesAndTheInformationAction) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+
+    FakeChatClient* client = nullptr;
+    // clang-format off
+    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    std::unique_ptr<QWidget> view(plugin.createNavigationView(QStringLiteral("tasks"), nullptr));
+    ASSERT_NE(view, nullptr);
+    view->resize(1100, 700);
+    view->show();
+
+    // The board owns the whole content area, so no terminal surface is created for a task.
+    EXPECT_EQ(view->findChild<QWidget*>(QStringLiteral("aiTaskTerminals")), nullptr);
+    EXPECT_EQ(view->findChild<QWidget*>(QStringLiteral("aiClearTerminal")), nullptr);
+    EXPECT_EQ(view->findChildren<QWidget*>(QStringLiteral("aiKanbanColumn")).size(), 5);
+    ASSERT_NE(view->findChild<QToolButton*>(QStringLiteral("aiTaskInfo")), nullptr);
+
+    auto* badge = view->findChild<QLabel*>(QStringLiteral("aiTaskBadge"));
+    ASSERT_NE(badge, nullptr);
+    EXPECT_EQ(badge->text(), QStringLiteral("Idle"));
+    EXPECT_EQ(badge->property("badge").toString(), QStringLiteral("idle"));
+
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return client != nullptr && client->sendCalls == 1; }));
+    // clang-format on
+    auto* runningBadge = view->findChild<QLabel*>(QStringLiteral("aiTaskBadge"));
+    ASSERT_NE(runningBadge, nullptr);
+    EXPECT_EQ(runningBadge->property("badge").toString(), QStringLiteral("running"));
+
+    // The badge is a rounded pill on its own line, and the live phase reads on the line below it.
+    auto* card = runningBadge->parentWidget();
+    ASSERT_NE(card, nullptr);
+    QLabel* phase = nullptr;
+    for (auto* candidate : card->findChildren<QLabel*>(QStringLiteral("mutedLabel"))) {
+        if (candidate->text() == host.translate(QStringLiteral("ai.phase.sending"))) {
+            phase = candidate;
+        }
+    }
+    ASSERT_NE(phase, nullptr);
+    card->layout()->activate();
+    EXPECT_GE(phase->y(), runningBadge->y() + runningBadge->height());
+    EXPECT_EQ(phase->x(), runningBadge->x());
+    EXPECT_LT(runningBadge->width(), card->width());
+    EXPECT_GT(host.theme().metric(ui::ThemeMetric::BadgeRadius), host.theme().metric(ui::ThemeMetric::ControlRadius));
+
+    client->deliver(QStringLiteral("answer"), {3, 4}, QStringLiteral("stop"));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { auto* current = view->findChild<QLabel*>(QStringLiteral("aiTaskBadge")); return current != nullptr && current->property("badge").toString() == QStringLiteral("succeeded"); }));
+    // clang-format on
+
+    view.reset();
+    plugin.shutdown();
+}
+
+TEST(AiConnectionSettingsViewTest, StartsFromTheEmptyStateAndOpensADialogWithTheDeclaredCredential) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    AiTestsHelper::installEmptyProviderRows(host);
+    AiPlugin plugin;
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+
+    // Nothing was ever configured, so the section presents the empty state instead of an empty grid.
+    ASSERT_TRUE(plugin.connections().isEmpty());
+    EXPECT_FALSE(plugin.defaultConnection().has_value());
+
+    std::unique_ptr<QWidget> section(plugin.createSettingsSection(QStringLiteral("connections"), QStringLiteral("general"), nullptr));
+    ASSERT_NE(section, nullptr);
+    section->resize(760, 520);
+    section->show();
+
+    auto* grid = section->findChild<QTableWidget*>(QStringLiteral("aiConnectionGrid"));
+    auto* empty = section->findChild<QLabel*>(QStringLiteral("aiConnectionEmpty"));
+    auto* defaultConnection = section->findChild<QComboBox*>(QStringLiteral("aiDefaultConnection"));
+    ASSERT_NE(grid, nullptr);
+    ASSERT_NE(empty, nullptr);
+    ASSERT_NE(defaultConnection, nullptr);
+    EXPECT_FALSE(grid->isVisible());
+    EXPECT_TRUE(empty->isVisible());
+    EXPECT_FALSE(defaultConnection->isEnabled());
+
+    AiConnectionDialog dialog(host, {}, {}, nullptr);
+    dialog.resize(700, 620);
+    dialog.show();
+    auto* provider = dialog.findChild<QComboBox*>(QStringLiteral("aiConnectionProvider"));
+    auto* model = dialog.findChild<QComboBox*>(QStringLiteral("aiConnectionModel"));
+    auto* apiKey = dialog.findChild<ui::SecretField*>(QStringLiteral("aiConnectionApiKey"));
+    ASSERT_NE(provider, nullptr);
+    ASSERT_NE(model, nullptr);
+    ASSERT_NE(apiKey, nullptr);
+    EXPECT_EQ(provider->count(), providerCatalog().size());
+    EXPECT_FALSE(apiKey->revealed());
+
+    const ProviderDescriptor* first = findProvider(provider->currentData().toString());
+    ASSERT_NE(first, nullptr);
+    EXPECT_FALSE(first->baseUrl.isEmpty());
+    EXPECT_EQ(apiKey->value(), QStringLiteral("{env.%1}").arg(first->apiKeyVariable));
+    EXPECT_FALSE(model->currentText().isEmpty());
+
+    // The providers read alphabetically, and the list opening alphabetically never changes the model its provider declares.
+    for (int index = 1; index < provider->count(); ++index) {
+        EXPECT_LE(QString::compare(provider->itemText(index - 1), provider->itemText(index), Qt::CaseInsensitive), 0) << provider->itemText(index - 1).toStdString();
+    }
+    provider->setCurrentIndex(provider->findData(QStringLiteral("anthropic")));
+    EXPECT_EQ(model->currentText(), findProvider(QStringLiteral("anthropic"))->preferredModels.first());
+    for (int index = 1; index < model->count(); ++index) {
+        EXPECT_LE(QString::compare(model->itemText(index - 1), model->itemText(index), Qt::CaseInsensitive), 0) << model->itemText(index - 1).toStdString();
+    }
+    EXPECT_TRUE(validateConnection(dialog.connection()).hasValue()) << validateConnection(dialog.connection()).error().code.toStdString();
+
+    provider->setCurrentIndex(provider->findData(QStringLiteral("openai")));
+    model->setCurrentText(QStringLiteral("gpt-4o"));
+    emit model->lineEdit()->editingFinished();
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    EXPECT_NE(dialog.findChild<QWidget*>(QStringLiteral("aiParameter.temperature")), nullptr);
+    EXPECT_EQ(dialog.findChild<QWidget*>(QStringLiteral("aiParameter.reasoningEffort")), nullptr);
+
+    // A reasoning model swaps the sampling fields for the effort field without any code change.
+    model->setCurrentText(QStringLiteral("o3-mini"));
+    emit model->lineEdit()->editingFinished();
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    EXPECT_EQ(dialog.findChild<QWidget*>(QStringLiteral("aiParameter.temperature")), nullptr);
+    EXPECT_NE(dialog.findChild<QWidget*>(QStringLiteral("aiParameter.reasoningEffort")), nullptr);
+
+    // Only a self-hosted service carries an address, so the field appears with it and disappears with the others.
+    auto* address = dialog.findChild<QLineEdit*>(QStringLiteral("aiConnectionAddress"));
+    ASSERT_NE(address, nullptr);
+    EXPECT_FALSE(address->isVisible());
+    provider->setCurrentIndex(provider->findData(QStringLiteral("ollama")));
+    EXPECT_TRUE(address->isVisible());
+    EXPECT_EQ(address->text(), findProvider(QStringLiteral("ollama"))->baseUrl);
+    EXPECT_FALSE(apiKey->isEnabled());
+
+    section.reset();
+    plugin.shutdown();
+}
+
+TEST(AiChatClientTest, ReportsTheReasonTheProviderReturnedInsteadOfTheTransportMessage) {
+    QTcpServer server;
+    ASSERT_TRUE(server.listen(QHostAddress::LocalHost, 0));
+    // clang-format off
+    QObject::connect(&server, &QTcpServer::newConnection, &server, [&server]() {
+        QTcpSocket* socket = server.nextPendingConnection();
+        QObject::connect(socket, &QTcpSocket::readyRead, socket, [socket]() {
+            if (!socket->readAll().contains(QByteArrayLiteral("\r\n\r\n"))) {
+                return;
+            }
+            const QByteArray body = QByteArrayLiteral("{\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"model: unknown model\"}}");
+            socket->write(QByteArrayLiteral("HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nContent-Length: ") + QByteArray::number(body.size()) + QByteArrayLiteral("\r\nConnection: close\r\n\r\n") + body);
+            socket->disconnectFromHost();
+        });
+    });
+    // clang-format on
+
+    const ProviderDescriptor* anthropic = findProvider(QStringLiteral("anthropic"));
+    ASSERT_NE(anthropic, nullptr);
+    const QString model = QStringLiteral("claude-3-haiku-20240307");
+    const ModelConnection connection{anthropic->id, model, {}, QStringLiteral("sk-test"), {}, defaultParameters(*anthropic, model), {}};
+
+    AiRequestGate clientGate;
+    AiHttpChatClient client(clientGate);
+    QVector<utils::Error> failures;
+    // clang-format off
+    QObject::connect(&client, &AiChatClient::failed, &client, [&failures](const utils::Error& error) { failures.append(error); });
+    // clang-format on
+    // clang-format off
+    client.send({connection, QStringLiteral("http://127.0.0.1:%1").arg(server.serverPort()), QJsonArray{QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QStringLiteral("hello")}}}, {}}, [](const QString& key) { return key; });
+    // clang-format on
+
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return !failures.isEmpty(); }));
+    // clang-format on
+    EXPECT_EQ(failures.first().code, QStringLiteral("ai_request_failed"));
+    EXPECT_TRUE(failures.first().message.contains(QStringLiteral("unknown model"))) << failures.first().message.toStdString();
+    // The status opens the detail and the body the service answered follows it, so the reason is readable in full.
+    EXPECT_TRUE(failures.first().detail.startsWith(QStringLiteral("HTTP 400\n"))) << failures.first().detail.toStdString();
+    EXPECT_TRUE(failures.first().detail.contains(QStringLiteral("unknown model")));
+    EXPECT_EQ(failures.size(), 1);
+}
+
+TEST(AiToolContractTest, RebuildsACallHoweverTheServiceStreamedItsArguments) {
+    // A service that streams the arguments as text fragments is the common shape.
+    ToolCallAccumulator streamed(WireProtocol::OpenAiCompatible);
+    streamed.consume(streamEvent(R"({"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"write_file","arguments":"{\"path\":"}}]}}]})"));
+    streamed.consume(streamEvent(R"({"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"a.txt\"}"}}]}}]})"));
+    const auto rebuilt = streamed.calls();
+    ASSERT_TRUE(rebuilt.hasValue()) << rebuilt.error().detail.toStdString();
+    ASSERT_EQ(rebuilt.value().size(), 1);
+    EXPECT_EQ(rebuilt.value().first().arguments.value(QStringLiteral("path")).toString(), QStringLiteral("a.txt"));
+
+    // A service that sends them already parsed is read the same way instead of arriving with nothing.
+    ToolCallAccumulator parsed(WireProtocol::OpenAiCompatible);
+    parsed.consume(streamEvent(R"({"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c2","function":{"name":"read_file","arguments":{"path":"b.txt"}}}]}}]})"));
+    const auto whole = parsed.calls();
+    ASSERT_TRUE(whole.hasValue()) << whole.error().detail.toStdString();
+    ASSERT_EQ(whole.value().size(), 1);
+    EXPECT_EQ(whole.value().first().arguments.value(QStringLiteral("path")).toString(), QStringLiteral("b.txt"));
+
+    // Arguments that were cut off say what arrived, because a failure nobody can read explains nothing.
+    ToolCallAccumulator cut(WireProtocol::OpenAiCompatible);
+    cut.consume(streamEvent(R"({"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c3","function":{"name":"write_file","arguments":"{\"path\":\"half"}}]}}]})"));
+    const auto broken = cut.calls();
+    ASSERT_TRUE(broken.hasValue());
+    ASSERT_EQ(broken.value().size(), 1);
+    EXPECT_TRUE(broken.value().first().unreadableArguments.contains(QStringLiteral("half"))) << broken.value().first().unreadableArguments.toStdString();
+}
+
+TEST(AiChatClientTest, DeliversTheCallTheOutputBudgetCutAndTheReasonItWasCut) {
+    // Recorded from a completion whose tool call arguments were cut when the model reached its output budget.
+    const QByteArray stream = QByteArrayLiteral("data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_1\",\"type\":\"function\",\"function\":{\"name\":\"write_file\",\"arguments\":\"\"}}]},\"finish_reason\":null}]}\n\n"
+                                                "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"path\\\":\\\"index.html\\\",\\\"content\\\":\\\"<html\"}}]},\"finish_reason\":null}]}\n\n"
+                                                "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"length\"}]}\n\n"
+                                                "data: [DONE]\n\n");
+
+    RecordedStreamServer server(stream);
+    ASSERT_TRUE(server.listen());
+
+    const ProviderDescriptor* openai = findProvider(QStringLiteral("openai"));
+    ASSERT_NE(openai, nullptr);
+    const QString model = QStringLiteral("gpt-4o");
+    const ModelConnection connection{openai->id, model, {}, QStringLiteral("sk-test"), {}, defaultParameters(*openai, model), {}};
+
+    AiRequestGate clientGate;
+    AiHttpChatClient client(clientGate);
+    QVector<utils::Error> failures;
+    QVector<ToolCall> delivered;
+    QStringList reasons;
+    // clang-format off
+    QObject::connect(&client, &AiChatClient::failed, &client, [&failures](const utils::Error& error) { failures.append(error); });
+    QObject::connect(&client, &AiChatClient::finished, &client, [&delivered, &reasons](const QString&, const QVector<ToolCall>& calls, ChatUsage, const QString& finishReason) { delivered = calls; reasons.append(finishReason); });
+    client.send({connection, server.address(), QJsonArray{QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QStringLiteral("write it")}}}, {}}, [](const QString& key) { return key; });
+    ASSERT_TRUE(test::waitUntil([&]() { return !reasons.isEmpty() || !failures.isEmpty(); }));
+    // clang-format on
+
+    // The transport delivers what arrived and the reason the answer was cut, and the run decides what to do with both.
+    EXPECT_TRUE(failures.isEmpty());
+    EXPECT_EQ(reasons, QStringList{QStringLiteral("length")});
+    ASSERT_EQ(delivered.size(), 1);
+    EXPECT_EQ(delivered.first().name, QStringLiteral("write_file"));
+    EXPECT_TRUE(delivered.first().unreadableArguments.contains(QStringLiteral("<html"))) << delivered.first().unreadableArguments.toStdString();
+}
+
+TEST(AiConversationViewTest, ReadsAsAChatWithSidedBubblesGroupsAndTheTimeOnTheLine) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+
+    QVector<FakeChatClient*> clients;
+    // clang-format off
+    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.size() == 1; }));
+    // clang-format on
+    clients.first()->deliver(QStringLiteral("Sure. I read the three files you asked about and the failure is in the writer, not the reader, so the fix belongs there."), {}, QStringLiteral("stop"));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return plugin.conversation(task.id).size() >= 2; }));
+    // clang-format on
+    ASSERT_TRUE(test::awaitFuture(plugin.sendMessage(task.id, QStringLiteral("thanks"))).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.sendMessage(task.id, QStringLiteral("open a pull request with it"))).hasValue());
+
+    std::unique_ptr<QWidget> view(plugin.createNavigationView(QStringLiteral("tasks"), nullptr));
+    ASSERT_NE(view, nullptr);
+    view->resize(920, 640);
+    view->show();
+    auto* badge = view->findChild<QLabel*>(QStringLiteral("aiTaskBadge"));
+    ASSERT_NE(badge, nullptr);
+    auto* surface = openTaskSurface(view.get(), QStringLiteral("aiTaskChat"));
+    ASSERT_NE(surface, nullptr);
+    surface->resize(view->size());
+    auto* conversation = surface->findChild<AiConversationView*>();
+    ASSERT_NE(conversation, nullptr);
+    // clang-format off
+    // The turn that is being written is a bubble of its own, so the transcript carries one more row than it has messages.
+    ASSERT_TRUE(test::waitUntil([conversation]() { return conversation->findChildren<QWidget*>(QStringLiteral("aiConversationRow")).size() == 5; }));
+    ASSERT_TRUE(test::waitUntil([conversation]() { const auto bubbles = conversation->findChildren<QWidget*>(QStringLiteral("aiConversationBubble")); return bubbles.size() == 5 && bubbles.first()->width() > 1; }));
+    // clang-format on
+
+    QCoreApplication::processEvents();
+    const auto rows = conversation->findChildren<QWidget*>(QStringLiteral("aiConversationRow"));
+    QList<QWidget*> bubbles;
+    for (auto* row : rows) {
+        bubbles.append(row->findChild<QWidget*>(QStringLiteral("aiConversationBubble")));
+        ASSERT_NE(bubbles.last(), nullptr);
+    }
+    auto* scroll = conversation->findChild<QScrollArea*>(QStringLiteral("aiConversationScroll"));
+    ASSERT_NE(scroll, nullptr);
+
+    // What the reader wrote sits against the right edge behind their avatar, and what the agent answered against the left one behind its own.
+    auto* you = rows.at(0)->findChild<ui::AvatarBadge*>(QStringLiteral("aiConversationYou"));
+    auto* agent = rows.at(1)->findChild<ui::AvatarBadge*>(QStringLiteral("aiConversationAgent"));
+    ASSERT_NE(you, nullptr);
+    ASSERT_NE(agent, nullptr);
+    EXPECT_EQ(you->mapTo(rows.at(0), QPoint(0, 0)).x() + you->width(), rows.at(0)->width());
+    EXPECT_GT(you->mapTo(rows.at(0), QPoint(0, 0)).x(), bubbles.at(0)->mapTo(rows.at(0), QPoint(0, 0)).x());
+    EXPECT_EQ(agent->mapTo(rows.at(1), QPoint(0, 0)).x(), 0);
+    EXPECT_LT(agent->mapTo(rows.at(1), QPoint(0, 0)).x(), bubbles.at(1)->mapTo(rows.at(1), QPoint(0, 0)).x());
+    EXPECT_GT(bubbles.at(0)->mapTo(rows.at(0), QPoint(0, 0)).x(), rows.at(0)->width() / 2);
+    EXPECT_LT(bubbles.at(1)->mapTo(rows.at(1), QPoint(0, 0)).x(), rows.at(1)->width() / 2);
+
+    // A message that follows one from the same writer repeats no avatar, because the group already named its writer.
+    auto* repeated = rows.at(3)->findChild<ui::AvatarBadge*>(QStringLiteral("aiConversationYou"));
+    ASSERT_NE(repeated, nullptr);
+    EXPECT_FALSE(repeated->isVisible());
+
+    // Every bubble obeys one width rule, so a short message and a long one are bounded by the same share.
+    int widest = 0;
+    for (auto* bubble : bubbles) {
+        EXPECT_LT(bubble->width(), scroll->viewport()->width());
+        widest = std::max(widest, bubble->width());
+    }
+    EXPECT_GT(widest, scroll->viewport()->width() / 2);
+    EXPECT_LT(bubbles.at(2)->width(), widest);
+
+    // The surface is closed by the same key that closes a tab.
+    auto* closeAction = surface->findChild<QAction*>(QStringLiteral("aiTaskSurfaceClose"));
+    ASSERT_NE(closeAction, nullptr);
+    EXPECT_EQ(closeAction->shortcut(), QKeySequence(QKeySequence::Close));
+    EXPECT_EQ(closeAction->shortcutContext(), Qt::WidgetWithChildrenShortcut);
+
+    // The time reads at the end of a line that has room for it and takes a line of its own when it does not.
+    auto* shortTime = bubbles.at(2)->findChild<QLabel*>(QStringLiteral("aiConversationTime"));
+    auto* shortLine = bubbles.at(2)->findChild<QWidget*>(QStringLiteral("aiConversationLine"));
+    ASSERT_NE(shortTime, nullptr);
+    ASSERT_NE(shortLine, nullptr);
+    EXPECT_EQ(shortTime->parentWidget(), shortLine);
+    EXPECT_TRUE(shortTime->isVisible());
+
+    auto* longTime = bubbles.at(1)->findChild<QLabel*>(QStringLiteral("aiConversationTime"));
+    ASSERT_NE(longTime, nullptr);
+    EXPECT_EQ(longTime->parentWidget(), bubbles.at(1));
+    EXPECT_TRUE(longTime->isVisible());
+
+    // A message that follows one from the same writer is part of the same group, so it opens no gap of its own.
+    EXPECT_GT(rows.at(2)->layout()->contentsMargins().top(), 0);
+    EXPECT_EQ(rows.at(3)->layout()->contentsMargins().top(), 0);
+
+    // The text of a bubble reads from the left, never centred, and no bubble passes the share the chat allows.
+    for (auto* bubble : bubbles) {
+        auto* written = bubble->findChild<ui::MarkdownView*>(QStringLiteral("aiConversationContent"));
+        ASSERT_NE(written, nullptr);
+        EXPECT_EQ(written->document()->defaultTextOption().alignment() & Qt::AlignHCenter, Qt::Alignment());
+        EXPECT_LE(bubble->width(), static_cast<int>(scroll->viewport()->width() * 0.7) + 1);
+    }
+
+    // A message written with the return key keeps the line it was broken at.
+    auto* broken = bubbles.at(2)->findChild<ui::MarkdownView*>(QStringLiteral("aiConversationContent"));
+    ASSERT_NE(broken, nullptr);
+
+    // Everything inside a bubble reads at the size the chat was given, so no line is smaller than the words beside it.
+    const int reading = plugin.executionSettings().chatFontSize;
+    EXPECT_EQ(broken->document()->defaultFont().pointSize(), reading);
+    for (auto* bubble : bubbles) {
+        for (auto* written : bubble->findChildren<QLabel*>()) {
+            EXPECT_EQ(written->font().pointSize(), reading) << written->objectName().toStdString();
+        }
+    }
+
+    // A turn that is being written says so inside the bubble its answer will land in.
+    auto* stop = surface->findChild<QPushButton*>(QStringLiteral("destructiveButton"));
+    ASSERT_NE(stop, nullptr);
+    const bool running = plugin.runState(task.id) != TaskRunState::Idle;
+    EXPECT_EQ(stop->isVisible(), running);
+    if (running) {
+        auto* thinking = conversation->findChild<QWidget*>(QStringLiteral("aiConversationThinking"));
+        auto* busy = conversation->findChild<ui::BusyIndicator*>(QStringLiteral("aiConversationBusy"));
+        auto* phase = conversation->findChild<QLabel*>(QStringLiteral("aiConversationPhase"));
+        ASSERT_NE(thinking, nullptr);
+        ASSERT_NE(busy, nullptr);
+        ASSERT_NE(phase, nullptr);
+        EXPECT_TRUE(thinking->isVisible());
+        EXPECT_TRUE(busy->isVisible());
+        EXPECT_FALSE(phase->text().isEmpty());
+
+        // The bubble that is waiting carries the indicator instead of an empty box with a time in it.
+        auto* pending = thinking->parentWidget();
+        ASSERT_NE(pending, nullptr);
+        auto* pendingTime = pending->findChild<QLabel*>(QStringLiteral("aiConversationTime"));
+        ASSERT_NE(pendingTime, nullptr);
+        EXPECT_FALSE(pendingTime->isVisible());
+
+        QTest::mouseClick(stop, Qt::LeftButton);
+        // clang-format off
+        ASSERT_TRUE(test::waitUntil([&plugin, &task]() { return plugin.runState(task.id) == TaskRunState::Idle; }));
+        ASSERT_TRUE(test::waitUntil([conversation, stop]() { return conversation->findChild<QWidget*>(QStringLiteral("aiConversationThinking")) == nullptr && !stop->isVisible(); }));
+        // clang-format on
+    }
+
+    // The action that sends is a circle, so its radius can never disagree with its shape.
+    auto* send = conversation->findChild<QPushButton*>(QStringLiteral("aiConversationSend"));
+    ASSERT_NE(send, nullptr);
+    EXPECT_EQ(send->width(), send->height());
+    EXPECT_EQ(send->width(), ui::themeManager().theme().metric(ui::ThemeMetric::RoundButtonSize));
+
+    // The composer opens on one line and grows with every line written into it until the bound it may not pass.
+    auto* composer = conversation->findChild<ui::TextField*>(QStringLiteral("aiConversationComposer"));
+    ASSERT_NE(composer, nullptr);
+    const int oneLine = composer->height();
+    composer->setPlainText(QStringLiteral("first\nsecond\nthird"));
+    QCoreApplication::processEvents();
+    const int threeLines = composer->height();
+    EXPECT_GT(threeLines, oneLine);
+    composer->setPlainText(QStringList(60, QStringLiteral("line")).join(QLatin1Char('\n')));
+    QCoreApplication::processEvents();
+    EXPECT_GT(composer->height(), threeLines);
+    EXPECT_LT(composer->height(), conversation->height() / 2);
+
+    view.reset();
+    plugin.shutdown();
+}
+
+TEST(AiConversationViewTest, ReadsEveryRoleAsMarkdownAndAnswersEachCallInsideItsOwnRow) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    filesystem::FileSystemService files;
+    host.useFileSystem(files);
+    QTemporaryDir workdir;
+    ASSERT_TRUE(workdir.isValid());
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    task.workdir = workdir.path();
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+
+    QVector<FakeChatClient*> clients;
+    // clang-format off
+    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.size() == 1; }));
+    // clang-format on
+
+    const QString first = QDir(QDir(workdir.path()).canonicalPath()).filePath(QStringLiteral("one.txt"));
+    const QString second = QDir(QDir(workdir.path()).canonicalPath()).filePath(QStringLiteral("two.txt"));
+    FakeChatClient* agent = clients.first();
+    agent->deliverToolCalls({{QStringLiteral("c1"), QStringLiteral("write_file"), QJsonObject{{QStringLiteral("path"), first}, {QStringLiteral("content"), QStringLiteral("one")}}}, {QStringLiteral("c2"), QStringLiteral("write_file"), QJsonObject{{QStringLiteral("path"), second}, {QStringLiteral("content"), QStringLiteral("two")}}}});
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([agent]() { return agent->sendCalls == 2; }));
+    // clang-format on
+    agent->deliver(QStringLiteral("Both files are written:\n\n```cpp\nint answer = 42;\n```"), {10, 20}, QStringLiteral("stop"));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return plugin.runState(task.id) == TaskRunState::Idle; }));
+    // clang-format on
+
+    std::unique_ptr<QWidget> view(plugin.createNavigationView(QStringLiteral("tasks"), nullptr));
+    ASSERT_NE(view, nullptr);
+    view->resize(960, 700);
+    view->show();
+    auto* badge = view->findChild<QLabel*>(QStringLiteral("aiTaskBadge"));
+    ASSERT_NE(badge, nullptr);
+    auto* surface = openTaskSurface(view.get(), QStringLiteral("aiTaskChat"));
+    ASSERT_NE(surface, nullptr);
+    surface->resize(view->size());
+    auto* conversation = surface->findChild<AiConversationView*>();
+    ASSERT_NE(conversation, nullptr);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([conversation]() { return !conversation->findChildren<QWidget*>(QStringLiteral("aiConversationTool")).isEmpty(); }));
+    // clang-format on
+    QCoreApplication::processEvents();
+
+    // A result answers inside the row of the call it belongs to, so it opens no bubble of its own.
+    const auto rows = conversation->findChildren<QWidget*>(QStringLiteral("aiConversationRow"));
+    const auto tools = conversation->findChildren<QWidget*>(QStringLiteral("aiConversationTool"));
+    ASSERT_EQ(tools.size(), 2);
+    // A call is read as the name the tool publishes and the one thing it is doing, never as the arguments it was given.
+    for (auto* entry : tools) {
+        auto* name = entry->findChild<QLabel*>(QStringLiteral("aiConversationToolName"));
+        auto* activity = entry->findChild<QLabel*>(QStringLiteral("aiConversationToolActivity"));
+        auto* mark = entry->findChild<QLabel*>(QStringLiteral("aiConversationToolIcon"));
+        ASSERT_NE(name, nullptr);
+        ASSERT_NE(activity, nullptr);
+        ASSERT_NE(mark, nullptr);
+        EXPECT_EQ(name->text(), host.translate(QStringLiteral("ai.tool-title.write-file")));
+        EXPECT_FALSE(name->text().contains(QLatin1Char('_')));
+        EXPECT_TRUE(activity->text().startsWith(host.translate(QStringLiteral("ai.tool-activity.write-file")).section(QLatin1Char('%'), 0, 0)));
+        EXPECT_TRUE(activity->text().contains(QStringLiteral(".txt")));
+        EXPECT_FALSE(activity->text().contains(QStringLiteral("content")));
+        EXPECT_FALSE(mark->pixmap().isNull());
+
+        // The name is read above what it is doing, with room between them, so a call is two lines rather than one long row.
+        EXPECT_GE(activity->mapTo(entry, QPoint(0, 0)).y(), name->mapTo(entry, QPoint(0, 0)).y() + name->height() + 3);
+        EXPECT_GE(activity->mapTo(entry, QPoint(0, 0)).x() + activity->contentsMargins().left(), name->mapTo(entry, QPoint(0, 0)).x());
+    }
+
+    // A result opens no bubble of its own, so a turn of two calls is one turn rather than three messages.
+    EXPECT_EQ(rows.size(), 3);
+
+    // Every role reads as Markdown, so a fenced block arrives as code rather than as its own source.
+    QTextBrowser* answer = nullptr;
+    for (auto* content : conversation->findChildren<QTextBrowser*>(QStringLiteral("aiConversationContent"))) {
+        if (content->toPlainText().contains(QStringLiteral("Both files are written"))) {
+            answer = content;
+        }
+    }
+    ASSERT_NE(answer, nullptr);
+    EXPECT_FALSE(answer->toPlainText().contains(QStringLiteral("```")));
+    EXPECT_TRUE(answer->toPlainText().contains(QStringLiteral("int answer = 42;")));
+
+    view.reset();
+    plugin.shutdown();
+}
+
+TEST(AiConversationViewTest, FollowsTheReaderInsteadOfDraggingThemToTheEndOfEveryMessage) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+
+    QVector<FakeChatClient*> clients;
+    // clang-format off
+    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    for (int index = 0; index < 30; ++index) {
+        ASSERT_TRUE(test::awaitFuture(plugin.sendMessage(task.id, QStringLiteral("message %1 that is long enough to take a line of its own in the conversation").arg(index))).hasValue());
+    }
+
+    std::unique_ptr<QWidget> view(plugin.createNavigationView(QStringLiteral("tasks"), nullptr));
+    ASSERT_NE(view, nullptr);
+    view->resize(900, 420);
+    view->show();
+    auto* badge = view->findChild<QLabel*>(QStringLiteral("aiTaskBadge"));
+    ASSERT_NE(badge, nullptr);
+    auto* surface = openTaskSurface(view.get(), QStringLiteral("aiTaskChat"));
+    ASSERT_NE(surface, nullptr);
+    surface->resize(view->size());
+    auto* conversation = surface->findChild<AiConversationView*>();
+    ASSERT_NE(conversation, nullptr);
+    auto* scroll = conversation->findChild<QScrollArea*>(QStringLiteral("aiConversationScroll"));
+    ASSERT_NE(scroll, nullptr);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([scroll]() { return scroll->verticalScrollBar()->maximum() > 0; }));
+    ASSERT_TRUE(test::waitUntil([scroll]() { return scroll->verticalScrollBar()->value() == scroll->verticalScrollBar()->maximum(); }));
+    // clang-format on
+
+    // A reader who has scrolled up is reading, so a message that arrives leaves the viewport where they left it.
+    scroll->verticalScrollBar()->setValue(0);
+    ASSERT_TRUE(test::awaitFuture(plugin.sendMessage(task.id, QStringLiteral("this one arrives while the reader is up here"))).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([conversation, scroll]() { return conversation->findChildren<QWidget*>(QStringLiteral("aiConversationRow")).size() >= 31 && scroll->verticalScrollBar()->maximum() > 0; }));
+    // clang-format on
+    for (int pass = 0; pass < 5; ++pass) {
+        QCoreApplication::processEvents();
+    }
+    EXPECT_EQ(scroll->verticalScrollBar()->value(), 0);
+
+    // A reader who is at the end is following, so the next message brings them along.
+    scroll->verticalScrollBar()->setValue(scroll->verticalScrollBar()->maximum());
+    ASSERT_TRUE(test::awaitFuture(plugin.sendMessage(task.id, QStringLiteral("and this one arrives while they are at the end"))).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([scroll]() { return scroll->verticalScrollBar()->value() == scroll->verticalScrollBar()->maximum(); }));
+    // clang-format on
+
+    view.reset();
+    plugin.shutdown();
+}
+
+TEST(AiTaskSurfaceTest, WritesTheLogOfARunWhileItRunsWithoutMovingTheReader) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+
+    QVector<TaskExecution> recordedRuns;
+    QVector<ExecutionLogEntry> recordedEntries;
+    for (int index = 0; index < 2; ++index) {
+        recordedRuns.append({QStringLiteral("execution-%1").arg(index), task.id, ExecutionStatus::Running, now.addSecs(-index), {}, 0, 0, {}, {}, {}});
+    }
+    for (int index = 0; index < 80; ++index) {
+        recordedEntries.append({QStringLiteral("entry-%1").arg(index), QStringLiteral("execution-1"), index, now, ExecutionLogLevel::Info, ExecutionLogKind::Started, QStringLiteral("line %1").arg(index)});
+    }
+    const AiTestsHelper::RecordedRuns recorded = AiTestsHelper::installExecutionRows(host, recordedRuns, recordedEntries);
+
+    QVector<FakeChatClient*> clients;
+    // clang-format off
+    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+
+    AiTaskInfoDialog surface(plugin, host, task, nullptr);
+    surface.resize(900, 460);
+    surface.show();
+    auto* executions = surface.findChild<QTableWidget*>(QStringLiteral("aiExecutionGrid"));
+    auto* entries = surface.findChild<QTableWidget*>(QStringLiteral("aiLogGrid"));
+    ASSERT_NE(executions, nullptr);
+    ASSERT_NE(entries, nullptr);
+    auto* tabs = surface.findChild<ui::TabWidget*>(QStringLiteral("aiTaskInfoTabs"));
+    ASSERT_NE(tabs, nullptr);
+    tabs->setCurrentIndex(tabs->indexOf(entries->parentWidget()));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([executions]() { return executions->rowCount() == 2; }));
+    // clang-format on
+
+    // The reader opened the second run and is reading further down its entries.
+    executions->setCurrentCell(1, 0);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([entries]() { return entries->rowCount() == 80; }));
+    // clang-format on
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([entries]() { return entries->verticalScrollBar()->maximum() > 0; }));
+    // clang-format on
+    entries->verticalScrollBar()->setValue(entries->verticalScrollBar()->maximum());
+    ASSERT_GT(entries->verticalScrollBar()->value(), 0);
+    const QString onScreen = entries->item(entries->rowAt(0), 3)->text();
+    ASSERT_FALSE(onScreen.isEmpty());
+
+    recorded.logs->append({QStringLiteral("entry-80"), QStringLiteral("execution-1"), 80, now, ExecutionLogLevel::Info, ExecutionLogKind::Started, QStringLiteral("line 80")});
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+
+    // The entry the run wrote reaches the open surface, and it leaves the reader where they were.
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([entries]() { return entries->rowCount() == 81; }));
+    // clang-format on
+    EXPECT_EQ(executions->currentRow(), 1);
+    EXPECT_EQ(entries->item(entries->rowAt(0), 3)->text(), onScreen);
+
+    // A reader already on the newest entry follows the run instead of being anchored behind it.
+    entries->verticalScrollBar()->setValue(0);
+    recorded.logs->append({QStringLiteral("entry-81"), QStringLiteral("execution-1"), 81, now, ExecutionLogLevel::Info, ExecutionLogKind::Started, QStringLiteral("line 81")});
+    ASSERT_TRUE(test::awaitFuture(plugin.stopTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([entries]() { return entries->rowCount() == 82; }));
+    // clang-format on
+    EXPECT_EQ(entries->verticalScrollBar()->value(), 0);
+    EXPECT_EQ(entries->item(0, 3)->text(), QStringLiteral("line 81"));
+
+    plugin.shutdown();
+}
+
+TEST(AiPluginTest, AnswersAToolCallItCouldNotReadInsteadOfEndingTheRun) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+
+    QVector<FakeChatClient*> clients;
+    // clang-format off
+    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.size() == 1; }));
+    // clang-format on
+
+    ToolCall unreadable;
+    unreadable.id = QStringLiteral("call-1");
+    unreadable.name = QStringLiteral("read_file");
+    unreadable.unreadableArguments = QStringLiteral("{\"path\":");
+    clients.first()->deliverToolCalls({unreadable});
+
+    // The run keeps going and the model is told what arrived, so it writes the call again instead of losing the turn.
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.first()->sentMessages.size() > 1; }));
+    // clang-format on
+    EXPECT_EQ(plugin.runState(task.id), TaskRunState::Running);
+    const QString transcript = QString::fromUtf8(QJsonDocument(clients.first()->sentMessages).toJson(QJsonDocument::Compact));
+    EXPECT_TRUE(transcript.contains(QStringLiteral("could not be read"))) << transcript.toStdString();
+    EXPECT_TRUE(transcript.contains(QStringLiteral("read_file"))) << transcript.toStdString();
+
+    // Repeating the same unreadable call is answered by the repetition budget rather than forever.
+    for (int attempt = 0; attempt < aiLimits().repeatedToolCallLimit + 1; ++attempt) {
+        clients.first()->deliverToolCalls({unreadable});
+    }
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return plugin.runState(task.id) == TaskRunState::Idle; }));
+    // clang-format on
+    EXPECT_EQ(plugin.lastStopReason(task.id), AgentStopReason::ToolRepetition);
+    EXPECT_EQ(plugin.lastExecutionStatus(task.id), ExecutionStatus::Succeeded);
+
+    plugin.shutdown();
+}
+
+TEST(AiTaskRepositoryTest, RecordsTheReasonARunStoppedAndRefusesOneNobodyDeclared) {
+    const QVector<AgentStopReason> reasons{AgentStopReason::Answered, AgentStopReason::IterationLimit, AgentStopReason::OutputBudget, AgentStopReason::ToolRepetition, AgentStopReason::Cancelled, AgentStopReason::Failed};
+    for (const auto reason : reasons) {
+        const QString name = AiTaskRepository::agentStopReasonName(reason);
+        EXPECT_FALSE(name.isEmpty());
+        ASSERT_TRUE(AiTaskRepository::agentStopReasonFromName(name).has_value()) << name.toStdString();
+        EXPECT_EQ(AiTaskRepository::agentStopReasonFromName(name).value(), reason);
+    }
+    EXPECT_FALSE(AiTaskRepository::agentStopReasonFromName(QStringLiteral("gave-up")).has_value());
+    EXPECT_FALSE(AiTaskRepository::agentStopReasonFromName(QString{}).has_value());
+
+    // A run reads back with the reason it recorded, and a reason nobody declares is refused where it is read.
+    test::TestPluginHost host;
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    TaskExecution stopped{QStringLiteral("execution-1"), QStringLiteral("task-1"), ExecutionStatus::Succeeded, now, now, 10, 20, QStringLiteral("length"), {}, QStringLiteral("half"), AgentStopReason::OutputBudget};
+    AiTestsHelper::installExecutionRows(host, {stopped}, {});
+    AiTaskRepository repository(host);
+    const auto restored = test::awaitFuture(repository.executions(QStringLiteral("task-1")));
+    ASSERT_TRUE(restored.hasValue());
+    ASSERT_EQ(restored.value().size(), 1);
+    EXPECT_EQ(restored.value().first().stopReason, AgentStopReason::OutputBudget);
+
+    auto previous = host.queryHandler;
+    // clang-format off
+    host.queryHandler = [previous](const QString& statement, const QVariantList& bindings) {
+        auto rows = previous(statement, bindings);
+        if (statement.contains(QStringLiteral("FROM ai_tasks_executions")) && rows.hasValue() && !rows.value().isEmpty()) {
+            rows.value().first().insert(QStringLiteral("stop_reason"), QStringLiteral("gave-up"));
+        }
+        return rows;
+    };
+    // clang-format on
+    EXPECT_EQ(test::awaitFuture(repository.executions(QStringLiteral("task-1"))).error().code, QStringLiteral("ai_tasks_execution_invalid"));
+}
+
+TEST(AiToolContractTest, GivesEachProtocolTheConversationShapeItDemands) {
+    const QJsonObject system{{QStringLiteral("role"), QStringLiteral("system")}, {QStringLiteral("content"), QStringLiteral("be brief")}};
+    const QJsonObject firstUser{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QStringLiteral("one")}};
+    const QJsonObject secondUser{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QStringLiteral("two")}};
+    const QJsonObject assistant{{QStringLiteral("role"), QStringLiteral("assistant")}, {QStringLiteral("content"), QStringLiteral("here")}};
+    const QJsonObject secondAssistant{{QStringLiteral("role"), QStringLiteral("assistant")}, {QStringLiteral("content"), QStringLiteral("and here")}};
+
+    // The OpenAI compatible API accepts the conversation as it stands, so nothing is rewritten for it.
+    const QJsonArray conversation{system, firstUser, secondUser, assistant, secondAssistant};
+    EXPECT_FALSE(protocolRequiresAlternatingRoles(WireProtocol::OpenAiCompatible));
+    EXPECT_EQ(enforceProtocolShape(WireProtocol::OpenAiCompatible, conversation), conversation);
+
+    // The Anthropic API refuses a repeated role, so two turns of one role become the turn it expects.
+    EXPECT_TRUE(protocolRequiresAlternatingRoles(WireProtocol::Anthropic));
+    const QJsonArray shaped = enforceProtocolShape(WireProtocol::Anthropic, conversation);
+    ASSERT_EQ(shaped.size(), 3);
+    EXPECT_EQ(shaped.at(0).toObject(), system);
+    EXPECT_EQ(shaped.at(1).toObject().value(QStringLiteral("role")).toString(), QStringLiteral("user"));
+    EXPECT_EQ(shaped.at(2).toObject().value(QStringLiteral("role")).toString(), QStringLiteral("assistant"));
+    const QJsonArray joined = shaped.at(1).toObject().value(QStringLiteral("content")).toArray();
+    ASSERT_EQ(joined.size(), 2);
+    EXPECT_EQ(joined.at(0).toObject().value(QStringLiteral("text")).toString(), QStringLiteral("one"));
+    EXPECT_EQ(joined.at(1).toObject().value(QStringLiteral("text")).toString(), QStringLiteral("two"));
+
+    // A conversation whose oldest turns were dropped can open with an assistant turn, which answers nothing and is left out.
+    const QJsonArray opening{system, assistant, firstUser};
+    const QJsonArray openingShaped = enforceProtocolShape(WireProtocol::Anthropic, opening);
+    ASSERT_EQ(openingShaped.size(), 2);
+    EXPECT_EQ(openingShaped.at(1).toObject(), firstUser);
+
+    // A turn already written as content blocks keeps its blocks when it is joined.
+    const QJsonObject blocks{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QJsonArray{QJsonObject{{QStringLiteral("type"), QStringLiteral("tool_result")}, {QStringLiteral("tool_use_id"), QStringLiteral("call-1")}}}}};
+    const QJsonArray withBlocks = enforceProtocolShape(WireProtocol::Anthropic, QJsonArray{blocks, firstUser});
+    ASSERT_EQ(withBlocks.size(), 1);
+    const QJsonArray blockContent = withBlocks.at(0).toObject().value(QStringLiteral("content")).toArray();
+    ASSERT_EQ(blockContent.size(), 2);
+    EXPECT_EQ(blockContent.at(0).toObject().value(QStringLiteral("type")).toString(), QStringLiteral("tool_result"));
+    EXPECT_EQ(blockContent.at(1).toObject().value(QStringLiteral("text")).toString(), QStringLiteral("one"));
+}
+
+TEST(AiPluginTest, SendsAgainThePictureAStoredResultCarries) {
+    const QByteArray picture = QByteArrayLiteral("bytes of a picture");
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+
+    // A run before this one read an image, so its answer is stored with the bytes it returned.
+    auto previous = host.queryHandler;
+    const QString stamp = now.toString(Qt::ISODateWithMs);
+    // clang-format off
+    host.queryHandler = [previous, picture, stamp](const QString& statement, const QVariantList& bindings) {
+        if (!statement.contains(QStringLiteral("FROM ai_tasks_messages")) || !statement.contains(QStringLiteral("tool_call_id"))) {
+            return previous(statement, bindings);
+        }
+        persistence::DatabaseRows rows;
+        rows.append({{QStringLiteral("id"), QStringLiteral("message-2")}, {QStringLiteral("task_id"), QStringLiteral("task-1")}, {QStringLiteral("sequence"), 2}, {QStringLiteral("role"), QStringLiteral("tool")}, {QStringLiteral("content"), QStringLiteral("media/square.png")}, {QStringLiteral("tool_calls"), QStringLiteral("[]")}, {QStringLiteral("tool_call_id"), QStringLiteral("call-1")}, {QStringLiteral("summarized_until"), 0}, {QStringLiteral("created_at_utc"), stamp}, {QStringLiteral("image_data"), picture}, {QStringLiteral("image_media_type"), QStringLiteral("image/png")}});
+        rows.append({{QStringLiteral("id"), QStringLiteral("message-1")}, {QStringLiteral("task_id"), QStringLiteral("task-1")}, {QStringLiteral("sequence"), 1}, {QStringLiteral("role"), QStringLiteral("assistant")}, {QStringLiteral("content"), QStringLiteral("Looking at it")}, {QStringLiteral("tool_calls"), QStringLiteral(R"([{"id":"call-1","name":"read_image","arguments":{}}])")}, {QStringLiteral("tool_call_id"), QString{}}, {QStringLiteral("summarized_until"), 0}, {QStringLiteral("created_at_utc"), stamp}, {QStringLiteral("image_data"), QByteArray{}}, {QStringLiteral("image_media_type"), QString{}}});
+        return utils::Result<persistence::DatabaseRows>::success(rows);
+    };
+    // clang-format on
+
+    QVector<FakeChatClient*> clients;
+    // clang-format off
+    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.loadConversation(task.id)).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.size() == 1 && !clients.first()->sentMessages.isEmpty(); }));
+    // clang-format on
+
+    // The picture is sent again from what was stored, so the model still sees what an earlier run showed it.
+    const QString body = QString::fromUtf8(QJsonDocument(clients.first()->sentMessages).toJson(QJsonDocument::Compact));
+    EXPECT_TRUE(body.contains(QString::fromUtf8(picture.toBase64()))) << body.left(600).toStdString();
+    EXPECT_FALSE(body.contains(QStringLiteral("does not read images")));
+    plugin.shutdown();
+}
+
+TEST(AiPluginTest, KeepsARunAliveWhileAnotherOneStartsUnderTheSignalItIsEmitting) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    QVector<AiTask> tasks;
+    for (int index = 0; index < 8; ++index) {
+        tasks.append(AiTestsHelper::makeTask(QStringLiteral("task-%1").arg(index), workspace.id));
+    }
+    AiTestsHelper::installAiRows(host, {workspace}, tasks, {});
+    QJsonObject settings = host.settingsDocument;
+    settings.insert(QStringLiteral("execution"), QJsonObject{{QStringLiteral("parallelExecutions"), 0}});
+    host.settingsDocument = settings;
+
+    QVector<FakeChatClient*> clients;
+    // clang-format off
+    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+
+    // Starting a run while another one is announcing itself grows the collection of running tasks under that announcement.
+    bool started = false;
+    // clang-format off
+    QObject::connect(&plugin, &AiPlugin::taskRunStateChanged, &plugin, [&plugin, &tasks, &started](const QString& taskId) {
+        if (started || taskId != tasks.first().id) {
+            return;
+        }
+        started = true;
+        for (int index = 1; index < tasks.size(); ++index) {
+            std::ignore = plugin.startTask(tasks.at(index).id);
+        }
+    });
+    // clang-format on
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(tasks.first().id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.size() == tasks.size(); }));
+    // clang-format on
+
+    // Every run reached the model with its own instructions, so none of them was reading a run that had moved.
+    for (auto* client : clients) {
+        ASSERT_NE(client, nullptr);
+        EXPECT_EQ(client->sendCalls, 1);
+        ASSERT_FALSE(client->sentMessages.isEmpty());
+        EXPECT_FALSE(client->sentMessages.first().toObject().value(QStringLiteral("content")).toString().isEmpty());
+    }
+    for (const auto& task : tasks) {
+        EXPECT_NE(plugin.runState(task.id), TaskRunState::Idle) << task.id.toStdString();
+    }
+
+    plugin.shutdown();
+}
+
+TEST(AiToolRegistryTest, NamesTheToolAndTheArgumentOfEveryCallItRefuses) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    AiToolRegistry registry(host);
+
+    // A call judged against the schema the model received is answered by name, so no tool leaves the model guessing what it got wrong.
+    for (const auto& schema : registry.schemas()) {
+        const QJsonArray required = schema.parameters.value(QStringLiteral("required")).toArray();
+        if (required.isEmpty()) {
+            continue;
+        }
+
+        QVector<ToolResult> results;
+        // clang-format off
+        const auto collect = [&results](ToolResult result) { results.append(std::move(result)); };
+        registry.invoke({QStringLiteral("call-1"), schema.name, QJsonObject{}, {}}, QStringLiteral("/tmp"), collect);
+        ASSERT_TRUE(test::waitUntil([&]() { return !results.isEmpty(); })) << schema.name.toStdString();
+        // clang-format on
+        EXPECT_TRUE(results.first().failed) << schema.name.toStdString();
+        EXPECT_TRUE(results.first().text.contains(schema.name)) << schema.name.toStdString() << ": " << results.first().text.toStdString();
+        EXPECT_TRUE(results.first().text.contains(required.first().toString())) << schema.name.toStdString() << ": " << results.first().text.toStdString();
+    }
+
+    // A value of the wrong type is named the same way, so the model reads which argument and which type were expected.
+    QVector<ToolResult> mistyped;
+    // clang-format off
+    const auto collectMistyped = [&mistyped](ToolResult result) { mistyped.append(std::move(result)); };
+    registry.invoke({QStringLiteral("call-2"), QStringLiteral("read_file"), QJsonObject{{QStringLiteral("path"), 12}}, {}}, QStringLiteral("/tmp"), collectMistyped);
+    ASSERT_TRUE(test::waitUntil([&]() { return !mistyped.isEmpty(); }));
+    // clang-format on
+    EXPECT_TRUE(mistyped.first().failed);
+    EXPECT_TRUE(mistyped.first().text.contains(QStringLiteral("read_file"))) << mistyped.first().text.toStdString();
+    EXPECT_TRUE(mistyped.first().text.contains(QStringLiteral("path"))) << mistyped.first().text.toStdString();
+}
+
+TEST(AiTasksViewTest, ReadsAScheduledTaskAndAStoppedRunAsTheStatesTheyAreIn) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    AiTask waiting = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    TaskSchedule schedule;
+    schedule.kind = ScheduleKind::Interval;
+    schedule.intervalSeconds = 3600;
+    schedule.timeZoneId = QByteArrayLiteral("UTC");
+    schedule.nextRunAtUtc = now.addSecs(3600);
+    waiting.schedule = schedule;
+    const AiTask plain = AiTestsHelper::makeTask(QStringLiteral("task-2"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {waiting, plain}, {});
+    AiTestsHelper::installExecutionRows(host, {}, {});
+
+    AiPlugin plugin;
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    std::unique_ptr<QWidget> view(plugin.createNavigationView(QStringLiteral("tasks"), nullptr));
+    ASSERT_NE(view, nullptr);
+    view->resize(1100, 700);
+    view->show();
+
+    // A task waiting for a schedule is not a task nobody scheduled, so it reads as its own state.
+    const auto badges = view->findChildren<QLabel*>(QStringLiteral("aiTaskBadge"));
+    ASSERT_EQ(badges.size(), 2);
+    QStringList states;
+    for (const auto* badge : badges) {
+        states.append(badge->property("badge").toString());
+    }
+    states.sort();
+    EXPECT_EQ(states, (QStringList{QStringLiteral("idle"), QStringLiteral("scheduled")}));
+    // clang-format off
+    const auto scheduled = std::find_if(badges.cbegin(), badges.cend(), [](const QLabel* badge) { return badge->property("badge").toString() == QStringLiteral("scheduled"); });
+    // clang-format on
+    ASSERT_NE(scheduled, badges.cend());
+    EXPECT_EQ((*scheduled)->text(), host.translate(QStringLiteral("ai.badge.scheduled")));
+    plugin.shutdown();
+}
+
+TEST(AiTasksViewTest, ReadsARunStoppedByALimitAsStoppedRatherThanAsSucceeded) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+    const TaskExecution stopped{QStringLiteral("execution-1"), task.id, ExecutionStatus::Succeeded, now, now, 10, 20, {}, {}, {}, AgentStopReason::IterationLimit};
+    AiTestsHelper::installExecutionRows(host, {stopped}, {});
+
+    AiPlugin plugin;
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    std::unique_ptr<QWidget> view(plugin.createNavigationView(QStringLiteral("tasks"), nullptr));
+    ASSERT_NE(view, nullptr);
+    view->resize(1100, 700);
+    view->show();
+
+    // A green badge over a line saying the run stopped without answering contradicts itself.
+    auto* badge = view->findChild<QLabel*>(QStringLiteral("aiTaskBadge"));
+    ASSERT_NE(badge, nullptr);
+    EXPECT_EQ(badge->property("badge").toString(), QStringLiteral("stopped"));
+    EXPECT_EQ(badge->text(), host.translate(QStringLiteral("ai.badge.stopped")));
+    plugin.shutdown();
+}
+
+TEST(AiConversationViewTest, MeasuresATurnOfToolsByTheSameRuleAsAMessage) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+
+    const QString command = QStringLiteral("find . -maxdepth 3 -type f -print -o -name node_modules -prune");
+    auto previous = host.queryHandler;
+    const QString stamp = now.toString(Qt::ISODateWithMs);
+    // clang-format off
+    host.queryHandler = [previous, command, stamp](const QString& statement, const QVariantList& bindings) {
+        if (!statement.contains(QStringLiteral("FROM ai_tasks_messages")) || !statement.contains(QStringLiteral("tool_call_id"))) {
+            return previous(statement, bindings);
+        }
+        const QString calls = QStringLiteral(R"([{"id":"call-1","name":"run_command","arguments":{"command":"%1"}}])").arg(command);
+        persistence::DatabaseRows rows;
+        rows.append({{QStringLiteral("id"), QStringLiteral("message-2")}, {QStringLiteral("task_id"), QStringLiteral("task-1")}, {QStringLiteral("sequence"), 2}, {QStringLiteral("role"), QStringLiteral("assistant")}, {QStringLiteral("content"), QString{}}, {QStringLiteral("tool_calls"), calls}, {QStringLiteral("tool_call_id"), QString{}}, {QStringLiteral("summarized_until"), 0}, {QStringLiteral("created_at_utc"), stamp}, {QStringLiteral("image_data"), QByteArray{}}, {QStringLiteral("image_media_type"), QString{}}});
+        rows.append({{QStringLiteral("id"), QStringLiteral("message-1")}, {QStringLiteral("task_id"), QStringLiteral("task-1")}, {QStringLiteral("sequence"), 1}, {QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QStringLiteral("List the files of this project and tell me what it is")}, {QStringLiteral("tool_calls"), QStringLiteral("[]")}, {QStringLiteral("tool_call_id"), QString{}}, {QStringLiteral("summarized_until"), 0}, {QStringLiteral("created_at_utc"), stamp}, {QStringLiteral("image_data"), QByteArray{}}, {QStringLiteral("image_media_type"), QString{}}});
+        return utils::Result<persistence::DatabaseRows>::success(rows);
+    };
+    // clang-format on
+
+    AiPlugin plugin;
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    AiConversationView view(plugin, host, nullptr);
+    view.resize(900, 600);
+    view.show();
+    view.setTask(task.id);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return view.findChildren<ui::RoundedSurface*>(QStringLiteral("aiConversationBubble")).size() == 2; }));
+    // clang-format on
+    QApplication::processEvents();
+
+    const auto bubbles = view.findChildren<ui::RoundedSurface*>(QStringLiteral("aiConversationBubble"));
+    ASSERT_EQ(bubbles.size(), 2);
+    auto* activity = view.findChild<QLabel*>(QStringLiteral("aiConversationToolActivity"));
+    ASSERT_NE(activity, nullptr);
+    EXPECT_TRUE(activity->text().contains(QStringLiteral("maxdepth"))) << activity->text().toStdString();
+
+    // A turn of tools is as wide as the words it carries, exactly like a message, instead of collapsing to one word.
+    auto* carrying = bubbles.constLast();
+    EXPECT_GE(carrying->width(), activity->fontMetrics().horizontalAdvance(activity->text())) << carrying->width();
+    EXPECT_LE(carrying->width(), static_cast<int>(view.width() * 0.70) + 1);
+    for (auto* bubble : bubbles) {
+        EXPECT_LE(bubble->width(), static_cast<int>(view.width() * 0.70) + 1) << bubble->width();
+    }
+    plugin.shutdown();
+}
+
+TEST(AiTranslationsTest, ReachesEveryKeyItBuildsFromAnEnumOrFromTheCatalog) {
+    const plugins::TranslationEntries english = translations::english();
+    const QVector<ExecutionLogKind> kinds{ExecutionLogKind::Started, ExecutionLogKind::Iteration, ExecutionLogKind::Compacted, ExecutionLogKind::RequestSent, ExecutionLogKind::FirstTokenReceived, ExecutionLogKind::ResponseReceived, ExecutionLogKind::UsageReported, ExecutionLogKind::ToolCalled, ExecutionLogKind::ToolReturned, ExecutionLogKind::Throttled, ExecutionLogKind::Succeeded, ExecutionLogKind::Failed, ExecutionLogKind::Cancelled};
+    const QVector<ExecutionPhase> phases{ExecutionPhase::Idle, ExecutionPhase::Queued, ExecutionPhase::Throttled, ExecutionPhase::Sending, ExecutionPhase::Streaming, ExecutionPhase::CallingTool, ExecutionPhase::Compacting, ExecutionPhase::Running};
+    const QVector<TaskColumn> columns{TaskColumn::Todo, TaskColumn::Doing, TaskColumn::Blocked, TaskColumn::Review, TaskColumn::Done};
+
+    QSet<QString> asked;
+    // clang-format off
+    for (const auto kind : kinds) { asked.insert(QStringLiteral("ai.log-kind.") + AiTaskRepository::executionLogKindName(kind)); }
+    for (const auto phase : phases) { asked.insert(QStringLiteral("ai.phase.") + AiPlugin::phaseName(phase)); }
+    for (const auto column : columns) { asked.insert(QStringLiteral("ai.column.%1").arg(AiTaskRepository::columnName(column))); }
+    // clang-format on
+    // A turn calling several tools says how many, which is the one sentence of that family the phase name does not spell.
+    asked.insert(QStringLiteral("ai.phase.tool-count"));
+    for (const auto& provider : providerCatalog()) {
+        asked.insert(provider.titleKey);
+        for (const auto& parameter : provider.parameters) {
+            asked.insert(parameter.titleKey);
+            for (const auto& option : parameter.options) {
+                asked.insert(option.titleKey);
+            }
+        }
+    }
+
+    // A key the plugin builds must be spelled, otherwise the reader is shown the key itself.
+    for (const auto& key : asked) {
+        EXPECT_TRUE(english.contains(key)) << "the ai catalog spells no " << key.toStdString();
+    }
+
+    // A key nothing builds is dead weight, so every key of those families answers something.
+    const QStringList families{QStringLiteral("ai.log-kind."), QStringLiteral("ai.phase."), QStringLiteral("ai.column."), QStringLiteral("ai.provider."), QStringLiteral("ai.parameter."), QStringLiteral("ai.effort.")};
+    for (auto entry = english.constBegin(); entry != english.constEnd(); ++entry) {
+        // clang-format off
+        const QString key = entry.key();
+        const bool owned = std::any_of(families.constBegin(), families.constEnd(), [key](const QString& family) { return key.startsWith(family); });
+        // clang-format on
+        if (!owned) {
+            continue;
+        }
+
+        EXPECT_TRUE(asked.contains(entry.key())) << "nothing builds " << entry.key().toStdString();
+    }
+}
+
+TEST(AiTranslationsTest, SpellsEveryKeyInEveryLanguageTheSelectorOffers) {
+    slotdeck::plugins::ai::AiPlugin plugin;
+    slotdeck::test::expectCompleteCatalog(QStringLiteral("ai"), plugin.translations());
+}
+
+} // namespace slotdeck::plugins::ai

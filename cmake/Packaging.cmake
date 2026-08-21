@@ -1,0 +1,14 @@
+set(CPACK_PACKAGE_NAME "SlotDeck")
+set(CPACK_PACKAGE_VENDOR "SlotDeck")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "SlotDeck")
+
+if(APPLE)
+    set(CPACK_GENERATOR DragNDrop)
+elseif(WIN32)
+    set(CPACK_GENERATOR ZIP)
+else()
+    set(CPACK_GENERATOR TGZ)
+endif()
+
+include(CPack)

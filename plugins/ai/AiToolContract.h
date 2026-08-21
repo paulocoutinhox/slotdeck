@@ -1,0 +1,100 @@
+#pragma once
+
+#include "AiProviderCatalog.h"
+#include "utils/Result.h"
+
+#include <QByteArray>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QMap>
+#include <QString>
+#include <QVector>
+
+#include <functional>
+#include <optional>
+
+namespace slotdeck::plugins::ai {
+
+struct ToolSchema final {
+    QString name;
+    QString descriptionKey;
+    QJsonObject parameters;
+    // What a reader is told the tool is doing, which is its public name and the one argument that explains the call.
+    QString titleKey{};
+    QString activityKey{};
+    QString activityArgument{};
+};
+
+struct ToolPresentation final {
+    QString title;
+    QString activity;
+};
+
+struct ToolCall final {
+    QString id;
+    QString name;
+    QJsonObject arguments;
+    // A call whose arguments could not be read carries what arrived with it, so the model is answered instead of the run being ended.
+    QString unreadableArguments{};
+};
+
+struct ToolResult final {
+    QString callId;
+    QString text;
+    bool failed{false};
+    // An image the tool read, carried to the model in the shape each protocol accepts.
+    QByteArray imageData{};
+    QByteArray imageMediaType{};
+};
+
+[[nodiscard]] utils::Result<void> validateToolSchema(const ToolSchema& schema);
+
+// What a call got wrong, named so the model can correct it instead of repeating the same call.
+struct ToolArgumentError final {
+    QString argument;
+    // The type the schema declares, empty when the argument is simply absent.
+    QString expectedType;
+};
+
+[[nodiscard]] std::optional<ToolArgumentError> findToolArgumentError(const ToolSchema& schema, const QJsonObject& arguments);
+[[nodiscard]] qint64 estimateTokens(const QJsonArray& messages);
+[[nodiscard]] qint64 fittingTokenLimit(int contextWindow, qint64 reservedTokens);
+[[nodiscard]] qsizetype pruneToolResults(QJsonArray& messages, qint64 limit);
+
+// Old turns are dropped whole, because an assistant turn carrying tool calls is invalid without the results that answer it.
+struct FittedConversation final {
+    QJsonArray messages;
+    QJsonArray dropped;
+    qsizetype preservedHead{0};
+};
+
+[[nodiscard]] FittedConversation fitConversation(const QJsonArray& messages, qint64 limit);
+[[nodiscard]] QJsonArray serializeTools(WireProtocol protocol, const QVector<ToolSchema>& tools, const std::function<QString(const QString&)>& translate);
+[[nodiscard]] QJsonObject serializeAssistantTurn(WireProtocol protocol, const QString& content, const QVector<ToolCall>& calls);
+// Each protocol declares what a conversation has to look like before it is accepted, so the projection ends by satisfying it.
+[[nodiscard]] bool protocolRequiresAlternatingRoles(WireProtocol protocol);
+[[nodiscard]] QJsonArray enforceProtocolShape(WireProtocol protocol, const QJsonArray& messages);
+[[nodiscard]] QVector<QJsonObject> serializeToolResults(WireProtocol protocol, const QVector<ToolResult>& results);
+
+// Both protocols stream tool arguments as text fragments, so the accumulator rebuilds each call before it is dispatched.
+class ToolCallAccumulator final {
+  public:
+    explicit ToolCallAccumulator(WireProtocol protocol);
+
+    void consume(const QJsonObject& event);
+    [[nodiscard]] utils::Result<QVector<ToolCall>> calls() const;
+    [[nodiscard]] bool empty() const;
+    void clear();
+
+  private:
+    struct PendingCall final {
+        QString id;
+        QString name;
+        QString arguments;
+    };
+
+    WireProtocol m_protocol;
+    QMap<int, PendingCall> m_pending;
+};
+
+} // namespace slotdeck::plugins::ai
