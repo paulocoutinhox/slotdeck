@@ -547,12 +547,6 @@ QVariant TerminalWidget::inputMethodQuery(Qt::InputMethodQuery query) const {
     return QWidget::inputMethodQuery(query);
 }
 
-// A selection is anchored to the row of the scrollback it started on, so scrolling moves it with the text it covers.
-terminalcore::TerminalRenderSnapshot TerminalWidget::currentSnapshot() const {
-    const QMutexLocker locker(&m_snapshotMutex);
-    return m_snapshot;
-}
-
 int TerminalWidget::viewportRows() const {
     const QMutexLocker locker(&m_snapshotMutex);
     return m_snapshot.rows;

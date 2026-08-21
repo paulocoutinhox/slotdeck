@@ -92,12 +92,6 @@ SkillDescriptor AiSkillCatalog::describe(const QString& name, const QString& pat
     return skill;
 }
 
-void AiSkillCatalog::forget() {
-    m_cacheValid = false;
-    m_cached.clear();
-    m_scannedWorkdir.clear();
-}
-
 // The catalog is read once per run, because the prompt and the tools ask for it on every turn and a disk is not answered that often.
 void AiSkillCatalog::discover(const QString& workdir, const Completion& completion) {
     if (m_cacheValid && m_scannedWorkdir == workdir) {

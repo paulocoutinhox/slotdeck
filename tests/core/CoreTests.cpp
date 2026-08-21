@@ -1552,6 +1552,20 @@ TEST(CalendarPopupTest, OpensFromTheIndicatorAndPaintsEveryDayOfTheMonthItIsRead
     EXPECT_FALSE(calendar->isVisible());
 }
 
+TEST(ApplicationTest, EndsQuietlyWhenTheWindowIsClosedWhileItIsStillLoading) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    app::Application application(directory.path(), nullptr);
+    ASSERT_TRUE(application.initialize().hasValue());
+    ASSERT_TRUE(application.loadInterface().hasValue());
+    QApplication::processEvents();
+
+    // The reader closed the window before anything it presents existed, so what was queued has nothing left to start.
+    application.shutdown();
+    const auto startup = application.completeStartup();
+    EXPECT_TRUE(startup.hasValue()) << startup.error().code.toStdString();
+}
+
 TEST(MainWindowTest, OpensOnItsLoadingPageAndKeepsNothingWhenItIsClosedThere) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());

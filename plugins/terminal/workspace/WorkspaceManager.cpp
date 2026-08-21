@@ -404,9 +404,10 @@ QString WorkspaceManager::createTerminal(int slotIndex) {
     return sessionId;
 }
 
+// The runtime leaves the collection before anything is announced, so no signal can reach a session this is already closing.
 void WorkspaceManager::closeTerminal(QString sessionId) {
-    const auto runtime = m_runtimeSessions.find(sessionId);
-    if (runtime == m_runtimeSessions.end()) {
+    auto closing = m_runtimeSessions.extract(sessionId);
+    if (closing.empty()) {
         return;
     }
 
@@ -424,11 +425,8 @@ void WorkspaceManager::closeTerminal(QString sessionId) {
     notifyTabChanged(owningTabIndex);
     emit sessionsChanged();
 
-    {
-        const QSignalBlocker blocker(runtime->second.get());
-        runtime->second->terminate();
-    }
-    m_runtimeSessions.erase(runtime);
+    const QSignalBlocker blocker(closing.mapped().get());
+    closing.mapped()->terminate();
     persist();
 }
 

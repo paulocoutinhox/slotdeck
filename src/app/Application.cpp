@@ -90,6 +90,10 @@ utils::Result<void> Application::initialize() {
 
 // Everything the reader waits for happens here, with the window already on screen saying that it is loading.
 utils::Result<void> Application::completeStartup() {
+    // A window closed while it was loading leaves nothing to start, which is an ending rather than a failure.
+    if (m_shutdownComplete) {
+        return utils::Result<void>::success();
+    }
     if (m_settings == nullptr || m_mainWindow == nullptr) {
         return utils::Result<void>::failure({"application_not_initialized", "The application is not initialized", {}});
     }

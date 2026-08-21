@@ -34,6 +34,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The window opens saying that it is loading and builds its interface only once every plugin it presents is ready, because a product that takes seconds to appear reads as a product that failed to open.
 - Everything the reader waits for runs from the event loop that is already painting that window.
 - A window closed while it is still loading keeps nothing and asks nothing, because nothing was read to be kept.
+- What was queued to run after that window has nothing left to start, which is an ending rather than a failure.
 - The core does not know which navigation destinations, feature widgets or plugin-owned settings exist.
 - The core may contribute its own application settings through the same settings group contract without representing itself as a feature plugin.
 - Runtime discovery scans the platform plugin directory without hardcoded plugin filenames or
@@ -262,6 +263,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A continuation attached to a future that already finished runs immediately, so an object never starts its own asynchronous work inside its constructor and announces the result to a caller that could not connect yet.
 - Plugins with direct asynchronous continuations bind them to a runtime context they own, created during initialization and destroyed before shutdown state is released, either a dedicated context object or the runtime object the continuation mutates.
 - Runtime state a signal can reach is held behind a shared pointer rather than inside the container that indexes it, because a container that grows while a signal is being delivered invalidates every reference into it.
+- State a run is closing leaves the collection that indexes it before anything is announced, so no signal can reach an entry that is already going.
 - Destroying a plugin runtime context cancels pending state mutations, notifications and runtime creation before repositories, hosts or owned collections are cleared.
 - Widget state is changed only from continuations delivered on the widget's owning thread.
 - Views expose pending state by disabling duplicate actions or presenting progress without blocking the event loop.
@@ -1431,7 +1433,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 333 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 334 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
@@ -1511,6 +1513,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Do not destroy a widget or a timer with `delete` when the destruction can be reached from a signal that object is emitting.
 - Deferred destruction is not enough on its own, because a modal dialog runs an event loop that processes it, so a widget that opened a dialog is still destroyed under the click that opened it.
 - A view that presents changing state reconciles the widgets it already has instead of rebuilding them, so a widget the user is interacting with survives the state that changed under it.
+- A widget a rebuild replaces leaves its parent and is destroyed through deferred deletion, because a rebuild can be reached from a signal one of those widgets is emitting.
 - Do not register plugin actions with application or window shortcut scope.
 - Do not forward a core or plugin action shortcut to terminal input.
 - Do not bypass the translated close confirmation for a normal application Quit request.

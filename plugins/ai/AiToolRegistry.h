@@ -46,7 +46,6 @@ class AiToolRegistry final : public QObject {
 
     [[nodiscard]] const QVector<ToolSchema>& schemas() const;
     void discoverSkills(const QString& sandboxRoot, const AiSkillCatalog::Completion& completion);
-    void forgetSkills();
     [[nodiscard]] ToolPresentation presentation(const QString& toolName, const QJsonObject& arguments) const;
     [[nodiscard]] ToolAccess accessOf(const ToolCall& call, const QString& sandboxRoot) const;
     [[nodiscard]] int deadlineMsFor(const ToolCall& call) const;

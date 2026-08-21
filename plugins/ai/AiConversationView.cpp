@@ -216,7 +216,10 @@ void AiConversationView::rebuild() {
     m_followNewest = false;
     while (m_messagesLayout->count() > 1) {
         QLayoutItem* item = m_messagesLayout->takeAt(m_messagesLayout->count() - 1);
-        delete item->widget();
+        if (QWidget* widget = item->widget(); widget != nullptr) {
+            widget->setParent(nullptr);
+            widget->deleteLater();
+        }
         delete item;
     }
 
@@ -448,7 +451,8 @@ void AiConversationView::closePendingTurn() {
     }
 
     m_messagesLayout->removeWidget(m_pendingRow);
-    delete m_pendingRow;
+    m_pendingRow->setParent(nullptr);
+    m_pendingRow->deleteLater();
     m_pendingRow = nullptr;
     m_streaming = nullptr;
 }

@@ -97,7 +97,6 @@ class TerminalWidget final : public QWidget {
     void advanceAutoscroll();
     [[nodiscard]] terminalcore::MouseButton draggedButton() const;
     [[nodiscard]] static terminalcore::MouseButton mouseButtonOf(Qt::MouseButton button);
-    [[nodiscard]] terminalcore::TerminalRenderSnapshot currentSnapshot() const;
     [[nodiscard]] int viewportRows() const;
     [[nodiscard]] static QStringList localPathsFromDrop(const QMimeData& mimeData);
 

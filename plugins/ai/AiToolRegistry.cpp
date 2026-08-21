@@ -414,10 +414,6 @@ void AiToolRegistry::discoverSkills(const QString& sandboxRoot, const AiSkillCat
     m_skills->discover(sandboxRoot, completion);
 }
 
-void AiToolRegistry::forgetSkills() {
-    m_skills->forget();
-}
-
 // A call is read as the tool it is, so a declared one is named by the catalog and a published one by the server that published it.
 ToolPresentation AiToolRegistry::presentation(const QString& toolName, const QJsonObject& arguments) const {
     const auto declared = std::find_if(m_schemas.cbegin(), m_schemas.cend(), [&toolName](const ToolSchema& schema) { return schema.name == toolName; });
@@ -913,7 +909,7 @@ void AiToolRegistry::describePath(const ToolCall& call, const QString& sandboxRo
         return;
     }
 
-    QJsonObject described{{QStringLiteral("type"), information.isDir() ? QStringLiteral("directory") : QStringLiteral("file")}, {QStringLiteral("byteSize"), information.size()}, {QStringLiteral("modifiedAtUtc"), persistence::storedTimestamp(information.lastModified(QTimeZone::UTC))}, {QStringLiteral("readable"), information.isReadable()}, {QStringLiteral("writable"), information.isWritable()}};
+    const QJsonObject described{{QStringLiteral("type"), information.isDir() ? QStringLiteral("directory") : QStringLiteral("file")}, {QStringLiteral("byteSize"), information.size()}, {QStringLiteral("modifiedAtUtc"), persistence::storedTimestamp(information.lastModified(QTimeZone::UTC))}, {QStringLiteral("readable"), information.isReadable()}, {QStringLiteral("writable"), information.isWritable()}};
     completion({call.id, QString::fromUtf8(QJsonDocument(described).toJson(QJsonDocument::Indented)), false});
 }
 

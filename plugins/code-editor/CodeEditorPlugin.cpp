@@ -159,9 +159,9 @@ QWidget* CodeEditorPlugin::createAppearanceSection(QWidget* parent) {
     // clang-format off
     connect(wordWrap, &QCheckBox::toggled, this, [this](bool enabled) { setWordWrap(enabled); });
     connect(fontFamily, &QComboBox::currentIndexChanged, this, [this, fontFamily](int index) { setEditorFontFamily(fontFamily->itemData(index).toString()); });
-    connect(this, &CodeEditorPlugin::wordWrapChanged, wordWrap, [this, wordWrap]() { QSignalBlocker blocker(wordWrap); wordWrap->setChecked(m_settings.wordWrap); });
+    connect(this, &CodeEditorPlugin::wordWrapChanged, wordWrap, [this, wordWrap]() { const QSignalBlocker blocker(wordWrap); wordWrap->setChecked(m_settings.wordWrap); });
     connect(fontSize, &QSpinBox::valueChanged, this, [this](int pointSize) { setEditorFontSize(pointSize); });
-    connect(this, &CodeEditorPlugin::editorFontChanged, fontSize, [this, fontSize]() { QSignalBlocker blocker(fontSize); fontSize->setValue(m_settings.fontSize); });
+    connect(this, &CodeEditorPlugin::editorFontChanged, fontSize, [this, fontSize]() { const QSignalBlocker blocker(fontSize); fontSize->setValue(m_settings.fontSize); });
     // clang-format on
     return view;
 }

@@ -396,7 +396,10 @@ void SystemInformationView::clearContent() {
     m_state = nullptr;
     while (m_contentLayout->count() > 0) {
         QLayoutItem* item = m_contentLayout->takeAt(0);
-        delete item->widget();
+        if (QWidget* widget = item->widget(); widget != nullptr) {
+            widget->setParent(nullptr);
+            widget->deleteLater();
+        }
         delete item;
     }
 }

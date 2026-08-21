@@ -30,7 +30,6 @@ class AiSkillCatalog final : public QObject {
     explicit AiSkillCatalog(PluginHost& host, QObject* parent = nullptr);
 
     void discover(const QString& workdir, const Completion& completion);
-    void forget();
 
     // The roots are the published ones, in the order that decides which of them owns a repeated name.
     [[nodiscard]] static QStringList roots(const QString& workdir);
