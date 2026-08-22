@@ -181,6 +181,7 @@ AiHttpChatClient::~AiHttpChatClient() {
 
 // The provider counts a request that is in flight, so the admission is held until this client stops using it.
 void AiHttpChatClient::releaseGate() {
+    m_gate.withdraw(m_providerId, this);
     if (!m_gateHeld) {
         return;
     }

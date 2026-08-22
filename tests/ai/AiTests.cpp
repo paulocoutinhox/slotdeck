@@ -2829,6 +2829,68 @@ TEST(AiConversationViewTest, MeasuresATurnOfToolsByTheSameRuleAsAMessage) {
     plugin.shutdown();
 }
 
+TEST(AiPluginTest, DispatchesOneDueOccurrenceOnceWhileItsQueueRowIsStillBeingWritten) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    AiTask due = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    TaskSchedule schedule;
+    schedule.kind = ScheduleKind::Interval;
+    schedule.intervalSeconds = 3600;
+    schedule.timeZoneId = QByteArrayLiteral("UTC");
+    schedule.nextRunAtUtc = now.addSecs(-60);
+    due.schedule = schedule;
+    AiTestsHelper::installAiRows(host, {workspace}, {due}, {});
+
+    // The row that takes the task out of the schedule is still being written while the scheduler wakes again.
+    QVector<std::shared_ptr<QPromise<utils::Result<void>>>> pending;
+    auto previous = host.transactionFutureHandler;
+    // clang-format off
+    host.transactionFutureHandler = [&pending, previous](const QVector<persistence::DatabaseStatement>& statements) {
+        const bool queueing = !statements.isEmpty() && statements.first().statement.contains(QStringLiteral("ai_tasks_queue"));
+        if (!queueing) {
+            return previous(statements);
+        }
+        auto promise = std::make_shared<QPromise<utils::Result<void>>>();
+        promise->start();
+        pending.append(promise);
+        return promise->future();
+    };
+    // clang-format on
+
+    QVector<FakeChatClient*> clients;
+    // clang-format off
+    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return !pending.isEmpty(); }));
+    // clang-format on
+
+    // The scheduler is given every chance to wake again before that write lands.
+    for (int turn = 0; turn < 40; ++turn) {
+        QApplication::processEvents(QEventLoop::AllEvents, 5);
+    }
+    EXPECT_EQ(pending.size(), 1);
+
+    // A second start asked for while that write is in flight is refused instead of reaching storage as a duplicate.
+    EXPECT_EQ(test::awaitFuture(plugin.startTask(due.id)).error().code, QStringLiteral("ai_tasks_task_busy"));
+    EXPECT_EQ(pending.size(), 1);
+
+    // The row that could not be written returns the task to the schedule it was taken from.
+    EXPECT_EQ(plugin.runState(due.id), TaskRunState::Waiting);
+    pending.first()->addResult(utils::Result<void>::failure({"write_failed", "Write failed", {}}));
+    pending.first()->finish();
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return plugin.runState(due.id) == TaskRunState::Idle; }));
+    // clang-format on
+    ASSERT_NE(plugin.tasks().constFirst().schedule.has_value(), false);
+    EXPECT_EQ(plugin.tasks().constFirst().schedule->nextRunAtUtc, schedule.nextRunAtUtc);
+    EXPECT_EQ(plugin.tasks().constFirst().column, due.column);
+    plugin.shutdown();
+}
+
 TEST(AiTranslationsTest, ReachesEveryKeyItBuildsFromAnEnumOrFromTheCatalog) {
     const plugins::TranslationEntries english = translations::english();
     const QVector<ExecutionLogKind> kinds{ExecutionLogKind::Started, ExecutionLogKind::Iteration, ExecutionLogKind::Compacted, ExecutionLogKind::RequestSent, ExecutionLogKind::FirstTokenReceived, ExecutionLogKind::ResponseReceived, ExecutionLogKind::UsageReported, ExecutionLogKind::ToolCalled, ExecutionLogKind::ToolReturned, ExecutionLogKind::Throttled, ExecutionLogKind::Succeeded, ExecutionLogKind::Failed, ExecutionLogKind::Cancelled};

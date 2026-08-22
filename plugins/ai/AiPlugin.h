@@ -183,6 +183,7 @@ class AiPlugin final : public QObject, public PluginInterface {
     void forgetTask(const QString& taskId);
     void reportFailure(const utils::Error& error, const QString& message);
     void processSchedules();
+    void applyScheduledDispatch(const QString& taskId, const std::optional<TaskSchedule>& schedule, TaskColumn column, const QDateTime& now);
     void armScheduleTimer();
 
     PluginHost* m_host{nullptr};

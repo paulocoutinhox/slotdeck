@@ -1691,6 +1691,50 @@ TEST(AiPluginTest, EndsTheAgentAtItsIterationLimitWithTheReasonRatherThanWithAFa
     plugin.shutdown();
 }
 
+TEST(AiChatClientTest, WithdrawsFromTheQueueWhenTheRunIsStoppedBeforeItsTurnCame) {
+    QTcpServer server;
+    ASSERT_TRUE(server.listen(QHostAddress::LocalHost, 0));
+    int requests = 0;
+    // clang-format off
+    QObject::connect(&server, &QTcpServer::newConnection, &server, [&server, &requests]() { QTcpSocket* socket = server.nextPendingConnection(); QObject::connect(socket, &QTcpSocket::readyRead, socket, [&requests]() { ++requests; }); });
+    // clang-format on
+
+    const ProviderDescriptor* openai = findProvider(QStringLiteral("openai"));
+    ASSERT_NE(openai, nullptr);
+    const QString model = QStringLiteral("gpt-4o");
+    const ModelConnection connection{openai->id, model, {}, QStringLiteral("sk"), {}, defaultParameters(*openai, model), {}};
+    const ChatRequest request{connection, QStringLiteral("http://127.0.0.1:%1").arg(server.serverPort()), QJsonArray{QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QStringLiteral("hello")}}}, {}};
+    // clang-format off
+    const auto translate = [](const QString& key) { return key; };
+    // clang-format on
+
+    // One request at a time, so the second one waits for its turn.
+    AiRequestGate gate;
+    gate.setLimits({{openai->id, 0, 0, 1}});
+    AiHttpChatClient holding(gate);
+    AiHttpChatClient waiting(gate);
+    holding.send(request, translate);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return gate.inFlight(openai->id) == 1; }));
+    // clang-format on
+    waiting.send(request, translate);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return gate.waiting(openai->id) == 1; }));
+    // clang-format on
+
+    // The run is stopped before its turn came, so the place it was holding in the queue is given back.
+    waiting.cancel();
+    EXPECT_EQ(gate.waiting(openai->id), 0);
+
+    const int before = requests;
+    holding.cancel();
+    for (int turn = 0; turn < 30; ++turn) {
+        QApplication::processEvents(QEventLoop::AllEvents, 5);
+    }
+    EXPECT_EQ(requests, before);
+    EXPECT_FALSE(waiting.running());
+}
+
 TEST(AiToolRegistryTest, DeclaresValidSchemasAndKeepsEveryPathInsideTheWorkingDirectory) {
     test::TestPluginHost host;
     host.translations = translations::english();

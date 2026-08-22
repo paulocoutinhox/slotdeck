@@ -1195,23 +1195,31 @@ QFuture<utils::Result<void>> AiPlugin::startTask(const QString& taskId) {
     return loaded.then(m_asyncContext.get(), prompted).unwrap();
 }
 
+// The task is queued before its row is written, because a second start asked for while that write is in flight would reach storage as a duplicate.
 QFuture<utils::Result<void>> AiPlugin::enqueueRun(const QString& taskId) {
+    const AiTask* queued = task(taskId);
+    if (queued == nullptr) {
+        return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_tasks_task_unknown", "The AI task is unknown", taskId}));
+    }
+
     const QDateTime now = QDateTime::currentDateTimeUtc();
+    const TaskColumn previousColumn = queued->column;
+    m_queue.append(taskId);
+    applyScheduledDispatch(taskId, queued->schedule, TaskColumn::Doing, now);
+    emit tasksChanged();
+    emit taskRunStateChanged(taskId);
+
     auto future = m_repository->enqueueTask(taskId, now);
     // clang-format off
-    return future.then(m_asyncContext.get(), [this, taskId, now](utils::Result<void> result) {
-        if (result.hasValue()) {
-            m_queue.append(taskId);
-            for (auto& candidate : m_tasks) {
-                if (candidate.id == taskId) {
-                    candidate.column = TaskColumn::Doing;
-                    candidate.updatedAtUtc = now;
-                }
-            }
+    return future.then(m_asyncContext.get(), [this, taskId, previousColumn, now](utils::Result<void> result) {
+        if (!result.hasValue()) {
+            m_queue.removeAll(taskId);
+            applyScheduledDispatch(taskId, task(taskId) == nullptr ? std::optional<TaskSchedule>{} : task(taskId)->schedule, previousColumn, now);
             emit tasksChanged();
             emit taskRunStateChanged(taskId);
-            dispatchQueue();
+            return result;
         }
+        dispatchQueue();
         return result;
     });
     // clang-format on
@@ -2243,46 +2251,67 @@ void AiPlugin::reportFailure(const utils::Error& error, const QString& message) 
     m_host->notify(m_host->translate(QStringLiteral("ai.error.title")), message, AlertSeverity::Error);
 }
 
+// A due occurrence leaves the schedule before its row is written, because a scheduler that wakes again while that write is in flight would dispatch it once more.
 void AiPlugin::processSchedules() {
     if (m_repository == nullptr) {
         return;
     }
 
     const QDateTime now = QDateTime::currentDateTimeUtc();
+    QStringList due;
     for (const auto& candidate : m_tasks) {
-        if (!candidate.schedule.has_value() || !candidate.schedule->enabled || candidate.schedule->nextRunAtUtc > now || runState(candidate.id) != TaskRunState::Idle) {
+        if (candidate.schedule.has_value() && candidate.schedule->enabled && candidate.schedule->nextRunAtUtc <= now && runState(candidate.id) == TaskRunState::Idle) {
+            due.append(candidate.id);
+        }
+    }
+
+    for (const auto& taskId : due) {
+        const AiTask* candidate = task(taskId);
+        if (candidate == nullptr || !candidate->schedule.has_value()) {
             continue;
         }
-        const auto advanced = AiPluginHelper::advanceSchedule(candidate.schedule.value(), now);
+
+        const auto advanced = AiPluginHelper::advanceSchedule(candidate->schedule.value(), now);
         if (!advanced.hasValue()) {
             reportFailure(advanced.error(), m_host->translate(QStringLiteral("ai.error.schedule-save")));
             continue;
         }
 
-        const QString taskId = candidate.id;
+        const TaskSchedule previousSchedule = candidate->schedule.value();
+        const TaskColumn previousColumn = candidate->column;
         const TaskSchedule schedule = advanced.value();
+        m_queue.append(taskId);
+        applyScheduledDispatch(taskId, schedule, TaskColumn::Doing, now);
+        emit tasksChanged();
+        emit taskRunStateChanged(taskId);
+
         auto future = m_repository->enqueueTask(taskId, now, schedule);
         // clang-format off
-        future.then(m_asyncContext.get(), [this, taskId, schedule, now](utils::Result<void> result) {
+        future.then(m_asyncContext.get(), [this, taskId, previousSchedule, previousColumn, now](utils::Result<void> result) {
             if (!result.hasValue()) {
+                m_queue.removeAll(taskId);
+                applyScheduledDispatch(taskId, previousSchedule, previousColumn, now);
+                emit tasksChanged();
+                emit taskRunStateChanged(taskId);
                 reportFailure(result.error(), m_host->translate(QStringLiteral("ai.error.schedule-save")));
                 return;
             }
-            m_queue.append(taskId);
-            for (auto& stored : m_tasks) {
-                if (stored.id == taskId) {
-                    stored.schedule = schedule;
-                    stored.column = TaskColumn::Doing;
-                    stored.updatedAtUtc = now;
-                }
-            }
-            emit tasksChanged();
-            emit taskRunStateChanged(taskId);
             dispatchQueue();
         });
         // clang-format on
     }
+
     armScheduleTimer();
+}
+
+void AiPlugin::applyScheduledDispatch(const QString& taskId, const std::optional<TaskSchedule>& schedule, TaskColumn column, const QDateTime& now) {
+    for (auto& stored : m_tasks) {
+        if (stored.id == taskId) {
+            stored.schedule = schedule;
+            stored.column = column;
+            stored.updatedAtUtc = now;
+        }
+    }
 }
 
 void AiPlugin::armScheduleTimer() {

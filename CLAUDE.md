@@ -681,6 +681,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Every request of an agent run passes through that queue rather than only the start of a task, because one task asks the model once per iteration and would spend the whole budget by itself.
 - The pace is applied where the request leaves, so the retry of a rejected request queues again like any other request.
 - A place in the queue belongs to the holder it was given to from the moment it is counted, so a run stopped before it heard about its turn gives that place back instead of holding it for a provider that then admits nobody.
+- A run stopped while it is still waiting withdraws from that queue, because a place nobody withdrew is admitted later and sends the request of a run that no longer exists.
 - A provider nobody limited stores nothing, because a limit of zeros is what the absence already means.
 - A run that is waiting says so on its card and records the wait in its execution log, because a card that only says sending explains nothing.
 - Every run is recorded as an execution with its UTC start, UTC finish, status, token usage, finish reason, error message and returned content.
@@ -841,6 +842,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The search walks the days the expression declares rather than every minute of the horizon, so an expression matching once a year costs the days of that year instead of its minutes.
 - An interval is counted in real seconds over UTC, so a daylight saving turn never changes the spacing between two runs.
 - A due occurrence advances its schedule and inserts its queue row in one transaction, preventing duplicate dispatch after a crash.
+- The task leaves the schedule before that row is written, because a scheduler that wakes again while the write is in flight would dispatch the same occurrence once more, and a write that fails returns the task to the schedule it was taken from.
+- Starting a task queues it before its row is written for the same reason, so a second start asked for meanwhile is refused instead of reaching storage as a duplicate.
 - One-time schedules disable after dispatch but keep the date they were given and the moment they ran, because the card is where the user remembers what was scheduled.
 - Interval schedules skip accumulated missed intervals and cron schedules calculate the next wall-clock occurrence.
 - Scheduler wakeups are capped so wall-clock and timezone changes are reconciled without a blocking polling loop.
@@ -1433,7 +1436,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 334 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 336 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.

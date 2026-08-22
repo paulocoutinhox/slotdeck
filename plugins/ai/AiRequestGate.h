@@ -26,6 +26,8 @@ class AiRequestGate final : public QObject {
     // The admission is held until it is released, and the estimated wait is returned so the caller can say why nothing is happening.
     qint64 acquire(const QString& providerId, QObject* context, std::function<void()> admitted);
     void release(const QString& providerId, QObject* context);
+    // A caller that stops before its turn came gives back the place it was holding in the queue.
+    void withdraw(const QString& providerId, QObject* context);
     [[nodiscard]] int inFlight(const QString& providerId) const;
     [[nodiscard]] int waiting(const QString& providerId) const;
 

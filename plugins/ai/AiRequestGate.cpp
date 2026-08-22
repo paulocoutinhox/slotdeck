@@ -133,6 +133,17 @@ void AiRequestGate::release(const QString& providerId, QObject* context) {
     pump(providerId);
 }
 
+void AiRequestGate::withdraw(const QString& providerId, QObject* context) {
+    auto position = m_providers.find(providerId);
+    if (position == m_providers.end()) {
+        return;
+    }
+
+    // clang-format off
+    position->waiters.removeIf([context](const Waiter& waiter) { return waiter.context == context; });
+    // clang-format on
+}
+
 void AiRequestGate::reclaim(const QString& providerId, QObject* context) {
     auto position = m_providers.find(providerId);
     if (position == m_providers.end() || position->held.remove(context) == 0) {
