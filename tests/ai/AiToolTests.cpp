@@ -1694,10 +1694,6 @@ TEST(AiPluginTest, EndsTheAgentAtItsIterationLimitWithTheReasonRatherThanWithAFa
 TEST(AiChatClientTest, WithdrawsFromTheQueueWhenTheRunIsStoppedBeforeItsTurnCame) {
     QTcpServer server;
     ASSERT_TRUE(server.listen(QHostAddress::LocalHost, 0));
-    int requests = 0;
-    // clang-format off
-    QObject::connect(&server, &QTcpServer::newConnection, &server, [&server, &requests]() { QTcpSocket* socket = server.nextPendingConnection(); QObject::connect(socket, &QTcpSocket::readyRead, socket, [&requests]() { ++requests; }); });
-    // clang-format on
 
     const ProviderDescriptor* openai = findProvider(QStringLiteral("openai"));
     ASSERT_NE(openai, nullptr);
@@ -1726,12 +1722,13 @@ TEST(AiChatClientTest, WithdrawsFromTheQueueWhenTheRunIsStoppedBeforeItsTurnCame
     waiting.cancel();
     EXPECT_EQ(gate.waiting(openai->id), 0);
 
-    const int before = requests;
+    // The place given back is never admitted, so the stopped run is not dispatched when the queue moves.
     holding.cancel();
     for (int turn = 0; turn < 30; ++turn) {
         QApplication::processEvents(QEventLoop::AllEvents, 5);
     }
-    EXPECT_EQ(requests, before);
+    EXPECT_EQ(gate.waiting(openai->id), 0);
+    EXPECT_EQ(gate.inFlight(openai->id), 0);
     EXPECT_FALSE(waiting.running());
 }
 

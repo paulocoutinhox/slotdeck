@@ -85,7 +85,6 @@ class AiHttpChatClient final : public AiChatClient {
     AiRequestGate& m_gate;
     QTimer m_retryTimer;
     QString m_providerId;
-    bool m_gateHeld{false};
     QNetworkAccessManager m_network;
     ChatRequest m_request;
     std::function<QString(const QString&)> m_translate;

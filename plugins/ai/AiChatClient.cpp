@@ -180,19 +180,15 @@ AiHttpChatClient::~AiHttpChatClient() {
 }
 
 // The provider counts a request that is in flight, so the admission is held until this client stops using it.
+// A place is given back the moment this client stops wanting it, whether it was waiting for that place or already holding it.
 void AiHttpChatClient::releaseGate() {
     m_gate.withdraw(m_providerId, this);
-    if (!m_gateHeld) {
-        return;
-    }
-
-    m_gateHeld = false;
     m_gate.release(m_providerId, this);
 }
 
 void AiHttpChatClient::acquireAndDispatch() {
     // clang-format off
-    const auto admitted = [this]() { m_gateHeld = true; dispatch(); };
+    const auto admitted = [this]() { dispatch(); };
     // clang-format on
     const qint64 wait = m_gate.acquire(m_providerId, this, admitted);
     if (wait != 0) {

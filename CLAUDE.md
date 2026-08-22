@@ -682,6 +682,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The pace is applied where the request leaves, so the retry of a rejected request queues again like any other request.
 - A place in the queue belongs to the holder it was given to from the moment it is counted, so a run stopped before it heard about its turn gives that place back instead of holding it for a provider that then admits nobody.
 - A run stopped while it is still waiting withdraws from that queue, because a place nobody withdrew is admitted later and sends the request of a run that no longer exists.
+- A place is given back the moment its holder stops wanting it, whether it was waiting for that place or already holding it, rather than when that holder is destroyed.
 - A provider nobody limited stores nothing, because a limit of zeros is what the absence already means.
 - A run that is waiting says so on its card and records the wait in its execution log, because a card that only says sending explains nothing.
 - Every run is recorded as an execution with its UTC start, UTC finish, status, token usage, finish reason, error message and returned content.
@@ -1493,6 +1494,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A command in a test uses the shell of the running platform through the shared `slotdeck::test` process helpers, and the Windows wait uses ping with both channels redirected, because timeout refuses a redirected console and an inherited pipe keeps the test runner waiting for a command it already killed.
 - A test that cancels a command keeps that command short enough to end on its own, because a child surviving the shell it was started from holds the pipe the process object is closed on and the case expires waiting for it.
 - A pace, a delay or an interval is asserted where it is applied rather than where its effect arrives, because an arrival also carries the setup of its own connection and the clock that timed it is not the one the waiting was measured on.
+- The same holds for a place in a queue, which is asserted on the queue itself rather than on the requests that reach a socket, because a request already on its way arrives whenever the platform delivers it.
 
 ## Documentation writing standard
 
