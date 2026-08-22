@@ -2891,6 +2891,74 @@ TEST(AiPluginTest, DispatchesOneDueOccurrenceOnceWhileItsQueueRowIsStillBeingWri
     plugin.shutdown();
 }
 
+TEST(AiPluginTest, GivesTheProtocolItsShapeOnTheTurnThatFollowsACompaction) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+
+    const ProviderDescriptor* anthropic = findProvider(QStringLiteral("anthropic"));
+    ASSERT_NE(anthropic, nullptr);
+    const QString model = QStringLiteral("claude-3-haiku-20240307");
+    const ModelConnection connection{anthropic->id, model, {}, QStringLiteral("sk-test"), {}, defaultParameters(*anthropic, model), {}};
+    AiAgent agent = AiTestsHelper::testAgent();
+    agent.connectionKey = connectionKey(connection);
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {}, {connection}, {agent});
+
+    // The conversation is far larger than the window of this model, so the turn that follows has to be compacted.
+    const QString filler(120000, QLatin1Char('x'));
+    auto previous = host.queryHandler;
+    const QString stamp = now.toString(Qt::ISODateWithMs);
+    // clang-format off
+    host.queryHandler = [previous, filler, stamp](const QString& statement, const QVariantList& bindings) {
+        if (!statement.contains(QStringLiteral("FROM ai_tasks_messages")) || !statement.contains(QStringLiteral("tool_call_id"))) {
+            return previous(statement, bindings);
+        }
+        persistence::DatabaseRows rows;
+        for (int index = 8; index >= 1; --index) {
+            const bool user = index % 2 == 1;
+            rows.append({{QStringLiteral("id"), QStringLiteral("message-%1").arg(index)}, {QStringLiteral("task_id"), QStringLiteral("task-1")}, {QStringLiteral("sequence"), index}, {QStringLiteral("role"), user ? QStringLiteral("user") : QStringLiteral("assistant")}, {QStringLiteral("content"), filler}, {QStringLiteral("tool_calls"), QStringLiteral("[]")}, {QStringLiteral("tool_call_id"), QString{}}, {QStringLiteral("summarized_until"), 0}, {QStringLiteral("created_at_utc"), stamp}, {QStringLiteral("image_data"), QByteArray{}}, {QStringLiteral("image_media_type"), QString{}}});
+        }
+        return utils::Result<persistence::DatabaseRows>::success(rows);
+    };
+    // clang-format on
+
+    QVector<FakeChatClient*> clients;
+    // clang-format off
+    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.loadConversation(task.id)).hasValue());
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+
+    // The run asks for a summary of what no longer fits, which is a second client of its own.
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return clients.size() == 2; }));
+    // clang-format on
+    clients.at(1)->deliver(QStringLiteral("They discussed the project"), {10, 20}, QStringLiteral("stop"));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return !clients.first()->sentMessages.isEmpty(); }));
+    // clang-format on
+
+    // The Anthropic API refuses a repeated role and a conversation that opens with an assistant turn, whether or not it was compacted.
+    const QJsonArray sent = clients.first()->sentMessages;
+    ASSERT_GE(sent.size(), 2);
+    QString previousRole;
+    for (const auto& value : sent) {
+        const QString role = value.toObject().value(QStringLiteral("role")).toString();
+        if (role == QStringLiteral("system")) {
+            continue;
+        }
+        if (previousRole.isEmpty()) {
+            EXPECT_EQ(role, QStringLiteral("user"));
+        }
+        EXPECT_NE(role, previousRole) << QString::fromUtf8(QJsonDocument(sent).toJson(QJsonDocument::Compact)).left(400).toStdString();
+        previousRole = role;
+    }
+    plugin.shutdown();
+}
+
 TEST(AiTranslationsTest, ReachesEveryKeyItBuildsFromAnEnumOrFromTheCatalog) {
     const plugins::TranslationEntries english = translations::english();
     const QVector<ExecutionLogKind> kinds{ExecutionLogKind::Started, ExecutionLogKind::Iteration, ExecutionLogKind::Compacted, ExecutionLogKind::RequestSent, ExecutionLogKind::FirstTokenReceived, ExecutionLogKind::ResponseReceived, ExecutionLogKind::UsageReported, ExecutionLogKind::ToolCalled, ExecutionLogKind::ToolReturned, ExecutionLogKind::Throttled, ExecutionLogKind::Succeeded, ExecutionLogKind::Failed, ExecutionLogKind::Cancelled};

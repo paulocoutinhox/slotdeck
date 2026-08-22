@@ -1654,7 +1654,7 @@ void AiPlugin::applySummary(const QString& taskId, const QString& executionId, c
     // clang-format off
     const auto translate = [this](const QString& key) { return m_host->translate(key); };
     // clang-format on
-    position->client->send({position->connection, connectionAddress(position->connection), messages, m_tools->schemas()}, translate);
+    position->client->send({position->connection, connectionAddress(position->connection), shapeForProtocol(position->connection, messages), m_tools->schemas()}, translate);
 }
 
 void AiPlugin::handleToolCalls(const QString& taskId, const QString& content, const QVector<ToolCall>& calls) {

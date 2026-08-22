@@ -758,7 +758,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A compaction and its summary are recorded in the execution log, so a run that compacted says so instead of silently forgetting.
 - A tool result travels straight into the model context, so it is truncated with an explicit notice rather than allowed to fill the window.
 - The Anthropic API carries the instructions in its own field, so the system message is lifted out of the conversation for that protocol.
-- Each protocol declares the shape it demands, and the projection ends by satisfying it rather than by trusting the order the conversation happens to hold.
+- Each protocol declares the shape it demands, and every request satisfies it before it leaves, including the turn that follows a compaction, because the summary joins the conversation as a turn of its own and can land beside a turn of the same role.
 - The Anthropic API refuses a repeated role, so two consecutive turns of one role are joined into the single turn it expects, keeping the content blocks each one carried.
 - A conversation whose oldest turns were dropped can open with an assistant turn, which answers nothing and is left out for that protocol.
 - The board and the conversation are pages of one stacked widget, so opening a task replaces the board rather than covering it.
@@ -1436,7 +1436,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 336 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 337 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
