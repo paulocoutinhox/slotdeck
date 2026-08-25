@@ -480,7 +480,6 @@ utils::Result<void> BrowserPlugin::setHomepage(const QString& address) {
 }
 
 PluginHost& BrowserPlugin::host() const {
-    Q_ASSERT(m_host != nullptr);
     return *m_host;
 }
 

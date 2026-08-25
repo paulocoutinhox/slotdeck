@@ -103,8 +103,14 @@ utils::Result<void> TerminalPlugin::initialize(PluginHost& host) {
         return settingsResult;
     }
 
+    const auto* selectedTheme = terminalcore::terminalTheme(m_settings->themeId());
+    if (selectedTheme == nullptr) {
+        shutdown();
+        return utils::Result<void>::failure({"terminal_theme_unknown", "The stored terminal theme is unknown", m_settings->themeId()});
+    }
+
     m_repository = std::make_unique<TerminalWorkspaceRepository>(host);
-    m_manager = std::make_unique<workspace::WorkspaceManager>(*m_repository, host, historyPath, terminalcore::terminalTheme(m_settings->themeId()), terminalcore::createSystemPtyBackend);
+    m_manager = std::make_unique<workspace::WorkspaceManager>(*m_repository, host, historyPath, *selectedTheme, terminalcore::createSystemPtyBackend);
     const auto workspaceResult = m_manager->initialize();
     if (!workspaceResult.hasValue()) {
         shutdown();

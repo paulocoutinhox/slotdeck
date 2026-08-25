@@ -408,9 +408,12 @@ void WorkspaceView::rebuildWorkspace() {
         m_focusHost = new QWidget(this);
         auto* focusLayout = new QVBoxLayout(m_focusHost);
         focusLayout->setContentsMargins(0, 0, 0, 0);
+        // A slot whose session is gone shows what an empty slot shows, because there is nothing to attach a terminal to.
         auto* pane = createTerminalPane(m_focusModeSessionId);
-        pane->setFocusMode(true);
-        focusLayout->addWidget(pane);
+        if (pane != nullptr) {
+            pane->setFocusMode(true);
+        }
+        focusLayout->addWidget(pane != nullptr ? static_cast<QWidget*>(pane) : createEmptySlot(0));
         m_rootLayout->insertWidget(0, m_focusHost, 1);
     } else {
         m_gridHost = new QWidget(this);
@@ -435,7 +438,8 @@ void WorkspaceView::rebuildWorkspace() {
             auto* slotLayout = new QVBoxLayout(slot);
             slotLayout->setContentsMargins(0, 0, 0, 0);
             slotLayout->setSpacing(0);
-            QWidget* content = sessionId.isEmpty() ? createEmptySlot(index) : createTerminalPane(sessionId);
+            QWidget* content = sessionId.isEmpty() ? createEmptySlot(index) : static_cast<QWidget*>(createTerminalPane(sessionId));
+            content = content == nullptr ? createEmptySlot(index) : content;
             slotLayout->addWidget(content);
             slot->registerDropSurface(*content);
 
@@ -516,7 +520,9 @@ QWidget* WorkspaceView::createEmptySlot(int slotIndex) {
 
 TerminalPane* WorkspaceView::createTerminalPane(const QString& sessionId) {
     auto* session = qobject_cast<terminalcore::TerminalSession*>(m_manager.sessionObject(sessionId));
-    Q_ASSERT(session != nullptr);
+    if (session == nullptr) {
+        return nullptr;
+    }
 
     auto* pane = new TerminalPane(*session, m_host, m_gridHost != nullptr ? m_gridHost : m_focusHost);
     pane->setTerminalFont(m_settings.fontFamily(), m_settings.fontSize());

@@ -16,22 +16,19 @@ class DatabaseWorker final : public QObject {
   public:
     explicit DatabaseWorker(QString filePath) : m_filePath(std::move(filePath)) {}
 
-    [[nodiscard]] utils::Result<void> ensureInitialized() {
+    [[nodiscard]] utils::Result<StateStore*> openedStore() {
         if (m_stateStore != nullptr) {
-            return utils::Result<void>::success();
+            return utils::Result<StateStore*>::success(m_stateStore.get());
         }
+
         auto stateStore = std::make_unique<StateStore>(m_filePath);
         const auto result = stateStore->initialize();
         if (!result.hasValue()) {
-            return result;
+            return utils::Result<StateStore*>::failure(result.error());
         }
-        m_stateStore = std::move(stateStore);
-        return utils::Result<void>::success();
-    }
 
-    [[nodiscard]] StateStore& stateStore() const {
-        Q_ASSERT(m_stateStore != nullptr);
-        return *m_stateStore;
+        m_stateStore = std::move(stateStore);
+        return utils::Result<StateStore*>::success(m_stateStore.get());
     }
 
     void close() {
@@ -55,13 +52,13 @@ template <typename T> QFuture<utils::Result<T>> DatabaseExecutorHelper::submit(D
 
     // clang-format off
     const bool submitted = QMetaObject::invokeMethod(worker, [worker, operation = std::move(operation), promise]() mutable {
-        const auto initialization = worker->ensureInitialized();
-        if (!initialization.hasValue()) {
-            promise->addResult(utils::Result<T>::failure(initialization.error()));
+        const auto opened = worker->openedStore();
+        if (!opened.hasValue()) {
+            promise->addResult(utils::Result<T>::failure(opened.error()));
             promise->finish();
             return;
         }
-        promise->addResult(operation(worker->stateStore()));
+        promise->addResult(operation(*opened.value()));
         promise->finish();
     }, Qt::QueuedConnection);
     // clang-format on
@@ -79,13 +76,13 @@ template <> QFuture<utils::Result<void>> DatabaseExecutorHelper::submit(Database
 
     // clang-format off
     const bool submitted = QMetaObject::invokeMethod(worker, [worker, operation = std::move(operation), promise]() mutable {
-        const auto initialization = worker->ensureInitialized();
-        if (!initialization.hasValue()) {
-            promise->addResult(utils::Result<void>::failure(initialization.error()));
+        const auto opened = worker->openedStore();
+        if (!opened.hasValue()) {
+            promise->addResult(utils::Result<void>::failure(opened.error()));
             promise->finish();
             return;
         }
-        promise->addResult(operation(worker->stateStore()));
+        promise->addResult(operation(*opened.value()));
         promise->finish();
     }, Qt::QueuedConnection);
     // clang-format on

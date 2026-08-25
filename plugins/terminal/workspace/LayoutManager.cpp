@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <optional>
-#include <stdexcept>
 
 namespace slotdeck::workspace {
 
@@ -10,13 +9,14 @@ QVector<domain::LayoutPreset> LayoutManager::presets() {
     return {{"1-single", "Single", 1, 1, 1, {1.0}, {1.0}}, {"2-columns", "Two Columns", 2, 2, 1, {1.0, 1.0}, {1.0}}, {"2-rows", "Two Rows", 2, 1, 2, {1.0}, {1.0, 1.0}}, {"3-left", "Large Left", 3, 2, 2, {1.15, 1.0}, {1.0, 1.0}}, {"3-bottom", "Large Bottom", 3, 2, 2, {1.0, 1.0}, {1.0, 1.0}}, {"4-grid", "Two by Two", 4, 2, 2, {1.0, 1.0}, {1.0, 1.0}}, {"5-balanced", "Five Balanced", 5, 3, 2, {1.0, 1.0, 1.0}, {1.0, 1.0}}, {"6-columns", "Three by Two", 6, 3, 2, {1.0, 1.0, 1.0}, {1.0, 1.0}}, {"6-rows", "Two by Three", 6, 2, 3, {1.0, 1.0}, {1.0, 1.0, 1.0}}, {"7-balanced", "Seven Balanced", 7, 3, 3, {1.0, 1.0, 1.0}, {1.0, 1.0, 1.0}}, {"8-columns", "Four by Two", 8, 4, 2, {1.0, 1.0, 1.0, 1.0}, {1.0, 1.0}}, {"8-rows", "Two by Four", 8, 2, 4, {1.0, 1.0}, {1.0, 1.0, 1.0, 1.0}}, {"9-grid", "Three by Three", 9, 3, 3, {1.0, 1.0, 1.0}, {1.0, 1.0, 1.0}}, {"10-balanced", "Five by Two", 10, 5, 2, {1.0, 1.0, 1.0, 1.0, 1.0}, {1.0, 1.0}}, {"11-balanced", "Eleven Balanced", 11, 4, 3, {1.0, 1.0, 1.0, 1.0}, {1.0, 1.0, 1.0}}, {"12-columns", "Four by Three", 12, 4, 3, {1.0, 1.0, 1.0, 1.0}, {1.0, 1.0, 1.0}}, {"12-rows", "Three by Four", 12, 3, 4, {1.0, 1.0, 1.0}, {1.0, 1.0, 1.0, 1.0}}};
 }
 
-domain::LayoutPreset LayoutManager::preset(const QString& presetId) {
+utils::Result<domain::LayoutPreset> LayoutManager::preset(const QString& presetId) {
     const auto availablePresets = presets();
     const auto match = std::ranges::find(availablePresets, presetId, &domain::LayoutPreset::id);
     if (match == availablePresets.end()) {
-        throw std::invalid_argument("Unknown layout preset");
+        return utils::Result<domain::LayoutPreset>::failure({"terminal_layout_preset_unknown", "The terminal layout preset is unknown", presetId});
     }
-    return *match;
+
+    return utils::Result<domain::LayoutPreset>::success(*match);
 }
 
 bool LayoutManager::contains(const domain::SlotLayoutState& layout, const QString& sessionId) {
@@ -35,8 +35,13 @@ int LayoutManager::visibleSlotIndex(const domain::SlotLayoutState& layout, const
     return static_cast<int>(std::distance(layout.slotAssignments.begin(), assignment));
 }
 
-void LayoutManager::changePreset(domain::SlotLayoutState& layout, const QString& presetId) {
-    const auto selectedPreset = preset(presetId);
+utils::Result<void> LayoutManager::changePreset(domain::SlotLayoutState& layout, const QString& presetId) {
+    const auto requested = preset(presetId);
+    if (!requested.hasValue()) {
+        return utils::Result<void>::failure(requested.error());
+    }
+
+    const domain::LayoutPreset selectedPreset = requested.value();
 
     if (selectedPreset.slotCount < layout.slotCount) {
         for (int index = selectedPreset.slotCount; index < layout.slotAssignments.size(); ++index) {
@@ -50,11 +55,12 @@ void LayoutManager::changePreset(domain::SlotLayoutState& layout, const QString&
     layout.slotAssignments.resize(selectedPreset.slotCount);
     layout.slotCount = selectedPreset.slotCount;
     layout.presetId = selectedPreset.id;
+    return utils::Result<void>::success();
 }
 
-void LayoutManager::assignToSlot(domain::SlotLayoutState& layout, const QString& sessionId, int slotIndex) {
-    if (slotIndex < 0 || slotIndex >= layout.slotCount) {
-        throw std::out_of_range("Slot index is outside the active layout");
+utils::Result<void> LayoutManager::assignToSlot(domain::SlotLayoutState& layout, const QString& sessionId, int slotIndex) {
+    if (slotIndex < 0 || slotIndex >= layout.slotCount || slotIndex >= layout.slotAssignments.size()) {
+        return utils::Result<void>::failure({"terminal_layout_slot_invalid", "The terminal slot is outside the active layout", QString::number(slotIndex)});
     }
 
     const auto sourceSlot = std::ranges::find(layout.slotAssignments, sessionId);
@@ -65,15 +71,16 @@ void LayoutManager::assignToSlot(domain::SlotLayoutState& layout, const QString&
     layout.slotAssignments[slotIndex] = sessionId;
 
     if (!displaced.has_value() || displaced.value() == sessionId) {
-        return;
+        return utils::Result<void>::success();
     }
 
     if (sourceSlotIndex >= 0) {
         layout.slotAssignments[sourceSlotIndex] = displaced.value();
-        return;
+        return utils::Result<void>::success();
     }
 
     layout.shelf.prepend(displaced.value());
+    return utils::Result<void>::success();
 }
 
 void LayoutManager::moveToShelf(domain::SlotLayoutState& layout, const QString& sessionId, int shelfIndex) {

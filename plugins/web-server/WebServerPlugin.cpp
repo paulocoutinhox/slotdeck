@@ -619,7 +619,6 @@ void WebServerPlugin::setSplitRatio(int ratio) {
 }
 
 PluginHost& WebServerPlugin::host() const {
-    Q_ASSERT(m_host != nullptr);
     return *m_host;
 }
 

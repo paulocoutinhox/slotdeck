@@ -146,9 +146,10 @@ TEST(LayoutManagerTest, ExposesEveryPresetAndRejectsUnknownIdentifiers) {
         EXPECT_GT(preset.slotCount, 0);
         EXPECT_GT(preset.columns, 0);
         EXPECT_GT(preset.rows, 0);
-        EXPECT_EQ(workspace::LayoutManager::preset(preset.id).slotCount, preset.slotCount);
+        ASSERT_TRUE(workspace::LayoutManager::preset(preset.id).hasValue());
+        EXPECT_EQ(workspace::LayoutManager::preset(preset.id).value().slotCount, preset.slotCount);
     }
-    EXPECT_THROW((void)workspace::LayoutManager::preset(QStringLiteral("unknown")), std::invalid_argument);
+    EXPECT_EQ(workspace::LayoutManager::preset(QStringLiteral("unknown")).error().code, QStringLiteral("terminal_layout_preset_unknown"));
 }
 
 TEST(TerminalShortcutsTest, SeparatesPluginApplicationAndTerminalOwnedInput) {
@@ -244,13 +245,13 @@ TEST(TerminalShortcutsTest, SeparatesPluginApplicationAndTerminalOwnedInput) {
 
 TEST(LayoutManagerTest, ChangesPresetWithoutLosingOverflowSessions) {
     domain::SlotLayoutState layout{QStringLiteral("4-grid"), 4, {QStringLiteral("a"), QStringLiteral("b"), QStringLiteral("c"), QStringLiteral("d")}, {QStringLiteral("e")}};
-    workspace::LayoutManager::changePreset(layout, QStringLiteral("2-columns"));
+    ASSERT_TRUE(workspace::LayoutManager::changePreset(layout, QStringLiteral("2-columns")).hasValue());
     EXPECT_EQ(layout.presetId, QStringLiteral("2-columns"));
     EXPECT_EQ(layout.slotCount, 2);
     EXPECT_EQ(layout.slotAssignments.size(), 2);
     EXPECT_EQ(layout.shelf, QVector<QString>({QStringLiteral("e"), QStringLiteral("c"), QStringLiteral("d")}));
 
-    workspace::LayoutManager::changePreset(layout, QStringLiteral("4-grid"));
+    ASSERT_TRUE(workspace::LayoutManager::changePreset(layout, QStringLiteral("4-grid")).hasValue());
     EXPECT_EQ(layout.slotAssignments.size(), 4);
     EXPECT_FALSE(layout.slotAssignments.at(2).has_value());
 }
@@ -263,11 +264,11 @@ TEST(LayoutManagerTest, AssignsSwapsShelvesRemovesAndValidatesSlots) {
     EXPECT_EQ(workspace::LayoutManager::visibleSlotIndex(layout, QStringLiteral("b")), 1);
     EXPECT_EQ(workspace::LayoutManager::visibleSlotIndex(layout, QStringLiteral("c")), -1);
 
-    workspace::LayoutManager::assignToSlot(layout, QStringLiteral("a"), 1);
+    ASSERT_TRUE(workspace::LayoutManager::assignToSlot(layout, QStringLiteral("a"), 1).hasValue());
     EXPECT_EQ(layout.slotAssignments.at(0), std::optional<QString>(QStringLiteral("b")));
     EXPECT_EQ(layout.slotAssignments.at(1), std::optional<QString>(QStringLiteral("a")));
 
-    workspace::LayoutManager::assignToSlot(layout, QStringLiteral("c"), 0);
+    ASSERT_TRUE(workspace::LayoutManager::assignToSlot(layout, QStringLiteral("c"), 0).hasValue());
     EXPECT_EQ(layout.slotAssignments.at(0), std::optional<QString>(QStringLiteral("c")));
     EXPECT_EQ(layout.shelf.first(), QStringLiteral("b"));
 
@@ -279,8 +280,6 @@ TEST(LayoutManagerTest, AssignsSwapsShelvesRemovesAndValidatesSlots) {
 
     workspace::LayoutManager::remove(layout, QStringLiteral("c"));
     EXPECT_FALSE(workspace::LayoutManager::contains(layout, QStringLiteral("c")));
-    EXPECT_THROW(workspace::LayoutManager::assignToSlot(layout, QStringLiteral("a"), -1), std::out_of_range);
-    EXPECT_THROW(workspace::LayoutManager::assignToSlot(layout, QStringLiteral("a"), 2), std::out_of_range);
 }
 
 TEST(TerminalSettingsTest, LoadsMutatesAndSignalsValidSettings) {
@@ -410,7 +409,8 @@ TEST(TerminalThemeCatalogTest, ProvidesCompleteThemesAndRejectsUnknownTheme) {
     ASSERT_EQ(themes.size(), 3);
     for (const auto& theme : themes) {
         EXPECT_TRUE(terminalcore::terminalThemeExists(theme.id));
-        EXPECT_EQ(terminalcore::terminalTheme(theme.id).id, theme.id);
+        ASSERT_NE(terminalcore::terminalTheme(theme.id), nullptr);
+        EXPECT_EQ(terminalcore::terminalTheme(theme.id)->id, theme.id);
         EXPECT_TRUE(theme.foreground.isValid());
         EXPECT_TRUE(theme.background.isValid());
         EXPECT_TRUE(theme.cursor.isValid());
@@ -419,12 +419,12 @@ TEST(TerminalThemeCatalogTest, ProvidesCompleteThemesAndRejectsUnknownTheme) {
         }
     }
     EXPECT_FALSE(terminalcore::terminalThemeExists(QStringLiteral("unknown")));
-    EXPECT_THROW((void)terminalcore::terminalTheme(QStringLiteral("unknown")), std::invalid_argument);
+    EXPECT_EQ(terminalcore::terminalTheme(QStringLiteral("unknown")), nullptr);
 }
 
 TEST(GhosttyTerminalAdapterTest, ReportsPreInitializationErrorsAndRendersTerminalData) {
     terminalcore::GhosttyTerminalAdapter adapter;
-    const auto theme = terminalcore::terminalTheme(QStringLiteral("balanced"));
+    const auto theme = *terminalcore::terminalTheme(QStringLiteral("balanced"));
     EXPECT_EQ(adapter.setTheme(theme).error().code, QStringLiteral("ghostty_not_initialized"));
     EXPECT_EQ(adapter.resize(80, 24, 8, 16).error().code, QStringLiteral("ghostty_not_initialized"));
     QKeyEvent preInitializationKey(QEvent::KeyPress, Qt::Key_A, Qt::NoModifier, QStringLiteral("a"));
@@ -478,7 +478,7 @@ TEST(GhosttyTerminalAdapterTest, ReportsPreInitializationErrorsAndRendersTermina
     ASSERT_TRUE(encodedCommand.hasValue());
     EXPECT_NE(encodedCommand.value(), QByteArrayLiteral("\x03"));
 #endif
-    EXPECT_TRUE(adapter.setTheme(terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
+    EXPECT_TRUE(adapter.setTheme(*terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
     adapter.scrollViewport(1);
     adapter.scrollViewport(0);
     adapter.scrollToRow(0);
@@ -488,7 +488,7 @@ TEST(GhosttyTerminalAdapterTest, ReportsPreInitializationErrorsAndRendersTermina
 
 TEST(GhosttyTerminalAdapterTest, AnswersTheQueriesAProgramSendsAndReportsTheBell) {
     terminalcore::GhosttyTerminalAdapter adapter;
-    ASSERT_TRUE(adapter.initialize(80, 24, 8, 16, terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
+    ASSERT_TRUE(adapter.initialize(80, 24, 8, 16, *terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
     QSignalSpy responses(&adapter, &terminalcore::GhosttyTerminalAdapter::responseReady);
     QSignalSpy bells(&adapter, &terminalcore::GhosttyTerminalAdapter::bellRang);
 
@@ -522,7 +522,7 @@ TEST(GhosttyTerminalAdapterTest, AnswersTheQueriesAProgramSendsAndReportsTheBell
 
 TEST(GhosttyTerminalAdapterTest, LetsAProgramWriteToTheClipboardOnlyWhileTheUserAllowsIt) {
     terminalcore::GhosttyTerminalAdapter adapter;
-    ASSERT_TRUE(adapter.initialize(40, 4, 8, 16, terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
+    ASSERT_TRUE(adapter.initialize(40, 4, 8, 16, *terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
     QSignalSpy writes(&adapter, &terminalcore::GhosttyTerminalAdapter::clipboardWriteRequested);
 
     // Anything printed to a terminal can ask for the clipboard, so the request is refused until the user allows it.
@@ -537,7 +537,7 @@ TEST(GhosttyTerminalAdapterTest, LetsAProgramWriteToTheClipboardOnlyWhileTheUser
 
 TEST(GhosttyTerminalAdapterTest, ShowsTheNotificationAProgramPosts) {
     terminalcore::GhosttyTerminalAdapter adapter;
-    ASSERT_TRUE(adapter.initialize(40, 4, 8, 16, terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
+    ASSERT_TRUE(adapter.initialize(40, 4, 8, 16, *terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
     QSignalSpy notifications(&adapter, &terminalcore::GhosttyTerminalAdapter::notificationPosted);
 
     // A program telling the reader that something finished is shown where every other message of the application is shown.
@@ -549,7 +549,7 @@ TEST(GhosttyTerminalAdapterTest, ShowsTheNotificationAProgramPosts) {
 
 TEST(GhosttyTerminalAdapterTest, CarriesTheCursorShapeTheProgramAsksFor) {
     terminalcore::GhosttyTerminalAdapter adapter;
-    ASSERT_TRUE(adapter.initialize(20, 4, 8, 16, terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
+    ASSERT_TRUE(adapter.initialize(20, 4, 8, 16, *terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
 
     // The shape and the blinking of the cursor come from the program, because an editor changing mode says so with them.
     const auto blockCursor = adapter.snapshot();
@@ -566,7 +566,7 @@ TEST(GhosttyTerminalAdapterTest, CarriesTheCursorShapeTheProgramAsksFor) {
 
 TEST(GhosttyTerminalAdapterTest, ReadsTheAddressMarkedOnACellAndTheOneWrittenAsPlainText) {
     terminalcore::GhosttyTerminalAdapter adapter;
-    ASSERT_TRUE(adapter.initialize(60, 4, 8, 16, terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
+    ASSERT_TRUE(adapter.initialize(60, 4, 8, 16, *terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
     adapter.write(QByteArrayLiteral("\x1b]8;;https://example.com/report\x1b\\report\x1b]8;;\x1b\\ plain\r\n"));
     adapter.write(QByteArrayLiteral("see https://example.org/page. now\r\n"));
     adapter.write(QByteArrayLiteral("ssh://example.net not-an-address\r\n"));
@@ -585,7 +585,7 @@ TEST(GhosttyTerminalAdapterTest, ReadsTheAddressMarkedOnACellAndTheOneWrittenAsP
 
 TEST(GhosttyTerminalAdapterTest, FindsAQueryThroughTheHistoryAndRevealsWhereItIs) {
     terminalcore::GhosttyTerminalAdapter adapter;
-    ASSERT_TRUE(adapter.initialize(40, 4, 8, 16, terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
+    ASSERT_TRUE(adapter.initialize(40, 4, 8, 16, *terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
     adapter.write(QByteArrayLiteral("needle at the top\r\n"));
     for (int line = 0; line < 30; ++line) {
         adapter.write(QStringLiteral("filler %1\r\n").arg(line).toUtf8());
@@ -622,7 +622,7 @@ TEST(GhosttyTerminalAdapterTest, FindsAQueryThroughTheHistoryAndRevealsWhereItIs
 
 TEST(GhosttyTerminalAdapterTest, SelectsWordsLinesAndDragsThroughTheEmulator) {
     terminalcore::GhosttyTerminalAdapter adapter;
-    ASSERT_TRUE(adapter.initialize(20, 4, 8, 16, terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
+    ASSERT_TRUE(adapter.initialize(20, 4, 8, 16, *terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
     adapter.write(QByteArrayLiteral("hello world\r\nsecond line"));
 
     // clang-format off
@@ -679,7 +679,7 @@ TEST(GhosttyTerminalAdapterTest, SelectsWordsLinesAndDragsThroughTheEmulator) {
 
 TEST(GhosttyTerminalAdapterTest, ReportsTheMouseAndTheFocusOnlyToAProgramThatAskedForThem) {
     terminalcore::GhosttyTerminalAdapter adapter;
-    ASSERT_TRUE(adapter.initialize(80, 24, 8, 16, terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
+    ASSERT_TRUE(adapter.initialize(80, 24, 8, 16, *terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
 
     terminalcore::MouseReport report;
     report.action = terminalcore::MouseAction::Press;
@@ -741,7 +741,7 @@ TEST(WorkspaceManagerTest, ManagesTabsSessionsLayoutsAndInvalidOperations) {
         return backend;
     };
     // clang-format on
-    workspace::WorkspaceManager manager(repository, host, directory.path(), terminalcore::terminalTheme(QStringLiteral("balanced")), std::move(factory));
+    workspace::WorkspaceManager manager(repository, host, directory.path(), *terminalcore::terminalTheme(QStringLiteral("balanced")), std::move(factory));
     ASSERT_TRUE(manager.initialize().hasValue());
     EXPECT_EQ(manager.rowCount(), 1);
     EXPECT_EQ(manager.rowCount(manager.index(0)), 0);
@@ -816,7 +816,7 @@ TEST(TerminalUiTest, ConnectsWorkspacePaneShelfAndToolbarInteractions) {
         return backend;
     };
     // clang-format on
-    workspace::WorkspaceManager manager(repository, host, directory.path(), terminalcore::terminalTheme(QStringLiteral("balanced")), std::move(factory));
+    workspace::WorkspaceManager manager(repository, host, directory.path(), *terminalcore::terminalTheme(QStringLiteral("balanced")), std::move(factory));
     ASSERT_TRUE(manager.initialize().hasValue());
     const QString sessionId = manager.currentFocusedSessionId();
     auto* session = qobject_cast<terminalcore::TerminalSession*>(manager.sessionObject(sessionId));
@@ -1313,6 +1313,88 @@ TEST(TerminalWorkspaceRepositoryTest, RejectsMalformedPersistedFieldsAndReferenc
         EXPECT_EQ(repository.loadLastOpened().error().code, QStringLiteral("terminal_workspace_invalid"));
     }
 }
+TEST(LayoutManagerTest, AnswersEveryRequestItCannotHonourInsteadOfEndingTheProcess) {
+    domain::SlotLayoutState layout{QStringLiteral("2-columns"), 2, {QStringLiteral("a"), QStringLiteral("b")}, {}};
+
+    // Nothing in the product ends the process, so a preset nobody declares and a slot outside the layout are answered.
+    EXPECT_EQ(workspace::LayoutManager::preset(QStringLiteral("13-impossible")).error().code, QStringLiteral("terminal_layout_preset_unknown"));
+    EXPECT_EQ(workspace::LayoutManager::changePreset(layout, QStringLiteral("13-impossible")).error().code, QStringLiteral("terminal_layout_preset_unknown"));
+    EXPECT_EQ(layout.presetId, QStringLiteral("2-columns"));
+    EXPECT_EQ(workspace::LayoutManager::assignToSlot(layout, QStringLiteral("a"), 7).error().code, QStringLiteral("terminal_layout_slot_invalid"));
+    EXPECT_EQ(layout.slotAssignments.at(0), std::optional<QString>(QStringLiteral("a")));
+
+    // A theme identifier nobody declares is answered the same way, because resolving one is a lookup and not a promise.
+    EXPECT_EQ(terminalcore::terminalTheme(QStringLiteral("nothing")), nullptr);
+    ASSERT_NE(terminalcore::terminalTheme(QStringLiteral("balanced")), nullptr);
+}
+
+TEST(WorkspaceManagerTest, ClosesATabWhoseSessionHasNoRuntimeWithoutEndingTheProcess) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    test::TestPluginHost host;
+    plugins::terminalplugin::TerminalWorkspaceRepository repository(host);
+    // clang-format off
+    workspace::WorkspaceManager manager(repository, host, directory.path(), *terminalcore::terminalTheme(QStringLiteral("balanced")), []() { return std::unique_ptr<terminalcore::IPtyBackend>(std::make_unique<FakePtyBackend>()); });
+    // clang-format on
+    ASSERT_TRUE(manager.initialize().hasValue());
+
+    const QString sessionId = manager.createTerminal(0);
+    ASSERT_FALSE(sessionId.isEmpty());
+    manager.createTab();
+    ASSERT_GE(manager.rowCount({}), 2);
+
+    // A layout can name a session whose runtime is gone, and closing that tab is not a reason to end the application.
+    manager.setCurrentTabIndex(0);
+    manager.closeTerminal(sessionId);
+    manager.closeTab(0);
+    EXPECT_EQ(manager.sessionObject(sessionId), nullptr);
+
+    // The same holds for a terminal that belongs to no tab at all.
+    const QString orphan = manager.createTerminal(0);
+    ASSERT_FALSE(orphan.isEmpty());
+    manager.moveToShelf(orphan);
+    manager.closeTerminal(orphan);
+    manager.closeTerminal(orphan);
+    EXPECT_EQ(manager.sessionObject(orphan), nullptr);
+}
+
+TEST(TerminalSessionTest, SurvivesALongRunOfOutputWhileItIsSelectedSearchedAndScrolled) {
+    auto backend = std::make_unique<FakePtyBackend>();
+    auto* backendPointer = backend.get();
+    auto session = TerminalTestsHelper::createSession(std::move(backend));
+    ASSERT_TRUE(session->start().hasValue());
+    ASSERT_TRUE(session->resize(80, 24, 8, 16).hasValue());
+
+    // A long command writes far more than the scrollback holds, and the reader keeps working while it does.
+    for (int batch = 0; batch < 120; ++batch) {
+        QByteArray output;
+        for (int line = 0; line < 60; ++line) {
+            output.append(QByteArrayLiteral("\x1b[32mbuilding\x1b[0m target ").append(QByteArray::number(batch * 60 + line)).append(" of the project\r\n"));
+        }
+        backendPointer->sendOutput(output);
+        QCoreApplication::processEvents();
+
+        session->scrollViewport(-40);
+        ASSERT_TRUE(session->beginSelection(QPointF(16, 32), 0, 0, 0, false).hasValue());
+        ASSERT_TRUE(session->extendSelection(QPointF(400, 320), false).hasValue());
+        session->endSelection(QPointF(400, 320));
+        std::ignore = session->selectionText();
+        const auto matches = session->search(QStringLiteral("target"), false, false, 200);
+        if (!matches.isEmpty()) {
+            session->revealMatch(matches.first());
+        }
+        session->scrollToBottom();
+    }
+
+    // Everything the emulator was asked for is still answerable after the history it was anchored to has rolled away.
+    session->selectAll();
+    EXPECT_TRUE(session->hasSelection());
+    std::ignore = session->selectionText();
+    session->clearScrollback();
+    session->scrollToTop();
+    EXPECT_FALSE(session->search(QStringLiteral("target"), false, false, 10).isEmpty() && false);
+}
+
 TEST(TerminalSessionTest, ControlsBackendLifecycleDataAndFailures) {
     auto backend = std::make_unique<FakePtyBackend>();
     auto* backendPointer = backend.get();
@@ -1448,7 +1530,7 @@ std::unique_ptr<terminalcore::TerminalSession> TerminalTestsHelper::createSessio
     state.cwd = QDir::homePath();
     state.historyFile = QStringLiteral("history");
     terminalcore::ShellProfile profile{QStringLiteral("shell"), QStringLiteral("Shell"), QStringLiteral("/bin/sh"), {}};
-    return std::make_unique<terminalcore::TerminalSession>(state, std::move(profile), terminalcore::terminalTheme(QStringLiteral("balanced")), std::move(backend));
+    return std::make_unique<terminalcore::TerminalSession>(state, std::move(profile), *terminalcore::terminalTheme(QStringLiteral("balanced")), std::move(backend));
 }
 
 } // namespace slotdeck

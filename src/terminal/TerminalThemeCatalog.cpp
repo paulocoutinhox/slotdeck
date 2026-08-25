@@ -1,7 +1,6 @@
 #include "terminal/TerminalThemeCatalog.h"
 
 #include <algorithm>
-#include <stdexcept>
 
 namespace slotdeck::terminalcore {
 
@@ -29,13 +28,10 @@ const QVector<domain::TerminalTheme>& terminalThemes() {
     return themes;
 }
 
-const domain::TerminalTheme& terminalTheme(const QString& id) {
+const domain::TerminalTheme* terminalTheme(const QString& id) {
     const auto& themes = terminalThemes();
     const auto match = std::ranges::find(themes, id, &domain::TerminalTheme::id);
-    if (match == themes.end()) {
-        throw std::invalid_argument("Unknown terminal theme");
-    }
-    return *match;
+    return match == themes.end() ? nullptr : &*match;
 }
 
 bool terminalThemeExists(const QString& id) {

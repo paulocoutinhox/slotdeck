@@ -159,12 +159,8 @@ void TerminalView::applyLayoutFromButton() {
 void TerminalView::updateLayoutSelection() {
     const QString presetId = m_manager.currentPresetId();
     for (auto* button : m_layoutPresetGroup->buttons()) {
-        if (button->property("layoutId").toString() == presetId) {
-            button->setChecked(true);
-            return;
-        }
+        button->setChecked(button->property("layoutId").toString() == presetId);
     }
-    Q_UNREACHABLE();
 }
 
 void TerminalView::updateStatus() {

@@ -387,7 +387,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Every session belongs to exactly one visible slot or one shelf.
 - Every tab and session reference is validated when state loads.
 - Closing copies the terminal identity before any signal can destroy its original storage.
-- Views detach before the runtime and process are destroyed.
+- Views detach before the runtime and process are destroyed, and a slot whose session is gone shows what an empty slot shows.
 - Terminal close and workspace mutations publish their namespaced events asynchronously.
 - Restarting retains stable identity, directory, shell profile and history.
 - New terminals receive input focus when their pane becomes available.
@@ -426,7 +426,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - PTY output and input queues remain bounded.
 - Missing directories and unavailable shell profiles are explicit startup failures.
 - Themes own foreground, background, cursor and all sixteen ANSI base colors.
-- Resolving an ANSI theme requires an identifier already validated against the catalog and no caller resolves a literal identifier.
+- Resolving an ANSI theme requires an identifier already validated against the catalog and no caller resolves a literal identifier, and an identifier nobody declares is answered rather than thrown.
 - Theme changes apply to current and future sessions.
 - Font choices contain only installed monospaced families.
 - A platform without an installed monospaced family keeps the terminal on the monospace style hint instead of resolving an empty family.
@@ -1437,7 +1437,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 337 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 340 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
@@ -1524,4 +1524,6 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Do not bypass the translated close confirmation for a normal application Quit request.
 - Do not use raw owning pointers when deterministic ownership exists.
 - Do not ignore persistence, plugin lifecycle, terminal, PTY or server errors.
+- Do not end the process from product code, so no assertion, no exception and no unreachable marker is what answers a lookup that failed, because a `Q_ASSERT` reaching a release of Qt built with Clang is a trap and the reader loses the application over a state the code could have handled.
+- A lookup that finds nothing is a state to handle, so a preset, a slot, a theme, a runtime session and a pane all answer with what they found and the caller decides.
 - Do not bind plugin-owned asynchronous state mutation to a context that survives plugin shutdown.

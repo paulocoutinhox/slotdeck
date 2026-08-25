@@ -8,17 +8,17 @@
 
 namespace slotdeck::plugins::webserver {
 
-RequestLogModel::RequestLogModel(qsizetype capacity) : m_capacity(capacity) {
-    Q_ASSERT(m_capacity > 0);
-}
+RequestLogModel::RequestLogModel(qsizetype capacity) : m_capacity(capacity) {}
 
 void RequestLogModel::append(RequestLogEntry entry) {
     const QWriteLocker locker(&m_lock);
     entry.sequence = m_nextSequence++;
-    if (m_entries.size() == m_capacity) {
+    while (!m_entries.isEmpty() && m_entries.size() >= m_capacity) {
         m_entries.removeFirst();
     }
-    m_entries.append(std::move(entry));
+    if (m_entries.size() < m_capacity) {
+        m_entries.append(std::move(entry));
+    }
 }
 
 void RequestLogModel::clear() {
@@ -27,7 +27,6 @@ void RequestLogModel::clear() {
 }
 
 RequestLogBatch RequestLogModel::entriesSince(std::uint64_t cursor, qsizetype maximumEntries) const {
-    Q_ASSERT(maximumEntries > 0);
 
     const QReadLocker locker(&m_lock);
     RequestLogBatch batch;

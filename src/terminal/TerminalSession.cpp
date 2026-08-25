@@ -21,7 +21,6 @@ constexpr qsizetype maximumPendingOutputSize = 1024 * 1024;
 constexpr qsizetype outputResumeSize = maximumPendingOutputSize / 2;
 
 TerminalSession::TerminalSession(domain::TerminalSessionState state, ShellProfile profile, domain::TerminalTheme theme, std::unique_ptr<IPtyBackend> backend, QObject* parent) : QObject(parent), m_state(std::move(state)), m_profile(std::move(profile)), m_theme(std::move(theme)), m_backend(std::move(backend)) {
-    Q_ASSERT(m_backend != nullptr);
     connect(m_backend.get(), &IPtyBackend::outputReady, this, &TerminalSession::processOutput);
     connect(m_backend.get(), &IPtyBackend::processExited, this, &TerminalSession::processExited);
     connect(m_backend.get(), &IPtyBackend::backendError, this, &TerminalSession::processError);
@@ -67,7 +66,7 @@ QString TerminalSession::status() const {
     case domain::TerminalProcessState::Failed:
         return QStringLiteral("Failed");
     }
-    Q_UNREACHABLE();
+    Q_UNREACHABLE_RETURN(QStringLiteral("Starting"));
 }
 
 int TerminalSession::exitCode() const {

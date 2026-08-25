@@ -20,6 +20,8 @@
 #include <QSpinBox>
 #include <QVBoxLayout>
 
+#include <algorithm>
+
 namespace slotdeck::ui {
 
 class ApplicationSettingsFactory final {
@@ -66,9 +68,7 @@ ApplicationSettingsView::ApplicationSettingsView(plugins::PluginManager& pluginM
             m_language->addItem(pluginManager.translate(ApplicationSettingsViewHelper::languageTitleKey(language)), language);
         }
         sortComboBoxItems(m_language);
-        const int selectedLanguage = m_language->findData(m_settings.language());
-        Q_ASSERT(selectedLanguage >= 0);
-        m_language->setCurrentIndex(selectedLanguage);
+        m_language->setCurrentIndex(std::max(0, m_language->findData(m_settings.language())));
         addSettingsRow(form, pluginManager.translate(QStringLiteral("slotdeck.application.language")), m_language);
         m_theme = new ui::ComboBox(pluginManager.theme(), this);
         m_theme->setObjectName(QStringLiteral("applicationTheme"));
@@ -76,9 +76,7 @@ ApplicationSettingsView::ApplicationSettingsView(plugins::PluginManager& pluginM
             m_theme->addItem(pluginManager.translate(theme->titleKey()), theme->id());
         }
         sortComboBoxItems(m_theme);
-        const int selectedTheme = m_theme->findData(m_settings.themeId());
-        Q_ASSERT(selectedTheme >= 0);
-        m_theme->setCurrentIndex(selectedTheme);
+        m_theme->setCurrentIndex(std::max(0, m_theme->findData(m_settings.themeId())));
         addSettingsRow(form, pluginManager.translate(QStringLiteral("slotdeck.application.theme")), m_theme);
         auto* version = new QLabel(QCoreApplication::applicationVersion(), this);
         version->setObjectName(QStringLiteral("applicationVersion"));

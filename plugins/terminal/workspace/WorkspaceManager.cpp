@@ -40,9 +40,7 @@ QVariantList WorkspaceManagerHelper::optionalSessionIds(const QVector<std::optio
     return result;
 }
 
-WorkspaceManager::WorkspaceManager(plugins::terminalplugin::TerminalWorkspaceRepository& repository, plugins::PluginHost& host, QString historyPath, domain::TerminalTheme terminalTheme, terminalcore::PtyBackendFactory backendFactory, QObject* parent) : QAbstractListModel(parent), m_repository(repository), m_host(host), m_historyPath(std::move(historyPath)), m_terminalTheme(std::move(terminalTheme)), m_backendFactory(std::move(backendFactory)) {
-    Q_ASSERT(m_backendFactory != nullptr);
-}
+WorkspaceManager::WorkspaceManager(plugins::terminalplugin::TerminalWorkspaceRepository& repository, plugins::PluginHost& host, QString historyPath, domain::TerminalTheme terminalTheme, terminalcore::PtyBackendFactory backendFactory, QObject* parent) : QAbstractListModel(parent), m_repository(repository), m_host(host), m_historyPath(std::move(historyPath)), m_terminalTheme(std::move(terminalTheme)), m_backendFactory(std::move(backendFactory)) {}
 
 WorkspaceManager::~WorkspaceManager() {
     shutdown();
@@ -118,7 +116,8 @@ QString WorkspaceManager::sessionName(const QString& sessionId) const {
 
 int WorkspaceManager::currentLayoutColumns() const {
     const auto* tab = currentTab();
-    return tab == nullptr ? 1 : LayoutManager::preset(tab->layout.presetId).columns;
+    const auto preset = tab == nullptr ? utils::Result<domain::LayoutPreset>::failure({}) : LayoutManager::preset(tab->layout.presetId);
+    return preset.hasValue() ? preset.value().columns : 1;
 }
 
 QString WorkspaceManager::currentCwd() const {
@@ -197,7 +196,12 @@ void WorkspaceManager::setTerminalTheme(const QString& themeId) {
         return;
     }
 
-    m_terminalTheme = terminalcore::terminalTheme(themeId);
+    const auto* selected = terminalcore::terminalTheme(themeId);
+    if (selected == nullptr) {
+        return;
+    }
+
+    m_terminalTheme = *selected;
     for (auto& [id, session] : m_runtimeSessions) {
         Q_UNUSED(id);
         session->setTheme(m_terminalTheme);
@@ -308,8 +312,7 @@ void WorkspaceManager::closeTab(int index) {
 
     if (!m_workspace.tabs.isEmpty() && !closingSelectedTab) {
         const auto selected = std::ranges::find(m_workspace.tabs, selectedTabId, &domain::MainTab::id);
-        Q_ASSERT(selected != m_workspace.tabs.end());
-        m_currentTabIndex = static_cast<int>(std::distance(m_workspace.tabs.begin(), selected));
+        m_currentTabIndex = selected == m_workspace.tabs.end() ? std::min(index, static_cast<int>(m_workspace.tabs.size()) - 1) : static_cast<int>(std::distance(m_workspace.tabs.begin(), selected));
     }
     if (!m_workspace.tabs.isEmpty() && closingSelectedTab) {
         m_currentTabIndex = std::min(index, static_cast<int>(m_workspace.tabs.size()) - 1);
@@ -325,8 +328,9 @@ void WorkspaceManager::closeTab(int index) {
 
     for (const auto& sessionId : sessionIds) {
         const auto state = std::ranges::find(m_workspace.sessions, sessionId, &domain::TerminalSessionState::id);
-        Q_ASSERT(state != m_workspace.sessions.end());
-        m_workspace.sessions.erase(state);
+        if (state != m_workspace.sessions.end()) {
+            m_workspace.sessions.erase(state);
+        }
     }
 
     const bool needsDefaultTab = m_workspace.tabs.isEmpty();
@@ -339,13 +343,13 @@ void WorkspaceManager::closeTab(int index) {
     }
 
     for (const auto& sessionId : sessionIds) {
-        const auto runtime = m_runtimeSessions.find(sessionId);
-        Q_ASSERT(runtime != m_runtimeSessions.end());
-        {
-            const QSignalBlocker blocker(runtime->second.get());
-            runtime->second->terminate();
+        auto closing = m_runtimeSessions.extract(sessionId);
+        if (closing.empty()) {
+            continue;
         }
-        m_runtimeSessions.erase(runtime);
+
+        const QSignalBlocker blocker(closing.mapped().get());
+        closing.mapped()->terminate();
     }
 
     if (needsDefaultTab) {
@@ -358,14 +362,19 @@ void WorkspaceManager::closeTab(int index) {
 
 QString WorkspaceManager::createTerminal(int slotIndex) {
     auto* tab = currentTab();
-    if (tab == nullptr) {
+    if (tab == nullptr || m_backendFactory == nullptr) {
+        return {};
+    }
+
+    auto backend = m_backendFactory();
+    if (backend == nullptr) {
         return {};
     }
 
     auto state = createSessionState();
     const QString sessionId = state.id;
     const auto profile = terminalcore::ShellProfileResolver::systemDefault();
-    auto session = std::make_unique<terminalcore::TerminalSession>(state, profile, m_terminalTheme, m_backendFactory());
+    auto session = std::make_unique<terminalcore::TerminalSession>(state, profile, m_terminalTheme, std::move(backend));
     session->setClipboardWriteAllowed(m_clipboardWriteAllowed);
     connect(session.get(), &terminalcore::TerminalSession::stateChanged, this, &WorkspaceManager::persistRuntimeSession);
     connect(session.get(), &terminalcore::TerminalSession::nameChanged, this, &WorkspaceManager::notifySessionNameChanged);
@@ -388,10 +397,11 @@ QString WorkspaceManager::createTerminal(int slotIndex) {
     }
     if (destinationSlot < 0) {
         destinationSlot = LayoutManager::visibleSlotIndex(tab->layout, tab->focusedSessionId);
-        Q_ASSERT(destinationSlot >= 0);
+    }
+    if (!LayoutManager::assignToSlot(tab->layout, sessionId, destinationSlot).hasValue()) {
+        LayoutManager::moveToShelf(tab->layout, sessionId);
     }
 
-    LayoutManager::assignToSlot(tab->layout, sessionId, destinationSlot);
     tab->focusedSessionId = sessionId;
 
     const auto result = runtimeSession(sessionId)->start();
@@ -412,7 +422,6 @@ void WorkspaceManager::closeTerminal(QString sessionId) {
     }
 
     const int owningTabIndex = tabIndexForSession(sessionId);
-    Q_ASSERT(owningTabIndex >= 0);
 
     emit terminalClosing(sessionId);
     removeSessionFromAllTabs(sessionId);
@@ -439,12 +448,11 @@ void WorkspaceManager::changeLayout(const QString& presetId) {
         return;
     }
 
-    try {
-        LayoutManager::changePreset(tab->layout, presetId);
-    } catch (const std::invalid_argument&) {
+    if (!LayoutManager::changePreset(tab->layout, presetId).hasValue()) {
         emit notificationRequested(m_host.translate(QStringLiteral("terminal.error.layout-title")), m_host.translate(QStringLiteral("terminal.error.layout-message")), true);
         return;
     }
+
     normalizeFocusedSession(*tab);
     notifyTabChanged(m_currentTabIndex);
     persist();
@@ -456,12 +464,11 @@ void WorkspaceManager::assignToSlot(const QString& sessionId, int slotIndex) {
         return;
     }
 
-    try {
-        LayoutManager::assignToSlot(tab->layout, sessionId, slotIndex);
-    } catch (const std::out_of_range&) {
+    if (!LayoutManager::assignToSlot(tab->layout, sessionId, slotIndex).hasValue()) {
         emit notificationRequested(m_host.translate(QStringLiteral("terminal.error.slot-title")), m_host.translate(QStringLiteral("terminal.error.slot-message")), true);
         return;
     }
+
     tab->focusedSessionId = sessionId;
     notifyTabChanged(m_currentTabIndex);
     persist();
@@ -482,10 +489,11 @@ void WorkspaceManager::activateShelvedSession(const QString& sessionId) {
     }
     if (destinationSlot < 0) {
         destinationSlot = LayoutManager::visibleSlotIndex(tab->layout, tab->focusedSessionId);
-        Q_ASSERT(destinationSlot >= 0);
+    }
+    if (!LayoutManager::assignToSlot(tab->layout, sessionId, destinationSlot).hasValue()) {
+        LayoutManager::moveToShelf(tab->layout, sessionId);
     }
 
-    LayoutManager::assignToSlot(tab->layout, sessionId, destinationSlot);
     tab->focusedSessionId = sessionId;
     notifyTabChanged(m_currentTabIndex);
     persist();
@@ -604,14 +612,23 @@ domain::TerminalSessionState WorkspaceManager::createSessionState() const {
 }
 
 utils::Result<void> WorkspaceManager::startRuntimeSessions() {
+    if (m_backendFactory == nullptr) {
+        return utils::Result<void>::failure({"terminal_backend_unavailable", "The terminal backend factory is unavailable", {}});
+    }
+
     const auto profiles = terminalcore::ShellProfileResolver::availableProfiles();
     for (auto& state : m_workspace.sessions) {
         const auto savedProfile = std::ranges::find(profiles, state.shellProfileId, &terminalcore::ShellProfile::id);
         if (savedProfile == profiles.end()) {
             return utils::Result<void>::failure({"shell_profile_unavailable", "A saved shell profile is unavailable", state.shellProfileId});
         }
+        auto backend = m_backendFactory();
+        if (backend == nullptr) {
+            return utils::Result<void>::failure({"terminal_backend_unavailable", "The terminal backend factory is unavailable", state.id});
+        }
+
         state.historyFile = QDir(m_historyPath).filePath(state.id + QStringLiteral(".history"));
-        auto session = std::make_unique<terminalcore::TerminalSession>(state, *savedProfile, m_terminalTheme, m_backendFactory());
+        auto session = std::make_unique<terminalcore::TerminalSession>(state, *savedProfile, m_terminalTheme, std::move(backend));
         session->setClipboardWriteAllowed(m_clipboardWriteAllowed);
         connect(session.get(), &terminalcore::TerminalSession::stateChanged, this, &WorkspaceManager::persistRuntimeSession);
         connect(session.get(), &terminalcore::TerminalSession::nameChanged, this, &WorkspaceManager::notifySessionNameChanged);

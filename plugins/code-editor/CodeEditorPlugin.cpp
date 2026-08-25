@@ -367,8 +367,10 @@ utils::Result<QString> CodeEditorPlugin::openWorkspace(const QString& rootPath) 
     const QString canonicalPath = directory.canonicalFilePath();
     for (const auto& existing : m_workspaces) {
         if (existing.rootPath == canonicalPath) {
-            const auto activation = activateWorkspace(existing.id);
-            Q_ASSERT(activation.hasValue());
+            if (const auto activation = activateWorkspace(existing.id); !activation.hasValue()) {
+                return utils::Result<QString>::failure(activation.error());
+            }
+
             emit workspacesChanged();
             return utils::Result<QString>::success(existing.id);
         }
