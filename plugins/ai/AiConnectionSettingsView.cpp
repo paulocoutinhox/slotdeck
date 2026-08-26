@@ -78,11 +78,13 @@ int AiConnectionSettingsView::selectedRow() const {
 
 QStringList AiConnectionSettingsView::takenKeys(int excludedRow) const {
     QStringList keys;
+
     for (int index = 0; index < static_cast<int>(m_connections.size()); ++index) {
         if (index != excludedRow) {
             keys.append(connectionKey(m_connections.at(index)));
         }
     }
+
     return keys;
 }
 
@@ -93,6 +95,7 @@ QString AiConnectionSettingsView::selectedDefaultKey() const {
 void AiConnectionSettingsView::rebuild() {
     m_loading = true;
     m_grid->setRowCount(static_cast<int>(m_connections.size()));
+
     for (int row = 0; row < static_cast<int>(m_connections.size()); ++row) {
         const ModelConnection& connection = m_connections.at(row);
         const ProviderDescriptor* descriptor = findProvider(connection.providerId);
@@ -104,9 +107,11 @@ void AiConnectionSettingsView::rebuild() {
 
     const QString previous = m_plugin.defaultConnectionKey();
     m_defaultConnection->clear();
+
     for (const auto& connection : m_connections) {
         m_defaultConnection->addItem(connectionLabel(connection), connectionKey(connection));
     }
+
     ui::sortComboBoxItems(m_defaultConnection);
     m_defaultConnection->setCurrentIndex(std::max(0, m_defaultConnection->findData(previous)));
     m_defaultConnection->setEnabled(!m_connections.isEmpty());
@@ -118,6 +123,7 @@ void AiConnectionSettingsView::rebuild() {
 
 void AiConnectionSettingsView::addConnection() {
     AiConnectionDialog dialog(m_host, {}, takenKeys(-1), this);
+
     if (dialog.exec() != QDialog::Accepted) {
         return;
     }
@@ -129,12 +135,14 @@ void AiConnectionSettingsView::addConnection() {
 
 void AiConnectionSettingsView::editConnection() {
     const int row = selectedRow();
+
     if (row < 0 || row >= static_cast<int>(m_connections.size())) {
         return;
     }
 
     const QString previousKey = connectionKey(m_connections.at(row));
     AiConnectionDialog dialog(m_host, m_connections.at(row), takenKeys(row), this);
+
     if (dialog.exec() != QDialog::Accepted) {
         return;
     }
@@ -149,6 +157,7 @@ void AiConnectionSettingsView::editConnection() {
 
 void AiConnectionSettingsView::removeConnection() {
     const int row = selectedRow();
+
     if (row < 0 || row >= static_cast<int>(m_connections.size())) {
         return;
     }

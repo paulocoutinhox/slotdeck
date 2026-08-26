@@ -48,6 +48,7 @@ MainWindow::MainWindow(plugins::PluginManager& pluginManager, app::ApplicationSe
     m_toasts = new ToastOverlay(m_pluginManager.theme(), this);
     createActions();
     showLoadingPage();
+
     if (!m_settings.windowGeometry().isEmpty()) {
         restoreGeometry(m_settings.windowGeometry());
     }
@@ -57,6 +58,7 @@ MainWindow::MainWindow(plugins::PluginManager& pluginManager, app::ApplicationSe
 utils::Result<void> MainWindow::buildInterface() {
     auto* loading = takeCentralWidget();
     const auto result = createInterface();
+
     if (!result.hasValue()) {
         setCentralWidget(loading);
         return result;
@@ -101,6 +103,7 @@ void MainWindow::closeEvent(QCloseEvent* event) {
     }
 
     const bool confirmed = ConfirmationDialog::confirm(this, m_pluginManager.translate(QStringLiteral("slotdeck.window.title")), m_pluginManager.translate(QStringLiteral("slotdeck.exit.title")), m_pluginManager.translate(QStringLiteral("slotdeck.exit.message")), m_pluginManager.translate(QStringLiteral("slotdeck.actions.cancel")), m_pluginManager.translate(QStringLiteral("slotdeck.exit.action")), true);
+
     if (!confirmed) {
         event->ignore();
         return;
@@ -126,6 +129,7 @@ void MainWindow::reloadTranslations() {
     setWindowTitle(m_pluginManager.translate(QStringLiteral("slotdeck.window.title")));
     m_quitAction->setText(m_pluginManager.translate(QStringLiteral("slotdeck.exit.action")));
     const auto result = createInterface(preferredModeId);
+
     if (result.hasValue()) {
         previousInterface->deleteLater();
         m_toasts->raise();
@@ -158,9 +162,11 @@ void MainWindow::resizeEvent(QResizeEvent* event) {
 
 void MainWindow::selectMode(const QString& selectedModeId) {
     auto* view = m_views.value(selectedModeId);
+
     if (view == nullptr) {
         return;
     }
+
     m_contentStack->setCurrentWidget(view);
     m_modeBar->setCurrentMode(selectedModeId);
     m_currentModeId = selectedModeId;
@@ -185,6 +191,7 @@ void MainWindow::createActions() {
     connect(m_quitAction, &QAction::triggered, this, &MainWindow::requestApplicationQuit);
 
     const QVector<QPair<QKeySequence, QString>> fontActions{{shortcuts::increaseContentFont(), QStringLiteral("increase")}, {shortcuts::decreaseContentFont(), QStringLiteral("decrease")}, {shortcuts::resetContentFont(), QStringLiteral("reset")}};
+
     for (const auto& fontAction : fontActions) {
         auto* action = new QAction(this);
         action->setShortcut(fontAction.first);
@@ -209,6 +216,7 @@ utils::Result<void> MainWindow::createInterface(const QString& preferredModeId) 
     root->addWidget(m_contentStack, 1);
 
     QString initialMode;
+
     for (const auto& contribution : m_pluginManager.navigationItems()) {
         const QString id = MainWindowHelper::modeId(contribution.pluginId, contribution.item.id);
         auto* view = m_pluginManager.createNavigationView(contribution.pluginId, contribution.item.id, m_contentStack);
@@ -228,12 +236,14 @@ utils::Result<void> MainWindow::createInterface(const QString& preferredModeId) 
 
     const QString settingsMode = QStringLiteral("slotdeck/settings");
     auto* settingsView = new SettingsView(m_pluginManager, m_coreSettings, m_contentStack);
+
     if (!settingsView->isValid()) {
         delete central;
         resetInterfacePointers();
         m_views.clear();
         return utils::Result<void>::failure({"plugin_settings_view_failed", "The settings interface could not be created", {}});
     }
+
     m_contentStack->addWidget(settingsView);
     m_views.insert(settingsMode, settingsView);
     m_modeBar->addMode(settingsMode, icon(IconName::Settings, m_pluginManager.theme()), m_pluginManager.translate(QStringLiteral("slotdeck.settings.title")), plugins::NavigationPlacement::Secondary);
@@ -242,12 +252,14 @@ utils::Result<void> MainWindow::createInterface(const QString& preferredModeId) 
     // clang-format off
     connect(&m_pluginManager, &plugins::PluginManager::navigationRequested, this, [this](const QString& pluginId, const QString& navigationId) { selectMode(MainWindowHelper::modeId(pluginId, navigationId)); });
     // clang-format on
+
     if (initialMode.isEmpty()) {
         delete central;
         resetInterfacePointers();
         m_views.clear();
         return utils::Result<void>::failure({"plugin_navigation_primary_missing", "A primary plugin navigation view is required", {}});
     }
+
     setCentralWidget(central);
     m_toasts->raise();
     selectMode(m_views.contains(preferredModeId) ? preferredModeId : initialMode);

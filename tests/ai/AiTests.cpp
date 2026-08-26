@@ -82,6 +82,7 @@ TEST(AiTaskRepositoryTest, DeclaresOneCreatingMigrationAndRoundTripsWorkspacesTa
     ASSERT_TRUE(repository.initialize().hasValue());
     ASSERT_EQ(host.appliedMigrations.size(), 1);
     EXPECT_EQ(host.appliedMigrations.first().version, 1);
+
     for (const auto& statement : host.appliedMigrations.first().statements) {
         EXPECT_TRUE(statement.startsWith(QStringLiteral("CREATE "))) << statement.toStdString();
     }
@@ -265,6 +266,7 @@ TEST(AiProviderCatalogTest, DeclaresEveryProviderWithConsistentDescriptors) {
     ASSERT_FALSE(catalog.isEmpty());
 
     QSet<QString> identifiers;
+
     for (const auto& provider : catalog) {
         EXPECT_FALSE(provider.id.isEmpty());
         EXPECT_TRUE(provider.titleKey.startsWith(QStringLiteral("ai.provider.")));
@@ -442,6 +444,7 @@ TEST(AiProviderCatalogTest, OpensEveryConnectionAtTheValuesARequestIsWrittenWith
     // A model that answers less than that keeps its own maximum, so no connection opens outside the range its model accepts.
     const ProviderDescriptor* openai = findProvider(QStringLiteral("openai"));
     ASSERT_NE(openai, nullptr);
+
     for (const auto& model : openai->models) {
         const ModelConnection connection = declaredConnection(*openai, model.id);
         const qint64 budget = connection.parameters.value(QStringLiteral("maxOutputTokens")).toInteger(-1);
@@ -593,16 +596,20 @@ TEST(AiProviderCatalogTest, SelectsParametersFromTheTraitsOfTheChosenModel) {
     ASSERT_NE(openai, nullptr);
 
     QStringList sampling;
+
     for (const auto& parameter : applicableParameters(*openai, QStringLiteral("gpt-4o"))) {
         sampling.append(parameter.id);
     }
+
     EXPECT_TRUE(sampling.contains(QStringLiteral("temperature")));
     EXPECT_FALSE(sampling.contains(QStringLiteral("reasoningEffort")));
 
     QStringList reasoning;
+
     for (const auto& parameter : applicableParameters(*openai, QStringLiteral("o3-mini"))) {
         reasoning.append(parameter.id);
     }
+
     EXPECT_TRUE(reasoning.contains(QStringLiteral("reasoningEffort")));
     EXPECT_FALSE(reasoning.contains(QStringLiteral("temperature")));
     EXPECT_TRUE(reasoning.contains(QStringLiteral("maxOutputTokens")));
@@ -1090,6 +1097,7 @@ TEST(AiPluginTest, SummarizesTheTurnsThatNoLongerFitInsteadOfLosingThem) {
     // Each turn asks for a different file, because an agent repeating the same call is stopped as making no progress.
     const qsizetype limit = fittingTokenLimit(findModel(*findProvider(QStringLiteral("openai")), QStringLiteral("gpt-4o"))->contextWindow, 0);
     int turns = 0;
+
     while (clients.size() == 1 && turns < 40) {
         ++turns;
         agent->deliverToolCalls({{QStringLiteral("call-%1").arg(turns), QStringLiteral("write_file"), QJsonObject{{QStringLiteral("path"), QStringLiteral("out-%1.txt").arg(turns)}, {QStringLiteral("content"), filler}}}});
@@ -1332,6 +1340,7 @@ TEST(AiPluginTest, FitsTheConversationToTheModelTheRunDeclaresAndNotToALaterSele
     const qint64 runLimit = fittingTokenLimit(findModel(*provider, QStringLiteral("gpt-4o"))->contextWindow, 0);
     const qint64 widerLimit = fittingTokenLimit(findModel(*provider, widerModel)->contextWindow, 0);
     int turns = 0;
+
     while (clients.size() == 1 && turns < 40) {
         ++turns;
         agent->deliverToolCalls({{QStringLiteral("call-%1").arg(turns), QStringLiteral("write_file"), QJsonObject{{QStringLiteral("path"), QStringLiteral("out-%1.txt").arg(turns)}, {QStringLiteral("content"), filler}}}});
@@ -1381,16 +1390,19 @@ TEST(AiTasksViewTest, OffersTheWorkingDirectoryToTheEditorAndTheWebServerOnlyWhe
 
     QToolButton* openFolder = nullptr;
     QToolButton* serveFolder = nullptr;
+
     for (auto* button : openButtons) {
         if (!button->isHidden()) {
             openFolder = button;
         }
     }
+
     for (auto* button : serveButtons) {
         if (!button->isHidden()) {
             serveFolder = button;
         }
     }
+
     ASSERT_NE(openFolder, nullptr);
     ASSERT_NE(serveFolder, nullptr);
 
@@ -1441,11 +1453,13 @@ TEST(AiTasksViewTest, StopsTheScheduleFromTheCardAndTakesTheActionAwayWithIt) {
     EXPECT_EQ(visible, 1);
 
     QToolButton* stopSchedule = nullptr;
+
     for (auto* button : cards) {
         if (!button->isHidden()) {
             stopSchedule = button;
         }
     }
+
     ASSERT_NE(stopSchedule, nullptr);
     ASSERT_TRUE(stopSchedule->isEnabled());
 
@@ -1547,12 +1561,14 @@ TEST(AiPluginTest, LeavesNothingBehindWhenATaskOrItsWorkspaceIsRemoved) {
 
     AiTaskRepository probe(host);
     const QDateTime now = QDateTime::currentDateTimeUtc();
+
     for (const auto& taskId : {removed.id, inDoomedWorkspace.id}) {
         const TaskExecution execution{QStringLiteral("run-") + taskId, taskId, ExecutionStatus::Failed, now, now.addSecs(1), 1, 2, QStringLiteral("error"), QStringLiteral("it broke"), {}};
         ASSERT_TRUE(test::awaitFuture(probe.startExecution(execution)).hasValue());
         ASSERT_TRUE(test::awaitFuture(probe.finishExecution(execution)).hasValue());
         ASSERT_TRUE(test::awaitFuture(probe.appendExecutionLog({QStringLiteral("log-") + taskId, execution.id, 1, now, ExecutionLogLevel::Error, ExecutionLogKind::Failed, QStringLiteral("detail")})).hasValue());
     }
+
     ASSERT_EQ(probe.lastOutcomes().value().size(), 2);
     plugin.shutdown();
 
@@ -1622,6 +1638,7 @@ TEST(AiTaskRepositoryTest, ReadsBackWhatHappenedToEachTaskAcrossARestart) {
     const TaskExecution older{QStringLiteral("run-1"), failing.id, ExecutionStatus::Succeeded, now.addSecs(-60), now.addSecs(-59), 1, 2, QStringLiteral("stop"), {}, QStringLiteral("first")};
     const TaskExecution newest{QStringLiteral("run-2"), failing.id, ExecutionStatus::Failed, now, now.addSecs(1), 1, 2, QStringLiteral("error"), QStringLiteral("the model refused"), {}};
     const TaskExecution other{QStringLiteral("run-3"), succeeding.id, ExecutionStatus::Succeeded, now, now.addSecs(1), 3, 4, QStringLiteral("stop"), {}, QStringLiteral("done")};
+
     for (const auto& execution : {older, newest, other}) {
         ASSERT_TRUE(test::awaitFuture(repository.startExecution(execution)).hasValue());
         ASSERT_TRUE(test::awaitFuture(repository.finishExecution(execution)).hasValue());
@@ -1704,9 +1721,11 @@ TEST(AiPluginTest, KeepsTheConversationAndClaimsAMessageTypedWhileTheTurnIsRunni
     // clang-format on
     const QJsonArray secondTurn = clients.first()->sentMessages;
     bool carriesTypedMessage = false;
+
     for (const auto& value : secondTurn) {
         carriesTypedMessage = carriesTypedMessage || QJsonDocument(value.toObject()).toJson().contains(QByteArrayLiteral("also check the tests"));
     }
+
     EXPECT_TRUE(carriesTypedMessage);
 
     // The answer of the turn is kept, so the next run starts from everything that was said.
@@ -1743,9 +1762,11 @@ TEST(AiPluginTest, KeepsTheConversationAndClaimsAMessageTypedWhileTheTurnIsRunni
 
 AiTaskInfoDialog* openTaskSurface(QWidget* view, const QString& objectName) {
     auto* button = view->findChild<QToolButton*>(objectName);
+
     if (button == nullptr) {
         return nullptr;
     }
+
     QTest::mouseClick(button, Qt::LeftButton);
     return view->findChild<AiTaskInfoDialog*>();
 }
@@ -1857,11 +1878,13 @@ TEST(AiTasksViewTest, RendersTheBoardWithStatusBadgesAndTheInformationAction) {
     auto* card = runningBadge->parentWidget();
     ASSERT_NE(card, nullptr);
     QLabel* phase = nullptr;
+
     for (auto* candidate : card->findChildren<QLabel*>(QStringLiteral("mutedLabel"))) {
         if (candidate->text() == host.translate(QStringLiteral("ai.phase.sending"))) {
             phase = candidate;
         }
     }
+
     ASSERT_NE(phase, nullptr);
     card->layout()->activate();
     EXPECT_GE(phase->y(), runningBadge->y() + runningBadge->height());
@@ -1926,11 +1949,14 @@ TEST(AiConnectionSettingsViewTest, StartsFromTheEmptyStateAndOpensADialogWithThe
     for (int index = 1; index < provider->count(); ++index) {
         EXPECT_LE(QString::compare(provider->itemText(index - 1), provider->itemText(index), Qt::CaseInsensitive), 0) << provider->itemText(index - 1).toStdString();
     }
+
     provider->setCurrentIndex(provider->findData(QStringLiteral("anthropic")));
     EXPECT_EQ(model->currentText(), findProvider(QStringLiteral("anthropic"))->preferredModels.first());
+
     for (int index = 1; index < model->count(); ++index) {
         EXPECT_LE(QString::compare(model->itemText(index - 1), model->itemText(index), Qt::CaseInsensitive), 0) << model->itemText(index - 1).toStdString();
     }
+
     EXPECT_TRUE(validateConnection(dialog.connection()).hasValue()) << validateConnection(dialog.connection()).error().code.toStdString();
 
     provider->setCurrentIndex(provider->findData(QStringLiteral("openai")));
@@ -2109,10 +2135,12 @@ TEST(AiConversationViewTest, ReadsAsAChatWithSidedBubblesGroupsAndTheTimeOnTheLi
     QCoreApplication::processEvents();
     const auto rows = conversation->findChildren<QWidget*>(QStringLiteral("aiConversationRow"));
     QList<QWidget*> bubbles;
+
     for (auto* row : rows) {
         bubbles.append(row->findChild<QWidget*>(QStringLiteral("aiConversationBubble")));
         ASSERT_NE(bubbles.last(), nullptr);
     }
+
     auto* scroll = conversation->findChild<QScrollArea*>(QStringLiteral("aiConversationScroll"));
     ASSERT_NE(scroll, nullptr);
 
@@ -2135,10 +2163,12 @@ TEST(AiConversationViewTest, ReadsAsAChatWithSidedBubblesGroupsAndTheTimeOnTheLi
 
     // Every bubble obeys one width rule, so a short message and a long one are bounded by the same share.
     int widest = 0;
+
     for (auto* bubble : bubbles) {
         EXPECT_LT(bubble->width(), scroll->viewport()->width());
         widest = std::max(widest, bubble->width());
     }
+
     EXPECT_GT(widest, scroll->viewport()->width() / 2);
     EXPECT_LT(bubbles.at(2)->width(), widest);
 
@@ -2180,6 +2210,7 @@ TEST(AiConversationViewTest, ReadsAsAChatWithSidedBubblesGroupsAndTheTimeOnTheLi
     // Everything inside a bubble reads at the size the chat was given, so no line is smaller than the words beside it.
     const int reading = plugin.executionSettings().chatFontSize;
     EXPECT_EQ(broken->document()->defaultFont().pointSize(), reading);
+
     for (auto* bubble : bubbles) {
         for (auto* written : bubble->findChildren<QLabel*>()) {
             EXPECT_EQ(written->font().pointSize(), reading) << written->objectName().toStdString();
@@ -2191,6 +2222,7 @@ TEST(AiConversationViewTest, ReadsAsAChatWithSidedBubblesGroupsAndTheTimeOnTheLi
     ASSERT_NE(stop, nullptr);
     const bool running = plugin.runState(task.id) != TaskRunState::Idle;
     EXPECT_EQ(stop->isVisible(), running);
+
     if (running) {
         auto* thinking = conversation->findChild<QWidget*>(QStringLiteral("aiConversationThinking"));
         auto* busy = conversation->findChild<ui::BusyIndicator*>(QStringLiteral("aiConversationBusy"));
@@ -2294,6 +2326,7 @@ TEST(AiConversationViewTest, ReadsEveryRoleAsMarkdownAndAnswersEachCallInsideIts
     const auto rows = conversation->findChildren<QWidget*>(QStringLiteral("aiConversationRow"));
     const auto tools = conversation->findChildren<QWidget*>(QStringLiteral("aiConversationTool"));
     ASSERT_EQ(tools.size(), 2);
+
     // A call is read as the name the tool publishes and the one thing it is doing, never as the arguments it was given.
     for (auto* entry : tools) {
         auto* name = entry->findChild<QLabel*>(QStringLiteral("aiConversationToolName"));
@@ -2319,11 +2352,13 @@ TEST(AiConversationViewTest, ReadsEveryRoleAsMarkdownAndAnswersEachCallInsideIts
 
     // Every role reads as Markdown, so a fenced block arrives as code rather than as its own source.
     QTextBrowser* answer = nullptr;
+
     for (auto* content : conversation->findChildren<QTextBrowser*>(QStringLiteral("aiConversationContent"))) {
         if (content->toPlainText().contains(QStringLiteral("Both files are written"))) {
             answer = content;
         }
     }
+
     ASSERT_NE(answer, nullptr);
     EXPECT_FALSE(answer->toPlainText().contains(QStringLiteral("```")));
     EXPECT_TRUE(answer->toPlainText().contains(QStringLiteral("int answer = 42;")));
@@ -2345,6 +2380,7 @@ TEST(AiConversationViewTest, FollowsTheReaderInsteadOfDraggingThemToTheEndOfEver
     AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
+
     for (int index = 0; index < 30; ++index) {
         ASSERT_TRUE(test::awaitFuture(plugin.sendMessage(task.id, QStringLiteral("message %1 that is long enough to take a line of its own in the conversation").arg(index))).hasValue());
     }
@@ -2373,9 +2409,11 @@ TEST(AiConversationViewTest, FollowsTheReaderInsteadOfDraggingThemToTheEndOfEver
     // clang-format off
     ASSERT_TRUE(test::waitUntil([conversation, scroll]() { return conversation->findChildren<QWidget*>(QStringLiteral("aiConversationRow")).size() >= 31 && scroll->verticalScrollBar()->maximum() > 0; }));
     // clang-format on
+
     for (int pass = 0; pass < 5; ++pass) {
         QCoreApplication::processEvents();
     }
+
     EXPECT_EQ(scroll->verticalScrollBar()->value(), 0);
 
     // A reader who is at the end is following, so the next message brings them along.
@@ -2399,12 +2437,15 @@ TEST(AiTaskSurfaceTest, WritesTheLogOfARunWhileItRunsWithoutMovingTheReader) {
 
     QVector<TaskExecution> recordedRuns;
     QVector<ExecutionLogEntry> recordedEntries;
+
     for (int index = 0; index < 2; ++index) {
         recordedRuns.append({QStringLiteral("execution-%1").arg(index), task.id, ExecutionStatus::Running, now.addSecs(-index), {}, 0, 0, {}, {}, {}});
     }
+
     for (int index = 0; index < 80; ++index) {
         recordedEntries.append({QStringLiteral("entry-%1").arg(index), QStringLiteral("execution-1"), index, now, ExecutionLogLevel::Info, ExecutionLogKind::Started, QStringLiteral("line %1").arg(index)});
     }
+
     const AiTestsHelper::RecordedRuns recorded = AiTestsHelper::installExecutionRows(host, recordedRuns, recordedEntries);
 
     QVector<FakeChatClient*> clients;
@@ -2511,12 +2552,14 @@ TEST(AiPluginTest, AnswersAToolCallItCouldNotReadInsteadOfEndingTheRun) {
 
 TEST(AiTaskRepositoryTest, RecordsTheReasonARunStoppedAndRefusesOneNobodyDeclared) {
     const QVector<AgentStopReason> reasons{AgentStopReason::Answered, AgentStopReason::IterationLimit, AgentStopReason::OutputBudget, AgentStopReason::ToolRepetition, AgentStopReason::Cancelled, AgentStopReason::Failed};
+
     for (const auto reason : reasons) {
         const QString name = AiTaskRepository::agentStopReasonName(reason);
         EXPECT_FALSE(name.isEmpty());
         ASSERT_TRUE(AiTaskRepository::agentStopReasonFromName(name).has_value()) << name.toStdString();
         EXPECT_EQ(AiTaskRepository::agentStopReasonFromName(name).value(), reason);
     }
+
     EXPECT_FALSE(AiTaskRepository::agentStopReasonFromName(QStringLiteral("gave-up")).has_value());
     EXPECT_FALSE(AiTaskRepository::agentStopReasonFromName(QString{}).has_value());
 
@@ -2632,9 +2675,11 @@ TEST(AiPluginTest, KeepsARunAliveWhileAnotherOneStartsUnderTheSignalItIsEmitting
     const QDateTime now = QDateTime::currentDateTimeUtc();
     const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
     QVector<AiTask> tasks;
+
     for (int index = 0; index < 8; ++index) {
         tasks.append(AiTestsHelper::makeTask(QStringLiteral("task-%1").arg(index), workspace.id));
     }
+
     AiTestsHelper::installAiRows(host, {workspace}, tasks, {});
     QJsonObject settings = host.settingsDocument;
     settings.insert(QStringLiteral("execution"), QJsonObject{{QStringLiteral("parallelExecutions"), 0}});
@@ -2671,6 +2716,7 @@ TEST(AiPluginTest, KeepsARunAliveWhileAnotherOneStartsUnderTheSignalItIsEmitting
         ASSERT_FALSE(client->sentMessages.isEmpty());
         EXPECT_FALSE(client->sentMessages.first().toObject().value(QStringLiteral("content")).toString().isEmpty());
     }
+
     for (const auto& task : tasks) {
         EXPECT_NE(plugin.runState(task.id), TaskRunState::Idle) << task.id.toStdString();
     }
@@ -2740,9 +2786,11 @@ TEST(AiTasksViewTest, ReadsAScheduledTaskAndAStoppedRunAsTheStatesTheyAreIn) {
     const auto badges = view->findChildren<QLabel*>(QStringLiteral("aiTaskBadge"));
     ASSERT_EQ(badges.size(), 2);
     QStringList states;
+
     for (const auto* badge : badges) {
         states.append(badge->property("badge").toString());
     }
+
     states.sort();
     EXPECT_EQ(states, (QStringList{QStringLiteral("idle"), QStringLiteral("scheduled")}));
     // clang-format off
@@ -2823,9 +2871,11 @@ TEST(AiConversationViewTest, MeasuresATurnOfToolsByTheSameRuleAsAMessage) {
     auto* carrying = bubbles.constLast();
     EXPECT_GE(carrying->width(), activity->fontMetrics().horizontalAdvance(activity->text())) << carrying->width();
     EXPECT_LE(carrying->width(), static_cast<int>(view.width() * 0.70) + 1);
+
     for (auto* bubble : bubbles) {
         EXPECT_LE(bubble->width(), static_cast<int>(view.width() * 0.70) + 1) << bubble->width();
     }
+
     plugin.shutdown();
 }
 
@@ -2872,6 +2922,7 @@ TEST(AiPluginTest, DispatchesOneDueOccurrenceOnceWhileItsQueueRowIsStillBeingWri
     for (int turn = 0; turn < 40; ++turn) {
         QApplication::processEvents(QEventLoop::AllEvents, 5);
     }
+
     EXPECT_EQ(pending.size(), 1);
 
     // A second start asked for while that write is in flight is refused instead of reaching storage as a duplicate.
@@ -2945,6 +2996,7 @@ TEST(AiPluginTest, GivesTheProtocolItsShapeOnTheTurnThatFollowsACompaction) {
     const QJsonArray sent = clients.first()->sentMessages;
     ASSERT_GE(sent.size(), 2);
     QString previousRole;
+
     for (const auto& value : sent) {
         const QString role = value.toObject().value(QStringLiteral("role")).toString();
         if (role == QStringLiteral("system")) {
@@ -2956,6 +3008,7 @@ TEST(AiPluginTest, GivesTheProtocolItsShapeOnTheTurnThatFollowsACompaction) {
         EXPECT_NE(role, previousRole) << QString::fromUtf8(QJsonDocument(sent).toJson(QJsonDocument::Compact)).left(400).toStdString();
         previousRole = role;
     }
+
     plugin.shutdown();
 }
 
@@ -2973,6 +3026,7 @@ TEST(AiTranslationsTest, ReachesEveryKeyItBuildsFromAnEnumOrFromTheCatalog) {
     // clang-format on
     // A turn calling several tools says how many, which is the one sentence of that family the phase name does not spell.
     asked.insert(QStringLiteral("ai.phase.tool-count"));
+
     for (const auto& provider : providerCatalog()) {
         asked.insert(provider.titleKey);
         for (const auto& parameter : provider.parameters) {
@@ -2990,6 +3044,7 @@ TEST(AiTranslationsTest, ReachesEveryKeyItBuildsFromAnEnumOrFromTheCatalog) {
 
     // A key nothing builds is dead weight, so every key of those families answers something.
     const QStringList families{QStringLiteral("ai.log-kind."), QStringLiteral("ai.phase."), QStringLiteral("ai.column."), QStringLiteral("ai.provider."), QStringLiteral("ai.parameter."), QStringLiteral("ai.effort.")};
+
     for (auto entry = english.constBegin(); entry != english.constEnd(); ++entry) {
         // clang-format off
         const QString key = entry.key();

@@ -55,6 +55,7 @@ LineEnding CodeDocumentHelper::detectLineEnding(const QString& text) {
     if (text.contains(QLatin1Char('\r'))) {
         return LineEnding::Cr;
     }
+
     return LineEnding::Lf;
 }
 
@@ -65,6 +66,7 @@ QString CodeDocumentHelper::unsupportedEncodingName(const QByteArray& content) {
     if (content.startsWith(QByteArrayLiteral("\x2B\x2F\x76"))) {
         return QStringLiteral("UTF-7");
     }
+
     return {};
 }
 
@@ -79,6 +81,7 @@ std::optional<TextCharset> CodeDocumentHelper::markedCharset(const QByteArray& c
     if (content.startsWith(QByteArrayLiteral("\xFE\xFF"))) {
         return TextCharset::Utf16Be;
     }
+
     return std::nullopt;
 }
 
@@ -94,6 +97,7 @@ QStringConverter::Encoding CodeDocumentHelper::converterOf(TextCharset charset) 
     case TextCharset::Utf8Bom:
         return QStringConverter::Utf8;
     }
+
     Q_UNREACHABLE_RETURN(QStringConverter::Utf8);
 }
 
@@ -109,6 +113,7 @@ QByteArray CodeDocumentHelper::markOf(TextCharset charset) {
     case TextCharset::Latin1:
         return {};
     }
+
     Q_UNREACHABLE_RETURN({});
 }
 
@@ -118,9 +123,11 @@ std::optional<QString> CodeDocumentHelper::decodeText(const QByteArray& content,
     const QByteArray payload = content.startsWith(mark) ? content.mid(mark.size()) : content;
     QStringDecoder decoder(CodeDocumentHelper::converterOf(charset));
     const QString text = decoder.decode(payload);
+
     if (decoder.hasError()) {
         return std::nullopt;
     }
+
     return text;
 }
 
@@ -128,6 +135,7 @@ std::optional<QString> CodeDocumentHelper::decodeText(const QByteArray& content,
 std::optional<QByteArray> CodeDocumentHelper::encodeText(const QString& text, TextCharset charset) {
     QStringEncoder encoder(CodeDocumentHelper::converterOf(charset));
     const QByteArray encoded = encoder.encode(text);
+
     if (encoder.hasError()) {
         return std::nullopt;
     }
@@ -144,6 +152,7 @@ QString CodeDocumentHelper::lineEndingText(LineEnding ending) {
     case LineEnding::Cr:
         return QStringLiteral("\r");
     }
+
     Q_UNREACHABLE_RETURN(QStringLiteral("\n"));
 }
 
@@ -203,6 +212,7 @@ CodeDocument::~CodeDocument() {
     m_analysisTimer.stop();
     m_highlightTimer.stop();
     m_highlighter.reset();
+
     if (m_languageServer != nullptr) {
         m_languageServer->closeDocument(m_path);
     }
@@ -274,9 +284,11 @@ void CodeDocument::setCursorPosition(int position) {
 
 void CodeDocument::setCursorLocation(int line, int character) {
     QTextBlock block = m_editor->document()->findBlockByNumber(std::max(0, line));
+
     if (!block.isValid()) {
         block = m_editor->document()->lastBlock();
     }
+
     QTextCursor cursor(block);
     cursor.setPosition(std::min(block.position() + std::max(0, character), block.position() + block.length() - 1));
     m_editor->setTextCursor(cursor);
@@ -287,11 +299,14 @@ void CodeDocument::setLanguageServer(LanguageServerClient* server) {
     if (m_languageServer == server) {
         return;
     }
+
     if (m_languageServer != nullptr) {
         m_languageServer->closeDocument(m_path);
         disconnect(m_languageServer, nullptr, this, nullptr);
     }
+
     m_languageServer = server;
+
     if (server == nullptr) {
         m_editor->setDiagnostics({});
         m_editor->setOccurrences({});
@@ -327,11 +342,13 @@ void CodeDocument::setWordWrap(bool enabled) {
 
 void CodeDocument::updatePath(const QString& path) {
     m_externalChangeTimer.stop();
+
     if (m_languageServer != nullptr) {
         m_languageServer->closeDocument(m_path);
         disconnect(m_languageServer, nullptr, this, nullptr);
         m_languageServer = nullptr;
     }
+
     m_watcher.removePath(m_path);
     m_path = QDir::cleanPath(path);
     m_language = LanguageRegistry::languageForPath(m_path);
@@ -365,6 +382,7 @@ void CodeDocument::save() {
     if (!m_dirty) {
         return;
     }
+
     writeContent();
 }
 
@@ -374,7 +392,9 @@ void CodeDocument::writeContent() {
         m_saveRequested = true;
         return;
     }
+
     const auto encoded = encodedContent();
+
     if (!encoded.has_value()) {
         emit operationFailed(m_host.translate(QStringLiteral("code-editor.error.charset-unrepresentable")).arg(textCharsetName(charset())));
         return;
@@ -414,6 +434,7 @@ void CodeDocument::writeContent() {
 
 std::optional<QByteArray> CodeDocument::encodedContent() const {
     QStringList lines = m_editor->toPlainText().split(QLatin1Char('\n'));
+
     if (m_editorConfig.trimTrailingWhitespace.value_or(false)) {
         for (auto& line : lines) {
             while (!line.isEmpty() && (line.back() == QLatin1Char(' ') || line.back() == QLatin1Char('\t') || line.back() == QLatin1Char('\r'))) {
@@ -424,6 +445,7 @@ std::optional<QByteArray> CodeDocument::encodedContent() const {
 
     const QString ending = CodeDocumentHelper::lineEndingText(lineEnding());
     QString text = lines.join(ending);
+
     if (m_editorConfig.insertFinalNewline.value_or(false) && !text.isEmpty() && !text.endsWith(ending)) {
         text += ending;
     }
@@ -434,6 +456,7 @@ std::optional<QByteArray> CodeDocument::encodedContent() const {
 void CodeDocument::loadEditorConfig() {
     const QStringList paths = editorConfigSearchPaths(m_path, m_rootPath);
     const quint64 generation = ++m_editorConfigGeneration;
+
     if (paths.isEmpty()) {
         applyEditorConfig({});
         return;
@@ -442,6 +465,7 @@ void CodeDocument::loadEditorConfig() {
     auto collection = std::make_shared<EditorConfigCollection>();
     collection->files.resize(paths.size());
     collection->pending = static_cast<int>(paths.size());
+
     for (qsizetype index = 0; index < paths.size(); ++index) {
         collection->files[index].directoryPath = QFileInfo(paths.at(index)).absolutePath();
         auto future = m_host.readFile(paths.at(index), LanguageRegistry::limits().maximumFileBytes);
@@ -460,9 +484,11 @@ void CodeDocument::loadEditorConfig() {
 void CodeDocument::applyEditorConfig(EditorConfigProperties properties) {
     m_editorConfig = std::move(properties);
     m_editor->setIndentation(m_editorConfig.indentStyle.value_or(IndentStyle::Space), resolvedIndentWidth(m_editorConfig));
+
     if (!m_editorConfig.unsupportedCharsets.isEmpty()) {
         emit operationFailed(m_host.translate(QStringLiteral("code-editor.error.editorconfig-charset")) + QStringLiteral("\n") + m_editorConfig.unsupportedCharsets.join(QStringLiteral(", ")));
     }
+
     emit editorConfigChanged();
 }
 
@@ -522,11 +548,13 @@ void CodeDocument::applyContent(const QByteArray& content) {
 void CodeDocument::applyDecoded(const DecodedContent& decoded) {
     // The same bytes read in another encoding spell another text, so a reading the reader asked for is applied whatever they say.
     const bool reread = std::exchange(m_rereading, false);
+
     if (!decoded.errorKey.isEmpty()) {
         const QString message = m_host.translate(decoded.errorKey);
         emit operationFailed(decoded.errorDetail.isEmpty() ? message : message + QStringLiteral(" ") + decoded.errorDetail);
         return;
     }
+
     // What the file says is judged only once it is decoded, so the reader can type while it is being read without losing what was typed.
     if (!reread) {
         if (decoded.digest == m_storedDigest) {
@@ -555,16 +583,20 @@ void CodeDocument::applyDecoded(const DecodedContent& decoded) {
         m_editor->setTextCursor(restored);
         m_editor->verticalScrollBar()->setValue(std::min(scrollValue, m_editor->verticalScrollBar()->maximum()));
     }
+
     m_appliedDigest = decoded.digest;
     m_dirty = false;
     ++m_contentRevision;
+
     if (!m_watcher.files().contains(m_path)) {
         m_watcher.addPath(m_path);
     }
+
     emit titleChanged();
     emit loaded(this);
     emit stateChanged();
     m_pendingEdits.clear();
+
     if (m_languageServer != nullptr) {
         m_languageServer->openDocument(m_path, decoded.text, LanguageRegistry::protocolLanguageId(m_path));
         m_languageServer->replaceDocument(m_path, decoded.text);
@@ -576,7 +608,9 @@ void CodeDocument::documentChanged(int position, int removedCharacters, int adde
     if (m_loading) {
         return;
     }
+
     ++m_contentRevision;
+
     if (!m_dirty) {
         m_dirty = true;
         emit titleChanged();
@@ -597,8 +631,10 @@ void CodeDocument::requestCompletionOnTrigger(const QString& addedText) {
     if (m_languageServer == nullptr || addedText.size() != 1) {
         return;
     }
+
     const bool completes = m_languageServer->completionTriggerCharacters().contains(addedText);
     const bool signature = m_languageServer->signatureHelpTriggerCharacters().contains(addedText);
+
     if (!completes && !signature) {
         return;
     }
@@ -606,9 +642,11 @@ void CodeDocument::requestCompletionOnTrigger(const QString& addedText) {
     synchronizeLanguageServer();
     const int line = m_editor->textCursor().blockNumber();
     const int character = m_editor->textCursor().positionInBlock();
+
     if (completes) {
         m_languageServer->requestCompletion(m_path, line, character);
     }
+
     if (signature) {
         m_languageServer->requestSignatureHelp(m_path, line, character);
     }
@@ -622,12 +660,14 @@ void CodeDocument::findText(const QString& query, bool forward) {
     }
 
     const QTextDocument::FindFlags flags = searchFlags(forward);
+
     if (!m_editor->find(query, flags)) {
         QTextCursor cursor = m_editor->textCursor();
         cursor.movePosition(forward ? QTextCursor::Start : QTextCursor::End);
         m_editor->setTextCursor(cursor);
         m_editor->find(query, flags);
     }
+
     refreshSearchMatches(query);
 }
 
@@ -646,15 +686,19 @@ void CodeDocument::searchFromAnchor(const QString& query) {
 
 QTextDocument::FindFlags CodeDocument::searchFlags(bool forward) const {
     QTextDocument::FindFlags flags;
+
     if (!forward) {
         flags |= QTextDocument::FindBackward;
     }
+
     if (m_findBar->caseSensitive()) {
         flags |= QTextDocument::FindCaseSensitively;
     }
+
     if (m_findBar->wholeWord()) {
         flags |= QTextDocument::FindWholeWords;
     }
+
     return flags;
 }
 
@@ -662,6 +706,7 @@ QTextDocument::FindFlags CodeDocument::searchFlags(bool forward) const {
 void CodeDocument::refreshSearchMatches(const QString& query) {
     QVector<QPair<int, int>> matches;
     int current = 0;
+
     if (!query.isEmpty()) {
         const QTextDocument::FindFlags flags = searchFlags(true);
         const int cursorEnd = m_editor->textCursor().selectionEnd();
@@ -694,9 +739,11 @@ void CodeDocument::watchedFileChanged() {
         emit externalFileRemoved(m_path);
         return;
     }
+
     if (!m_watcher.files().contains(m_path)) {
         m_watcher.addPath(m_path);
     }
+
     if (m_saving) {
         return;
     }
@@ -717,9 +764,11 @@ void CodeDocument::requestAnalysis() {
     if (m_languageServer == nullptr) {
         return;
     }
+
     synchronizeLanguageServer();
     m_languageServer->requestDocumentSymbols(m_path);
     m_languageServer->requestDiagnostics(m_path);
+
     // Semantic tokens repaint the complete document, so a file above this bound keeps the pattern colors instead of freezing on every change.
     if (m_editor->document()->blockCount() <= LanguageRegistry::limits().maximumSemanticTokenLines) {
         m_languageServer->requestSemanticTokens(m_path);
@@ -731,6 +780,7 @@ void CodeDocument::showContextMenu(const QPoint& position) {
     const QPoint viewportPosition = m_editor->viewport()->mapFromGlobal(m_editor->mapToGlobal(position));
     const QTextCursor clicked = m_editor->cursorForPosition(viewportPosition);
     const QTextCursor selection = m_editor->textCursor();
+
     if (!selection.hasSelection() || clicked.position() < selection.selectionStart() || clicked.position() > selection.selectionEnd()) {
         m_editor->setTextCursor(clicked);
     }
@@ -739,6 +789,7 @@ void CodeDocument::showContextMenu(const QPoint& position) {
     menu->setAttribute(Qt::WA_DeleteOnClose);
     const QVector<QPair<SymbolQueryKind, QString>> queries{{SymbolQueryKind::Definition, QStringLiteral("code-editor.actions.go-to-definition")}, {SymbolQueryKind::Declaration, QStringLiteral("code-editor.actions.go-to-declaration")}, {SymbolQueryKind::TypeDefinition, QStringLiteral("code-editor.actions.go-to-type-definition")}, {SymbolQueryKind::Implementation, QStringLiteral("code-editor.actions.go-to-implementation")}, {SymbolQueryKind::References, QStringLiteral("code-editor.actions.find-references")}};
     bool separated = false;
+
     for (const auto& query : queries) {
         if (m_languageServer == nullptr || !m_languageServer->supports(query.first)) {
             continue;
@@ -752,6 +803,7 @@ void CodeDocument::showContextMenu(const QPoint& position) {
         connect(action, &QAction::triggered, this, [this, kind = query.first]() { requestSymbolQuery(kind); });
         // clang-format on
     }
+
     menu->popup(m_editor->viewport()->mapToGlobal(viewportPosition));
 }
 
@@ -763,6 +815,7 @@ void CodeDocument::requestSymbolQuery(SymbolQueryKind kind) {
     if (m_languageServer == nullptr) {
         return;
     }
+
     synchronizeLanguageServer();
     m_languageServer->requestSymbolQuery(m_path, m_editor->textCursor().blockNumber(), m_editor->textCursor().positionInBlock(), kind);
 }
@@ -773,13 +826,16 @@ void CodeDocument::reloadEditorConfig() {
 
 void CodeDocument::synchronizeLanguageServer() {
     m_languageServerTimer.stop();
+
     if (m_pendingEdits.isEmpty() || m_languageServer == nullptr) {
         m_pendingEdits.clear();
         return;
     }
+
     if (!m_languageServer->editDocument(m_path, m_pendingEdits)) {
         m_languageServer->replaceDocument(m_path, m_editor->toPlainText());
     }
+
     m_pendingEdits.clear();
 }
 

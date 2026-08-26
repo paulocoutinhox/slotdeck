@@ -113,6 +113,7 @@ class RequestTableModel final : public QAbstractTableModel {
         }
 
         const auto& entry = m_entries.at(index.row());
+
         if (role == Qt::ForegroundRole && index.column() == 1) {
             return m_host.theme().color(entry.status < 400 ? ThemeColor::Success : ThemeColor::Danger);
         }
@@ -178,6 +179,7 @@ class RequestTableModel final : public QAbstractTableModel {
 
         QVector<Entry> incoming;
         incoming.reserve(values.size());
+
         for (const auto& value : values) {
             const QVariantMap entry = value.toMap();
             const QDateTime timestamp = persistence::parseStoredTimestamp(entry.value("timestamp"));
@@ -186,12 +188,15 @@ class RequestTableModel final : public QAbstractTableModel {
 
         const int incomingCount = static_cast<int>(incoming.size());
         beginInsertRows({}, 0, incomingCount - 1);
+
         for (auto& entry : incoming) {
             m_entries.prepend(std::move(entry));
         }
+
         endInsertRows();
 
         const int overflow = std::max(0, static_cast<int>(m_entries.size()) - maximumVisibleRequests);
+
         if (overflow == 0) {
             return;
         }
@@ -206,6 +211,7 @@ class RequestTableModel final : public QAbstractTableModel {
         if (m_entries.isEmpty()) {
             return;
         }
+
         beginResetModel();
         m_entries.clear();
         endResetModel();
@@ -345,6 +351,7 @@ WebServerDialog::WebServerDialog(QString serverId, QString terminalId, QString i
 
 void WebServerDialog::chooseRoot() {
     const QString directory = QFileDialog::getExistingDirectory(this, m_plugin.host().translate(QStringLiteral("web-server.dialog.choose-root-title")), m_rootEdit->text().trimmed(), QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+
     if (!directory.isEmpty()) {
         m_rootEdit->setText(directory);
         if (m_nameEdit->text().trimmed().isEmpty()) {
@@ -376,9 +383,11 @@ void WebServerDialog::stopServer() {
 
 void WebServerDialog::editServer() {
     const bool confirmed = m_plugin.host().confirm(this, m_plugin.host().translate(QStringLiteral("web-server.dialog.edit-title")), m_plugin.host().translate(QStringLiteral("web-server.dialog.edit-message")), m_plugin.host().translate(QStringLiteral("web-server.dialog.edit-detail")), m_plugin.host().translate(QStringLiteral("web-server.dialog.stop-edit")), true);
+
     if (!confirmed) {
         return;
     }
+
     m_plugin.stopWebServer(m_serverId);
     m_rootEdit->setFocus(Qt::OtherFocusReason);
 }
@@ -603,6 +612,7 @@ void WebServerView::refreshInstances(const QString& changedServerId) {
 
     int selectedRow = -1;
     int runningCount = 0;
+
     for (int row = 0; row < static_cast<int>(servers.size()); ++row) {
         const QVariantMap server = servers.at(row).toMap();
         const QString serverId = server.value(QStringLiteral("serverId")).toString();
@@ -664,6 +674,7 @@ void WebServerView::refreshInstances(const QString& changedServerId) {
     m_serverTable->setVisible(!empty);
     m_requestPane->setVisible(!empty);
     m_summaryLabel->setText(m_plugin.host().translate(QStringLiteral("web-server.manager.summary")).arg(servers.size()).arg(runningCount));
+
     if (!empty) {
         m_serverTable->selectRow(selectedRow >= 0 ? selectedRow : 0);
         if (!changedServerId.isEmpty() && changedServerId == selectedServerId()) {
@@ -676,6 +687,7 @@ void WebServerView::refreshInstances(const QString& changedServerId) {
 
 void WebServerView::refreshRequests() {
     const QString serverId = selectedServerId();
+
     if (!isVisible() || serverId.isEmpty()) {
         return;
     }
@@ -692,9 +704,11 @@ void WebServerView::refreshRequests() {
 
 void WebServerView::selectServer() {
     const QString serverId = selectedServerId();
+
     if (m_requestServerId != serverId) {
         resetRequestLog(serverId);
     }
+
     const QString name = m_plugin.webServerName(serverId);
     m_requestTitle->setText(name.isEmpty() ? m_plugin.host().translate(QStringLiteral("web-server.manager.requests")) : m_plugin.host().translate(QStringLiteral("web-server.manager.requests-for")).arg(name));
     refreshRequests();
@@ -712,23 +726,28 @@ void WebServerView::createServer() {
 
 void WebServerView::createServerFromTerminal() {
     const QString terminalId = m_plugin.activeTerminalId();
+
     if (terminalId.isEmpty()) {
         m_plugin.host().notify(m_plugin.host().translate(QStringLiteral("web-server.plugin.title")), m_plugin.host().translate(QStringLiteral("web-server.manager.no-terminal")), plugins::AlertSeverity::Error);
         return;
     }
 
     QString serverId = m_plugin.serverIdForTerminal(terminalId);
+
     if (serverId.isEmpty()) {
         serverId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     }
+
     openDialog(new WebServerDialog(serverId, terminalId, {}, m_plugin, this));
 }
 
 void WebServerView::editServerConfiguration() {
     const auto* button = qobject_cast<QToolButton*>(sender());
+
     if (button == nullptr) {
         return;
     }
+
     openServerEditor(button->property("serverId").toString());
 }
 
@@ -747,11 +766,14 @@ void WebServerView::openServerEditor(const QString& serverId) {
 
 void WebServerView::removeServerConfiguration() {
     const auto* button = qobject_cast<QToolButton*>(sender());
+
     if (button == nullptr) {
         return;
     }
+
     const QString serverId = button->property("serverId").toString();
     const bool confirmed = m_plugin.host().confirm(this, m_plugin.host().translate(QStringLiteral("web-server.dialog.remove-title")), m_plugin.host().translate(QStringLiteral("web-server.dialog.remove-message")).arg(m_plugin.webServerName(serverId)), m_plugin.host().translate(QStringLiteral("web-server.dialog.remove-detail")), m_plugin.host().translate(QStringLiteral("web-server.dialog.remove-action")), true);
+
     if (!confirmed) {
         return;
     }
@@ -775,9 +797,11 @@ void WebServerView::resetRequestLog(const QString& serverId) {
 
 void WebServerView::startServer() {
     const auto* button = qobject_cast<QToolButton*>(sender());
+
     if (button == nullptr) {
         return;
     }
+
     auto future = m_plugin.startWebServer(button->property("serverId").toString());
     // clang-format off
     future.then(this, [this](utils::Result<void> result) {
@@ -790,6 +814,7 @@ void WebServerView::startServer() {
 
 void WebServerView::stopServer() {
     const auto* button = qobject_cast<QToolButton*>(sender());
+
     if (button != nullptr) {
         m_plugin.stopWebServer(button->property("serverId").toString());
     }
@@ -804,6 +829,7 @@ void WebServerView::openServerInBrowser() {
 
 void WebServerView::openServer() {
     const auto* button = qobject_cast<QToolButton*>(sender());
+
     if (button != nullptr) {
         const bool opened = m_plugin.openWebServer(button->property("serverId").toString());
         Q_UNUSED(opened);
@@ -827,6 +853,7 @@ void WebServerView::clearRequests() {
 void WebServerView::scheduleSplitterSave(int, int) {
     const QList<int> sizes = m_splitter->sizes();
     const int total = sizes.at(0) + sizes.at(1);
+
     if (total <= 0) {
         return;
     }

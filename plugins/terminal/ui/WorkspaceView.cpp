@@ -54,6 +54,7 @@ class SlotFrame final : public QFrame {
 
     void registerDropSurface(QWidget& surface) {
         registerDropWidget(surface);
+
         for (auto* child : surface.findChildren<QWidget*>(QString{}, Qt::FindDirectChildrenOnly)) {
             registerDropWidget(*child);
         }
@@ -75,6 +76,7 @@ class SlotFrame final : public QFrame {
             dragEnterEvent(dragEvent);
             return true;
         }
+
         if (event->type() == QEvent::DragMove) {
             auto* dragEvent = static_cast<QDragMoveEvent*>(event);
             if (WorkspaceViewHelper::sessionDragSourceFromDrop(*dragEvent) == nullptr) {
@@ -85,6 +87,7 @@ class SlotFrame final : public QFrame {
             dragMoveEvent(dragEvent);
             return true;
         }
+
         if (event->type() == QEvent::DragLeave) {
             if (!m_internalDragActive) {
                 return QFrame::eventFilter(watched, event);
@@ -94,6 +97,7 @@ class SlotFrame final : public QFrame {
             m_internalDragActive = false;
             return true;
         }
+
         if (event->type() == QEvent::Drop) {
             auto* drop = static_cast<QDropEvent*>(event);
             if (WorkspaceViewHelper::sessionDragSourceFromDrop(*drop) == nullptr) {
@@ -110,6 +114,7 @@ class SlotFrame final : public QFrame {
 
     void dragEnterEvent(QDragEnterEvent* event) override {
         const auto* source = WorkspaceViewHelper::sessionDragSourceFromDrop(*event);
+
         if (source == nullptr || source->draggedSessionId() == m_assignedSessionId) {
             event->ignore();
             return;
@@ -122,6 +127,7 @@ class SlotFrame final : public QFrame {
 
     void dragMoveEvent(QDragMoveEvent* event) override {
         const auto* source = WorkspaceViewHelper::sessionDragSourceFromDrop(*event);
+
         if (source == nullptr || source->draggedSessionId() == m_assignedSessionId) {
             setDropActive(false);
             event->ignore();
@@ -141,6 +147,7 @@ class SlotFrame final : public QFrame {
     void dropEvent(QDropEvent* event) override {
         auto* source = WorkspaceViewHelper::sessionDragSourceFromDrop(*event);
         setDropActive(false);
+
         if (source == nullptr || source->draggedSessionId() == m_assignedSessionId) {
             event->ignore();
             return;
@@ -165,6 +172,7 @@ class SlotFrame final : public QFrame {
 
     void setDropActive(bool active) {
         m_dropIndicator->setVisible(active);
+
         if (active) {
             m_dropIndicator->raise();
         }
@@ -185,6 +193,7 @@ class ShelfFrame final : public QFrame {
   protected:
     void dragEnterEvent(QDragEnterEvent* event) override {
         const auto* source = WorkspaceViewHelper::sessionDragSourceFromDrop(*event);
+
         if (source == nullptr || m_manager.currentShelf().contains(source->draggedSessionId())) {
             event->ignore();
             return;
@@ -197,6 +206,7 @@ class ShelfFrame final : public QFrame {
 
     void dragMoveEvent(QDragMoveEvent* event) override {
         const auto* source = WorkspaceViewHelper::sessionDragSourceFromDrop(*event);
+
         if (source == nullptr || m_manager.currentShelf().contains(source->draggedSessionId())) {
             setDropActive(false);
             event->ignore();
@@ -216,6 +226,7 @@ class ShelfFrame final : public QFrame {
     void dropEvent(QDropEvent* event) override {
         auto* source = WorkspaceViewHelper::sessionDragSourceFromDrop(*event);
         setDropActive(false);
+
         if (source == nullptr || m_manager.currentShelf().contains(source->draggedSessionId())) {
             event->ignore();
             return;
@@ -244,11 +255,13 @@ class ShelfFrame final : public QFrame {
 SessionDragSource* WorkspaceViewHelper::sessionDragSourceFromDrop(const QDropEvent& event) {
     const QString mimeType = QString::fromLatin1(sessionDragMimeType);
     auto* source = dynamic_cast<SessionDragSource*>(event.source());
+
     if (source == nullptr || !event.mimeData()->hasFormat(mimeType)) {
         return nullptr;
     }
 
     const QString sessionId = QString::fromUtf8(event.mimeData()->data(mimeType));
+
     if (sessionId.isEmpty() || source->draggedSessionId() != sessionId) {
         return nullptr;
     }
@@ -263,6 +276,7 @@ GridPosition WorkspaceViewHelper::positionFor(const QString& presetId, int index
     if (presetId == QStringLiteral("3-bottom")) {
         return index == 2 ? GridPosition{1, 0, 1, 2} : GridPosition{0, index};
     }
+
     return {index / columns, index % columns};
 }
 
@@ -336,11 +350,13 @@ void WorkspaceView::synchronize() {
         rebuildWorkspace();
         return;
     }
+
     updateSelection();
 }
 
 void WorkspaceView::updateSelection(const QString& sessionId) {
     const QString selectedId = sessionId.isEmpty() ? m_manager.currentFocusedSessionId() : sessionId;
+
     for (auto* pane : m_panes) {
         pane->setSelected(pane->sessionId() == selectedId);
     }
@@ -348,10 +364,13 @@ void WorkspaceView::updateSelection(const QString& sessionId) {
 
 void WorkspaceView::createTerminalInSlot() {
     const auto* button = qobject_cast<QPushButton*>(sender());
+
     if (button == nullptr) {
         return;
     }
+
     const QString sessionId = m_manager.createTerminal(button->property("slotIndex").toInt());
+
     if (!sessionId.isEmpty()) {
         focusTerminal(sessionId);
     }
@@ -458,6 +477,7 @@ void WorkspaceView::retireWorkspaceHosts() {
     for (auto* pane : m_panes) {
         pane->deactivate();
     }
+
     m_panes.clear();
 
     if (m_gridHost != nullptr) {
@@ -466,6 +486,7 @@ void WorkspaceView::retireWorkspaceHosts() {
         m_gridHost->deleteLater();
         m_gridHost = nullptr;
     }
+
     if (m_focusHost != nullptr) {
         m_focusHost->hide();
         m_rootLayout->removeWidget(m_focusHost);
@@ -483,6 +504,7 @@ void WorkspaceView::rebuildShelf() {
     }
 
     m_shelf->setVisible(!m_renderedShelf.isEmpty());
+
     if (m_renderedShelf.isEmpty()) {
         return;
     }
@@ -496,6 +518,7 @@ void WorkspaceView::rebuildShelf() {
         connect(chip, &ShelfSessionChip::slotDropRequested, this, &WorkspaceView::assignSessionToSlot);
         m_shelfLayout->addWidget(chip);
     }
+
     m_shelfLayout->addStretch(1);
     m_shelfContents->adjustSize();
 }
@@ -520,6 +543,7 @@ QWidget* WorkspaceView::createEmptySlot(int slotIndex) {
 
 TerminalPane* WorkspaceView::createTerminalPane(const QString& sessionId) {
     auto* session = qobject_cast<terminalcore::TerminalSession*>(m_manager.sessionObject(sessionId));
+
     if (session == nullptr) {
         return nullptr;
     }

@@ -34,40 +34,52 @@ const QHash<QString, QString>& coreDatabaseTableSchemas() {
 
 utils::Result<QHash<QString, int>> validateCoreDatabase(const QSqlDatabase& database) {
     QSqlQuery version(database);
+
     if (!version.exec(QStringLiteral("PRAGMA user_version")) || !version.next()) {
         return utils::Result<QHash<QString, int>>::failure(CoreDatabaseSchemaHelper::queryError(version));
     }
+
     qint64 storedCoreVersion = -1;
+
     if (!readStoredInteger(version.value(0), storedCoreVersion) || storedCoreVersion != coreDatabaseSchemaVersion || version.next()) {
         return utils::Result<QHash<QString, int>>::failure({"database_schema_unsupported", "The application database schema version is unsupported", QString::number(storedCoreVersion)});
     }
 
     QSqlQuery schema(database);
+
     if (!schema.exec(QStringLiteral("SELECT name, sql FROM sqlite_schema WHERE type = 'table' AND name IN ('plugin_settings', 'core_state', 'plugin_schema_versions')"))) {
         return utils::Result<QHash<QString, int>>::failure(CoreDatabaseSchemaHelper::queryError(schema));
     }
+
     QHash<QString, QString> storedSchemas;
+
     while (schema.next()) {
         storedSchemas.insert(schema.value(0).toString(), schema.value(1).toString().remove(QLatin1Char('"')));
     }
+
     if (storedSchemas != coreDatabaseTableSchemas()) {
         return utils::Result<QHash<QString, int>>::failure({"database_schema_invalid", "The core database schema is incomplete", {}});
     }
 
     QSqlQuery state(database);
+
     if (!state.exec(QStringLiteral("SELECT singleton, typeof(clean_shutdown), clean_shutdown FROM core_state")) || !state.next()) {
         return utils::Result<QHash<QString, int>>::failure(state.lastError().isValid() ? CoreDatabaseSchemaHelper::queryError(state) : utils::Error{"database_state_invalid", "The application shutdown state is invalid", {}});
     }
+
     qint64 stateSingleton = 0;
     qint64 cleanShutdown = -1;
+
     if (!readStoredInteger(state.value(0), stateSingleton) || stateSingleton != 1 || state.value(1).toString() != QStringLiteral("integer") || !readStoredInteger(state.value(2), cleanShutdown) || (cleanShutdown != 0 && cleanShutdown != 1) || state.next()) {
         return utils::Result<QHash<QString, int>>::failure({"database_state_invalid", "The application shutdown state is invalid", {}});
     }
 
     QSqlQuery settings(database);
+
     if (!settings.exec(QStringLiteral("SELECT owner_id, typeof(document) FROM plugin_settings"))) {
         return utils::Result<QHash<QString, int>>::failure(CoreDatabaseSchemaHelper::queryError(settings));
     }
+
     while (settings.next()) {
         if (settings.value(0).toString().isEmpty() || settings.value(1).toString() != QStringLiteral("text")) {
             return utils::Result<QHash<QString, int>>::failure({"database_settings_invalid", "A stored settings document is invalid", settings.value(0).toString()});
@@ -75,10 +87,13 @@ utils::Result<QHash<QString, int>> validateCoreDatabase(const QSqlDatabase& data
     }
 
     QSqlQuery plugins(database);
+
     if (!plugins.exec(QStringLiteral("SELECT plugin_id, typeof(version), version FROM plugin_schema_versions"))) {
         return utils::Result<QHash<QString, int>>::failure(CoreDatabaseSchemaHelper::queryError(plugins));
     }
+
     QHash<QString, int> pluginVersions;
+
     while (plugins.next()) {
         const QString pluginId = plugins.value(0).toString();
         qint64 pluginVersion = -1;
@@ -87,6 +102,7 @@ utils::Result<QHash<QString, int>> validateCoreDatabase(const QSqlDatabase& data
         }
         pluginVersions.insert(pluginId, static_cast<int>(pluginVersion));
     }
+
     return utils::Result<QHash<QString, int>>::success(std::move(pluginVersions));
 }
 

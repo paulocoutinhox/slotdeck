@@ -22,43 +22,55 @@ utils::Result<QString> FileSystemServiceHelper::normalizedPath(const QString& pa
     }
 
     const QString normalized = QDir::cleanPath(path);
+
     if (normalized == QDir::rootPath()) {
         return utils::Result<QString>::failure({"filesystem_path_unsafe", "The filesystem root cannot be modified", normalized});
     }
+
     return utils::Result<QString>::success(normalized);
 }
 
 utils::Result<void> FileSystemServiceHelper::validateNewEntry(const QString& path) {
     const QFileInfo entry(path);
+
     if (entry.exists() || entry.isSymLink()) {
         return utils::Result<void>::failure({"filesystem_destination_exists", "The destination already exists", path});
     }
+
     const QFileInfo parent(entry.absolutePath());
+
     if (!parent.isDir() || !parent.isWritable()) {
         return utils::Result<void>::failure({"filesystem_parent_unavailable", "The destination directory is unavailable", parent.absoluteFilePath()});
     }
+
     return utils::Result<void>::success();
 }
 
 utils::Result<QString> FileSystemServiceHelper::preparedNewEntry(const QString& path) {
     const auto normalized = normalizedPath(path);
+
     if (!normalized.hasValue()) {
         return normalized;
     }
+
     const auto validation = validateNewEntry(normalized.value());
+
     if (!validation.hasValue()) {
         return utils::Result<QString>::failure(validation.error());
     }
+
     return normalized;
 }
 
 utils::Result<void> FileSystemServiceHelper::writeFileNow(const QString& path, const QByteArray& content) {
     const auto normalized = normalizedPath(path);
+
     if (!normalized.hasValue()) {
         return utils::Result<void>::failure(normalized.error());
     }
     // A file that is not there yet is created, because refusing it would mean nothing could ever write a new one.
     const QFileInfo file(normalized.value());
+
     if (file.exists() && (!file.isFile() || file.isSymLink() || !file.isWritable())) {
         return utils::Result<void>::failure({"filesystem_file_unavailable", "The file is unavailable for writing", normalized.value()});
     }
@@ -68,9 +80,11 @@ utils::Result<void> FileSystemServiceHelper::writeFileNow(const QString& path, c
 
     QSaveFile output(normalized.value());
     output.setDirectWriteFallback(false);
+
     if (!output.open(QIODevice::WriteOnly) || output.write(content) != content.size() || !output.commit()) {
         return utils::Result<void>::failure({"filesystem_write_failed", "The file could not be written atomically", output.errorString()});
     }
+
     return utils::Result<void>::success();
 }
 

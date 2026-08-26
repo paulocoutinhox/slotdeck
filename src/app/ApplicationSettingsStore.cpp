@@ -36,6 +36,7 @@ domain::ApplicationSettings ApplicationSettingsStoreHelper::settingsFromDocument
 
     settings.windowGeometry = QByteArray::fromBase64(geometry.toLatin1());
     settings.themeId = ui::themeManager().catalog().themeOrDefault(themeId).id();
+
     if (!domain::isSupportedApplicationLanguage(settings.language)) {
         settings.language = declared.language;
     }
@@ -51,6 +52,7 @@ ApplicationSettingsStore::ApplicationSettingsStore(persistence::StateStore& stat
 
 utils::Result<void> ApplicationSettingsStore::initialize() {
     const auto result = m_stateStore.initialize();
+
     if (!result.hasValue()) {
         return result;
     }
@@ -115,12 +117,15 @@ void ApplicationSettingsStore::save(domain::ApplicationSettings settings) {
     const QString previousLanguage = m_settings.language;
     const QString previousThemeId = m_settings.themeId;
     m_settings = std::move(settings);
+
     if (m_settings.language != previousLanguage) {
         emit languageChanged(m_settings.language);
     }
+
     if (m_settings.themeId != previousThemeId) {
         emit themeChanged(m_settings.themeId);
     }
+
     const auto candidate = m_settings;
     const quint64 revision = ++m_revision;
     auto future = m_databaseExecutor.saveSettings(QString::fromLatin1(applicationSettingsOwner), ApplicationSettingsStoreHelper::settingsDocument(candidate));

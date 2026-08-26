@@ -223,6 +223,7 @@ int AiMcpSettingsView::selectedRow() const {
 
 void AiMcpSettingsView::rebuild() {
     m_grid->setRowCount(static_cast<int>(m_servers.size()));
+
     for (int row = 0; row < static_cast<int>(m_servers.size()); ++row) {
         const McpServerDescriptor& server = m_servers.at(row);
         const bool stdio = server.transport == McpTransport::Stdio;
@@ -240,11 +241,13 @@ void AiMcpSettingsView::rebuild() {
 
 void AiMcpSettingsView::addServer() {
     QStringList taken;
+
     for (const auto& server : m_servers) {
         taken.append(server.id);
     }
 
     AiMcpServerDialog dialog(m_host, {}, taken, this);
+
     if (dialog.exec() != QDialog::Accepted) {
         return;
     }
@@ -256,11 +259,13 @@ void AiMcpSettingsView::addServer() {
 
 void AiMcpSettingsView::editServer() {
     const int row = selectedRow();
+
     if (row < 0 || row >= static_cast<int>(m_servers.size())) {
         return;
     }
 
     QStringList taken;
+
     for (int index = 0; index < static_cast<int>(m_servers.size()); ++index) {
         if (index != row) {
             taken.append(m_servers.at(index).id);
@@ -268,6 +273,7 @@ void AiMcpSettingsView::editServer() {
     }
 
     AiMcpServerDialog dialog(m_host, m_servers.at(row), taken, this);
+
     if (dialog.exec() != QDialog::Accepted) {
         return;
     }
@@ -279,6 +285,7 @@ void AiMcpSettingsView::editServer() {
 
 void AiMcpSettingsView::removeServer() {
     const int row = selectedRow();
+
     if (row < 0 || row >= static_cast<int>(m_servers.size())) {
         return;
     }

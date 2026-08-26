@@ -32,6 +32,7 @@ class ApplicationSettingsFactory final {
         if (groupId != QStringLiteral("application") || (sectionId != QStringLiteral("general") && sectionId != QStringLiteral("configuration"))) {
             return nullptr;
         }
+
         return new ApplicationSettingsView(m_pluginManager, m_settings, m_configurationManager, sectionId, parent);
     }
 
@@ -53,6 +54,7 @@ QString ApplicationSettingsViewHelper::languageTitleKey(const QString& language)
     if (language == QStringLiteral("pt")) {
         return QStringLiteral("slotdeck.application.portuguese");
     }
+
     Q_UNREACHABLE_RETURN({});
 }
 
@@ -60,6 +62,7 @@ ApplicationSettingsView::ApplicationSettingsView(plugins::PluginManager& pluginM
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(8);
+
     if (sectionId == QStringLiteral("general")) {
         auto* form = settingsForm();
         m_language = new ui::ComboBox(pluginManager.theme(), this);
@@ -115,7 +118,9 @@ void ApplicationSettingsView::selectLanguage(int index) {
     if (index < 0 || index >= m_language->count()) {
         return;
     }
+
     const auto result = m_settings.setLanguage(m_language->itemData(index).toString());
+
     if (!result.hasValue()) {
         m_pluginManager.notify(m_pluginManager.translate(QStringLiteral("slotdeck.application.title")), m_pluginManager.translate(QStringLiteral("slotdeck.application.language-save-error")), plugins::AlertSeverity::Error);
     }
@@ -125,7 +130,9 @@ void ApplicationSettingsView::selectTheme(int index) {
     if (index < 0 || index >= m_theme->count()) {
         return;
     }
+
     const auto result = m_settings.setTheme(m_theme->itemData(index).toString());
+
     if (!result.hasValue()) {
         m_pluginManager.notify(m_pluginManager.translate(QStringLiteral("slotdeck.application.title")), m_pluginManager.translate(QStringLiteral("slotdeck.application.theme-save-error")), plugins::AlertSeverity::Error);
     }
@@ -133,6 +140,7 @@ void ApplicationSettingsView::selectTheme(int index) {
 
 void ApplicationSettingsView::exportConfiguration() {
     const QString path = QFileDialog::getSaveFileName(this, m_pluginManager.translate(QStringLiteral("slotdeck.configuration.export-title")), QStringLiteral("slotdeck.sqlite3"), m_pluginManager.translate(QStringLiteral("slotdeck.configuration.file-filter")));
+
     if (path.isEmpty()) {
         return;
     }
@@ -147,10 +155,13 @@ void ApplicationSettingsView::exportConfiguration() {
 
 void ApplicationSettingsView::importConfiguration() {
     const QString path = QFileDialog::getOpenFileName(this, m_pluginManager.translate(QStringLiteral("slotdeck.configuration.import-title")), {}, m_pluginManager.translate(QStringLiteral("slotdeck.configuration.file-filter")));
+
     if (path.isEmpty()) {
         return;
     }
+
     const bool confirmed = ConfirmationDialog::confirm(this, m_pluginManager.translate(QStringLiteral("slotdeck.window.title")), m_pluginManager.translate(QStringLiteral("slotdeck.configuration.confirm-title")), m_pluginManager.translate(QStringLiteral("slotdeck.configuration.confirm-message")), m_pluginManager.translate(QStringLiteral("slotdeck.configuration.confirm-detail")), m_pluginManager.translate(QStringLiteral("slotdeck.configuration.import")), true);
+
     if (!confirmed) {
         return;
     }

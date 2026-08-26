@@ -419,6 +419,7 @@ TEST(ApplicationSettingsTest, KeepsTheDeclaredDefaultForEveryValueItCannotUse) {
 
     // A value of the wrong type is the declared default, for the shell exactly as for every plugin.
     const QVector<QJsonObject> mistyped{{{QStringLiteral("windowGeometry"), 7}}, {{QStringLiteral("language"), 7}}, {{QStringLiteral("themeId"), 7}}};
+
     for (const auto& document : mistyped) {
         ASSERT_TRUE(store.saveSettings(QStringLiteral("slotdeck"), document).hasValue());
         persistence::StateStore mistypedStore(path);
@@ -503,6 +504,7 @@ TEST(ApplicationSettingsTest, RollsBackThemeWhenAsynchronousPersistenceFails) {
 
 TEST(AppStyleTest, DefinesCompletePaletteMetricsHintsAndControlSizes) {
     const std::array roles{ui::AppStyle::Color::Window, ui::AppStyle::Color::Panel, ui::AppStyle::Color::Raised, ui::AppStyle::Color::Hover, ui::AppStyle::Color::Pressed, ui::AppStyle::Color::Border, ui::AppStyle::Color::BorderStrong, ui::AppStyle::Color::Text, ui::AppStyle::Color::TextMuted, ui::AppStyle::Color::Accent, ui::AppStyle::Color::AccentHover, ui::AppStyle::Color::OnAccent, ui::AppStyle::Color::Success, ui::AppStyle::Color::Warning, ui::AppStyle::Color::Danger, ui::AppStyle::Color::DangerBackground, ui::AppStyle::Color::DangerText, ui::AppStyle::Color::Terminal};
+
     for (const auto role : roles) {
         EXPECT_TRUE(ui::AppStyle::color(role).isValid());
     }
@@ -590,6 +592,7 @@ TEST(ToastOverlayTest, CoversOnlyItsLiveToastsAndDisappearsWhenEmpty) {
 
     const auto toasts = overlay->findChildren<QWidget*>(QStringLiteral("toast"));
     ASSERT_EQ(toasts.size(), 2);
+
     for (const auto* toast : toasts) {
         EXPECT_TRUE(overlay->mask().contains(toast->geometry()));
     }
@@ -668,11 +671,13 @@ TEST(SharedComponentsTest, PaintsItsOwnIndicatorOnTheSelectableField) {
     const int indicator = combo->width() - theme.metric(ui::ThemeMetric::ComboIndicatorWidth) / 2;
     const QColor background = painted.pixelColor(1, painted.height() / 2);
     int indicatorPixels = 0;
+
     for (int y = 0; y < painted.height(); ++y) {
         for (int x = std::max(0, indicator - 6); x < std::min(indicator + 6, painted.width()); ++x) {
             indicatorPixels += painted.pixelColor(x, y) != background ? 1 : 0;
         }
     }
+
     EXPECT_GT(indicatorPixels, 0) << "the selectable field paints its own indicator";
 }
 
@@ -843,6 +848,7 @@ TEST(TabBarTest, PaintsApplicationTabsAndReplacesTheCloseButton) {
     ASSERT_NE(bar, nullptr);
     EXPECT_EQ(bar->count(), 2);
     EXPECT_EQ(bar->height(), theme.metric(ui::ThemeMetric::WorkspaceBarHeight));
+
     for (int index = 0; index < bar->count(); ++index) {
         auto* close = qobject_cast<ui::TabCloseButton*>(bar->tabButton(index, QTabBar::RightSide));
         ASSERT_NE(close, nullptr) << "tab " << index << " keeps the Qt close button";
@@ -901,6 +907,7 @@ TEST(ThemeTest, ResolvesEveryStyleTokenAndNeverLeavesAPrefixBehind) {
         EXPECT_NE(candidate->color(ui::ThemeColor::OnDanger), candidate->color(ui::ThemeColor::TextMuted));
         EXPECT_GT(candidate->color(ui::ThemeColor::OnDanger).lightness(), candidate->color(ui::ThemeColor::Danger).lightness());
     }
+
     EXPECT_NE(ui::destructiveIcon(ui::IconName::Clear, theme).pixmap(16, 16).toImage(), ui::icon(ui::IconName::Clear, theme).pixmap(16, 16).toImage());
 
     // The strong accent is darker than the accent in every built-in theme, so a filled chip separates itself from a selected row.
@@ -908,6 +915,7 @@ TEST(ThemeTest, ResolvesEveryStyleTokenAndNeverLeavesAPrefixBehind) {
         EXPECT_LT(candidate->color(ui::ThemeColor::AccentStrong).lightness(), candidate->color(ui::ThemeColor::Accent).lightness()) << qPrintable(candidate->id());
         EXPECT_NE(candidate->color(ui::ThemeColor::AccentStrong), candidate->color(ui::ThemeColor::Accent));
     }
+
     EXPECT_TRUE(resolved.contains(QString::number(theme.metric(ui::ThemeMetric::ControlRadius))));
     EXPECT_TRUE(resolved.contains(QString::number(theme.metric(ui::ThemeMetric::ControlHorizontalPadding))));
 
@@ -932,6 +940,7 @@ TEST(ThemeTest, ProvidesThreeCompleteThemesAndStrictSelection) {
     const std::array metrics{ui::ThemeMetric::ModeBarMinimumWidth, ui::ThemeMetric::ModeButtonMinimumHeight, ui::ThemeMetric::PageHeaderHeight, ui::ThemeMetric::SmallIconSize, ui::ThemeMetric::ScrollBarExtent, ui::ThemeMetric::ControlRadius, ui::ThemeMetric::TerminalMinimumColumns};
     const std::array fonts{ui::ThemeFont::Interface, ui::ThemeFont::Navigation, ui::ThemeFont::PageTitle, ui::ThemeFont::SectionTitle, ui::ThemeFont::Monospace};
     QSet<QRgb> accents;
+
     for (const auto& theme : catalog.themes()) {
         EXPECT_FALSE(theme->id().isEmpty());
         EXPECT_FALSE(theme->titleKey().isEmpty());
@@ -947,7 +956,9 @@ TEST(ThemeTest, ProvidesThreeCompleteThemesAndStrictSelection) {
         }
         accents.insert(theme->color(ui::ThemeColor::Accent).rgba());
     }
+
     EXPECT_EQ(accents.size(), 3);
+
     for (const auto& theme : catalog.themes()) {
         EXPECT_EQ(theme->color(ui::ThemeColor::Success), theme->color(ui::ThemeColor::AccentHover));
         EXPECT_NE(theme->color(ui::ThemeColor::Warning), theme->color(ui::ThemeColor::Accent));
@@ -986,6 +997,7 @@ TEST(IconsTest, RendersEveryDeclaredIcon) {
 TEST(IconsTest, UsesWhiteForegroundForPrimaryActions) {
     const QImage image = ui::primaryIcon(ui::IconName::Add, ui::themeManager().catalog().themeOrDefault(QStringLiteral("red"))).pixmap(32, 32).toImage();
     bool foundOpaquePixel = false;
+
     for (int y = 0; y < image.height(); ++y) {
         for (int x = 0; x < image.width(); ++x) {
             const QColor color = image.pixelColor(x, y);
@@ -998,11 +1010,13 @@ TEST(IconsTest, UsesWhiteForegroundForPrimaryActions) {
             EXPECT_EQ(color.blue(), 255);
         }
     }
+
     EXPECT_TRUE(foundOpaquePixel);
 }
 
 TEST(IconsTest, RendersEveryVectorIconAndLayoutVariant) {
     const QVector<ui::IconName> names = ui::allIconNames();
+
     for (const auto name : names) {
         const QIcon generated = ui::icon(name, ui::themeManager().theme());
         EXPECT_FALSE(generated.isNull());
@@ -1020,6 +1034,7 @@ TEST(IconsTest, DrawsEveryIconApartFromEveryOther) {
     const QVector<ui::IconName> names = ui::allIconNames();
 
     QVector<QImage> drawings;
+
     for (const auto name : names) {
         const QImage drawing = ui::icon(name, QColor(Qt::white)).pixmap(48, 48).toImage();
         ASSERT_FALSE(drawing.isNull());
@@ -1028,6 +1043,7 @@ TEST(IconsTest, DrawsEveryIconApartFromEveryOther) {
         }
         drawings.append(drawing);
     }
+
     EXPECT_EQ(drawings.size(), names.size());
 }
 
@@ -1064,12 +1080,14 @@ TEST(ModeBarTest, ExpandsForTranslatedWordsWrapsLabelsAndEmitsModeRequests) {
     QApplication::processEvents();
     const auto buttons = bar.findChildren<QWidget*>();
     QWidget* interactiveButton = nullptr;
+
     for (auto* candidate : buttons) {
         if (candidate->toolTip() == QStringLiteral("Terminal")) {
             interactiveButton = candidate;
             break;
         }
     }
+
     ASSERT_NE(interactiveButton, nullptr);
 
     QSignalSpy requested(&bar, &ui::ModeBar::modeRequested);
@@ -1125,11 +1143,13 @@ TEST(SettingsViewTest, LetsTheDividerAndTheGridReachTheEdgeAndInsetsEverythingEl
     EXPECT_EQ(title->contentsMargins().left(), inset);
 
     QLabel* caption = nullptr;
+
     for (auto* candidate : page->findChildren<QLabel*>()) {
         if (candidate->text() == QStringLiteral("Caption")) {
             caption = candidate;
         }
     }
+
     ASSERT_NE(caption, nullptr);
     EXPECT_EQ(caption->mapTo(page, QPoint(0, 0)).x(), inset);
 }
@@ -1253,6 +1273,7 @@ TEST(SettingsViewTest, GivesACaptionTheWidthItsOwnWordsNeed) {
     QLabel* shortLabel = nullptr;
     QLabel* longLabel = nullptr;
     QLabel* unreadableLabel = nullptr;
+
     for (auto* candidate : page->findChildren<QLabel*>()) {
         if (candidate->text() == shortCaption) {
             shortLabel = candidate;
@@ -1264,6 +1285,7 @@ TEST(SettingsViewTest, GivesACaptionTheWidthItsOwnWordsNeed) {
             unreadableLabel = candidate;
         }
     }
+
     ASSERT_NE(shortLabel, nullptr);
     ASSERT_NE(longLabel, nullptr);
     ASSERT_NE(unreadableLabel, nullptr);
@@ -1517,6 +1539,7 @@ TEST(IconsTest, PaintsEveryIconInTheColourItIsAskedFor) {
     const QImage first = ui::icon(ui::IconName::Tool, asked).pixmap(48, 48).toImage();
     const QImage second = ui::icon(ui::IconName::Tool, QColor(33, 92, 214)).pixmap(48, 48).toImage();
     ASSERT_EQ(first.size(), second.size());
+
     for (int y = 0; y < first.height(); ++y) {
         for (int x = 0; x < first.width(); ++x) {
             EXPECT_EQ(first.pixelColor(x, y).alpha(), second.pixelColor(x, y).alpha()) << x << "," << y;
@@ -1553,6 +1576,7 @@ TEST(CalendarPopupTest, OpensFromTheIndicatorAndPaintsEveryDayOfTheMonthItIsRead
     const auto cells = calendar->findChildren<QToolButton*>(QStringLiteral("calendarDay"));
     ASSERT_EQ(cells.size(), 42);
     int painted = 0;
+
     for (auto* cell : cells) {
         const QDate date = cell->property("date").toDate();
         ASSERT_TRUE(date.isValid());
@@ -1560,6 +1584,7 @@ TEST(CalendarPopupTest, OpensFromTheIndicatorAndPaintsEveryDayOfTheMonthItIsRead
         EXPECT_GE(cell->width(), cell->fontMetrics().horizontalAdvance(QStringLiteral("30"))) << cell->text().toStdString();
         painted += date.month() == 8 ? 1 : 0;
     }
+
     EXPECT_EQ(painted, 31);
 
     // clang-format off
@@ -1734,9 +1759,11 @@ TEST(ApplicationTest, ValidatesStartupLockInterfaceLifecycleAndRecovery) {
         EXPECT_EQ(application.loadInterface().error().code, QStringLiteral("application_interface_loaded"));
         QApplication::processEvents();
         QWidget* mainWindow = nullptr;
+
         for (auto* topLevel : QApplication::topLevelWidgets()) {
             mainWindow = topLevel->objectName() == QStringLiteral("mainWindow") ? topLevel : mainWindow;
         }
+
         ASSERT_NE(mainWindow, nullptr);
         EXPECT_NE(mainWindow->findChild<QWidget*>(QStringLiteral("startupLoading")), nullptr);
         EXPECT_EQ(mainWindow->findChild<QWidget*>(QStringLiteral("slotdeck/settings")), nullptr);
@@ -1837,9 +1864,11 @@ TEST(PluginManagerIntegrationTest, DiscoversInitializesAndBuildsThePluginDrivenI
     const auto navigation = manager.navigationItems();
     ASSERT_EQ(navigation.size(), 8);
     QSet<QString> navigationPlugins;
+
     for (const auto& contribution : navigation) {
         navigationPlugins.insert(contribution.pluginId);
     }
+
     EXPECT_EQ(navigationPlugins, QSet<QString>({QStringLiteral("browser"), QStringLiteral("code-editor"), QStringLiteral("donate"), QStringLiteral("logs"), QStringLiteral("ai"), QStringLiteral("system-information"), QStringLiteral("terminal"), QStringLiteral("web-server")}));
     EXPECT_EQ(navigation.at(0).pluginId, QStringLiteral("ai"));
     EXPECT_EQ(navigation.at(0).item.id, QStringLiteral("tasks"));
@@ -1848,9 +1877,11 @@ TEST(PluginManagerIntegrationTest, DiscoversInitializesAndBuildsThePluginDrivenI
 
     // The bar reads in the order the destinations declare rather than in the order the filesystem listed their libraries.
     QVector<plugins::NavigationOrder> declared;
+
     for (const auto& contribution : navigation) {
         declared.append(contribution.item.order);
     }
+
     QVector<plugins::NavigationOrder> ascending = declared;
     std::sort(ascending.begin(), ascending.end());
     EXPECT_EQ(declared, ascending);
@@ -1858,6 +1889,7 @@ TEST(PluginManagerIntegrationTest, DiscoversInitializesAndBuildsThePluginDrivenI
     EXPECT_EQ(navigation.at(1).item.order, plugins::NavigationOrder::Terminal);
     const auto pluginSettings = manager.settings();
     ASSERT_EQ(pluginSettings.size(), 10);
+
     for (const auto& pluginSettingsEntry : pluginSettings) {
         if (pluginSettingsEntry.group.sections.size() == 1) {
             EXPECT_EQ(pluginSettingsEntry.group.sections.first().id, QStringLiteral("general"));
@@ -1866,6 +1898,7 @@ TEST(PluginManagerIntegrationTest, DiscoversInitializesAndBuildsThePluginDrivenI
             EXPECT_NE(manager.createSettingsSection(pluginSettingsEntry.pluginId, pluginSettingsEntry.group.id, section.id, nullptr), nullptr) << pluginSettingsEntry.group.id.toStdString() << '/' << section.id.toStdString();
         }
     }
+
     EXPECT_EQ(manager.pluginTitle(QStringLiteral("missing")), QStringLiteral("missing"));
     const QHash<QString, int> expectedSchemaVersions{{QStringLiteral("logs"), 1}, {QStringLiteral("ai"), 1}, {QStringLiteral("terminal"), 1}, {QStringLiteral("web-server"), 1}, {QStringLiteral("browser"), 1}, {QStringLiteral("code-editor"), 1}};
     EXPECT_EQ(manager.databaseSchemaVersions(), expectedSchemaVersions);
@@ -1916,14 +1949,17 @@ TEST(PluginManagerIntegrationTest, DiscoversInitializesAndBuildsThePluginDrivenI
         EXPECT_GT(settingsInset, 0);
         const auto settingsForms = settingsView->findChildren<QFormLayout*>();
         EXPECT_GT(settingsForms.size(), 0);
+
         for (auto* sectionForm : settingsForms) {
             EXPECT_EQ(sectionForm->contentsMargins().left(), settingsInset) << sectionForm->parent()->objectName().toStdString();
             EXPECT_EQ(sectionForm->contentsMargins().right(), settingsInset) << sectionForm->parent()->objectName().toStdString();
         }
+
         for (auto* actionRow : settingsView->findChildren<QWidget*>(QStringLiteral("settingsActionRow"))) {
             ASSERT_NE(actionRow->layout(), nullptr);
             EXPECT_EQ(actionRow->layout()->contentsMargins().left(), settingsInset);
         }
+
         auto* browserTabs = window.findChild<QTabWidget*>(QStringLiteral("browserTabs"));
         ASSERT_NE(browserTabs, nullptr);
         EXPECT_EQ(browserTabs->count(), 1);
@@ -1982,10 +2018,12 @@ void CoreTestsHelper::executeSqliteStatements(const QString& path, const QString
         auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
         database.setDatabaseName(path);
         ASSERT_TRUE(database.open()) << database.lastError().text().toStdString();
+
         for (const auto& statement : statements) {
             QSqlQuery query(database);
             ASSERT_TRUE(query.exec(statement)) << query.lastError().text().toStdString();
         }
+
         database.close();
     }
     QSqlDatabase::removeDatabase(connectionName);

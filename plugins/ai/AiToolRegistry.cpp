@@ -202,6 +202,7 @@ QString AiToolRegistryHelper::readableToolName(const QString& toolName) {
     written.replace(QLatin1Char('_'), QLatin1Char(' '));
     written.replace(QLatin1Char('-'), QLatin1Char(' '));
     QStringList words;
+
     for (const auto& word : written.split(QLatin1Char(' '), Qt::SkipEmptyParts)) {
         words.append(word.left(1).toUpper() + word.mid(1));
     }
@@ -212,6 +213,7 @@ QString AiToolRegistryHelper::readableToolName(const QString& toolName) {
 // A long argument keeps its beginning and its end, because the end of a path is what names the file.
 QString AiToolRegistryHelper::shortenedArgument(const QString& value) {
     const QString single = QString(value).replace(QLatin1Char('\n'), QLatin1Char(' ')).simplified();
+
     if (single.size() <= readableArgumentLimit) {
         return single;
     }
@@ -245,11 +247,13 @@ ToolSchema AiToolRegistryHelper::readMcpPromptSchema() {
 
 QString AiToolRegistryHelper::serverCatalogText(const QString& serverId, const QJsonArray& entries, bool prompts) {
     QStringList lines;
+
     for (const auto& value : entries) {
         const QJsonObject entry = value.toObject();
         const QString identity = prompts ? entry.value(QStringLiteral("name")).toString() : entry.value(QStringLiteral("uri")).toString();
         lines.append(QStringLiteral("%1 | %2 | %3").arg(serverId, identity, entry.value(QStringLiteral("description")).toString()));
     }
+
     return lines.join(QLatin1Char('\n'));
 }
 
@@ -289,6 +293,7 @@ QJsonArray AiToolRegistryHelper::searchEntries(SearchProvider provider, const QJ
     if (provider == SearchProvider::Brave) {
         return payload.value(QStringLiteral("web")).toObject().value(QStringLiteral("results")).toArray();
     }
+
     return payload.value(QStringLiteral("results")).toArray();
 }
 
@@ -299,6 +304,7 @@ QString AiToolRegistryHelper::searchSummary(SearchProvider provider, const QJson
 QString AiToolRegistryHelper::formatSearchResults(SearchProvider provider, const QJsonObject& payload, int count, const QString& emptyMessage) {
     const QJsonArray entries = searchEntries(provider, payload);
     QStringList lines;
+
     for (const auto& value : entries) {
         if (lines.size() >= count) {
             break;
@@ -306,6 +312,7 @@ QString AiToolRegistryHelper::formatSearchResults(SearchProvider provider, const
         const QJsonObject entry = value.toObject();
         lines.append(QStringLiteral("%1\n%2\n%3").arg(entry.value(QStringLiteral("title")).toString(), entry.value(QStringLiteral("url")).toString(), readableText(searchSummary(provider, entry).toUtf8())));
     }
+
     return lines.isEmpty() ? emptyMessage : lines.join(QStringLiteral("\n\n"));
 }
 
@@ -313,6 +320,7 @@ QString AiToolRegistryHelper::formatSearchResults(SearchProvider provider, const
 QString AiToolRegistryHelper::serviceErrorMessage(const QByteArray& payload, const QString& transportMessage) {
     const QJsonObject document = QJsonDocument::fromJson(payload).object();
     const QStringList candidates{QStringLiteral("message"), QStringLiteral("detail"), QStringLiteral("error_description")};
+
     for (const auto& key : candidates) {
         const QJsonValue value = document.value(key);
         if (value.isString() && !value.toString().isEmpty()) {
@@ -324,12 +332,14 @@ QString AiToolRegistryHelper::serviceErrorMessage(const QByteArray& payload, con
     }
 
     const QJsonValue error = document.value(QStringLiteral("error"));
+
     if (error.isString() && !error.toString().isEmpty()) {
         return error.toString();
     }
     if (error.isObject() && error.toObject().value(QStringLiteral("message")).isString()) {
         return error.toObject().value(QStringLiteral("message")).toString();
     }
+
     return payload.isEmpty() ? transportMessage : QStringLiteral("%1: %2").arg(transportMessage, QString::fromUtf8(payload.left(512)));
 }
 
@@ -346,9 +356,11 @@ QString AiToolRegistryHelper::selectedLines(const QString& content, int firstLin
     const QStringList lines = content.split(QLatin1Char('\n'));
     const qsizetype from = firstLine > 0 ? std::min<qsizetype>(firstLine - 1, lines.size()) : 0;
     const qsizetype to = lastLine > 0 ? std::min<qsizetype>(lastLine, lines.size()) : lines.size();
+
     if (from >= to) {
         return QString{};
     }
+
     return QStringList(lines.begin() + from, lines.begin() + to).join(QLatin1Char('\n'));
 }
 
@@ -357,6 +369,7 @@ QString AiToolRegistryHelper::boundedText(const QString& text) {
     if (text.size() <= maximumResultCharacters) {
         return text;
     }
+
     return text.left(maximumResultHeadCharacters) + QStringLiteral("\n[... %1 characters omitted ...]\n").arg(QString::number(text.size() - maximumResultHeadCharacters - maximumResultTailCharacters)) + text.right(maximumResultTailCharacters);
 }
 
@@ -367,22 +380,26 @@ bool AiToolRegistryHelper::pathsOverlap(const QString& first, const QString& sec
     if (first == second) {
         return true;
     }
+
     return first.startsWith(second + QLatin1Char('/')) || second.startsWith(first + QLatin1Char('/'));
 }
 
 QString AiToolRegistryHelper::qualifiedToolName(const QString& serverId, const QString& toolName) {
     QString exposed = QStringLiteral("mcp_%1_%2").arg(serverId, toolName).toLower();
+
     for (auto& character : exposed) {
         if (!character.isLetterOrNumber() && character != QLatin1Char('_')) {
             character = QLatin1Char('_');
         }
     }
+
     return exposed.size() > 64 ? QString() : exposed;
 }
 
 // A server answers with content blocks, so the textual blocks become the agent visible result.
 ToolResult AiToolRegistryHelper::mcpToolResult(const ToolCall& call, const QJsonObject& payload) {
     QStringList sections;
+
     for (const auto& value : payload.value(QStringLiteral("content")).toArray()) {
         const QJsonObject block = value.toObject();
         const QString type = block.value(QStringLiteral("type")).toString();
@@ -412,6 +429,7 @@ void AiToolRegistry::discoverSkills(const QString& sandboxRoot, const AiSkillCat
 // A call is read as the tool it is, so a declared one is named by the catalog and a published one by the server that published it.
 ToolPresentation AiToolRegistry::presentation(const QString& toolName, const QJsonObject& arguments) const {
     const auto declared = std::find_if(m_schemas.cbegin(), m_schemas.cend(), [&toolName](const ToolSchema& schema) { return schema.name == toolName; });
+
     if (declared == m_schemas.cend()) {
         return {AiToolRegistryHelper::readableToolName(toolName), {}};
     }
@@ -420,6 +438,7 @@ ToolPresentation AiToolRegistry::presentation(const QString& toolName, const QJs
     }
 
     const QString title = m_host.translate(declared->titleKey);
+
     if (declared->activityArgument.isEmpty()) {
         return {title, {}};
     }
@@ -448,6 +467,7 @@ bool toolAccessesConflict(const ToolAccess& first, const ToolAccess& second) {
             }
         }
     }
+
     return false;
 }
 
@@ -471,14 +491,17 @@ ToolAccess AiToolRegistry::accessOf(const ToolCall& call, const QString& sandbox
     if (detachedTools.contains(call.name) || m_readOnlyMcpTools.contains(call.name)) {
         return {ToolAccessKind::None, {}};
     }
+
     if (readingTools.contains(call.name)) {
         const auto resolved = resolveSandboxPath(sandboxRoot, call.arguments.value(QStringLiteral("path")).toString());
         return resolved.hasValue() ? ToolAccess{ToolAccessKind::Read, {resolved.value()}} : ToolAccess{ToolAccessKind::None, {}};
     }
+
     if (writingTools.contains(call.name)) {
         const auto resolved = resolveSandboxPath(sandboxRoot, call.arguments.value(QStringLiteral("path")).toString());
         return resolved.hasValue() ? ToolAccess{ToolAccessKind::Write, {resolved.value()}} : ToolAccess{ToolAccessKind::None, {}};
     }
+
     if (pairTools.contains(call.name)) {
         const auto source = resolveSandboxPath(sandboxRoot, call.arguments.value(QStringLiteral("source")).toString());
         const auto destination = resolveSandboxPath(sandboxRoot, call.arguments.value(QStringLiteral("destination")).toString());
@@ -491,12 +514,14 @@ ToolAccess AiToolRegistry::accessOf(const ToolCall& call, const QString& sandbox
         }
         return paths.isEmpty() ? ToolAccess{ToolAccessKind::None, {}} : ToolAccess{ToolAccessKind::Write, paths};
     }
+
     return {ToolAccessKind::Everything, {}};
 }
 
 // Stopping a task must stop the work it started, so a command still running for one of its calls is terminated instead of left to finish alone.
 void AiToolRegistry::cancel(const QString& callId) {
     const auto running = m_runningCommands.take(callId);
+
     if (running.runner == nullptr) {
         return;
     }
@@ -515,6 +540,7 @@ utils::Result<QString> AiToolRegistry::resolveSandboxPath(const QString& sandbox
     }
 
     const QString root = QDir(sandboxRoot).canonicalPath();
+
     if (root.isEmpty()) {
         return utils::Result<QString>::failure({"ai_tool_sandbox_missing", m_host.translate(QStringLiteral("ai.error.tool-workdir-unavailable")).arg(sandboxRoot), sandboxRoot});
     }
@@ -524,6 +550,7 @@ utils::Result<QString> AiToolRegistry::resolveSandboxPath(const QString& sandbox
     // What the path really points at is what has to be inside the root, so the deepest ancestor that exists is resolved and the rest is measured from it.
     QString ancestor = candidate;
     QStringList remainder;
+
     while (!QFileInfo::exists(ancestor)) {
         const QString parent = QFileInfo(ancestor).absolutePath();
         if (parent == ancestor || parent.isEmpty()) {
@@ -535,9 +562,11 @@ utils::Result<QString> AiToolRegistry::resolveSandboxPath(const QString& sandbox
 
     const QString canonicalAncestor = QFileInfo(ancestor).canonicalFilePath();
     const QString contained = canonicalAncestor.isEmpty() ? candidate : QDir::cleanPath(canonicalAncestor + QLatin1Char('/') + remainder.join(QLatin1Char('/')));
+
     if (contained != root && !contained.startsWith(root + QLatin1Char('/'))) {
         return utils::Result<QString>::failure({"ai_tool_path_outside", m_host.translate(QStringLiteral("ai.error.tool-path-outside")).arg(path, root), path});
     }
+
     return utils::Result<QString>::success(contained);
 }
 
@@ -546,6 +575,7 @@ void AiToolRegistry::invoke(const ToolCall& call, const QString& sandboxRoot, co
     // clang-format off
     const auto declared = std::find_if(m_schemas.cbegin(), m_schemas.cend(), [&call](const ToolSchema& schema) { return schema.name == call.name; });
     // clang-format on
+
     if (declared != m_schemas.cend()) {
         if (const auto invalid = findToolArgumentError(*declared, call.arguments); invalid.has_value()) {
             const QString key = call.arguments.contains(invalid->argument) ? QStringLiteral("ai.error.tool-argument-type") : QStringLiteral("ai.error.tool-argument-missing");
@@ -558,106 +588,132 @@ void AiToolRegistry::invoke(const ToolCall& call, const QString& sandboxRoot, co
         readFile(call, sandboxRoot, completion);
         return;
     }
+
     if (call.name == QStringLiteral("write_file")) {
         writeFile(call, sandboxRoot, completion);
         return;
     }
+
     if (call.name == QStringLiteral("edit_file")) {
         editFile(call, sandboxRoot, completion);
         return;
     }
+
     if (call.name == QStringLiteral("read_image")) {
         readImage(call, sandboxRoot, completion);
         return;
     }
+
     if (call.name == QStringLiteral("list_directory")) {
         listDirectory(call, sandboxRoot, completion);
         return;
     }
+
     if (call.name == QStringLiteral("create_directory")) {
         createDirectory(call, sandboxRoot, completion);
         return;
     }
+
     if (call.name == QStringLiteral("move_path")) {
         movePath(call, sandboxRoot, completion);
         return;
     }
+
     if (call.name == QStringLiteral("copy_file")) {
         copyFile(call, sandboxRoot, completion);
         return;
     }
+
     if (call.name == QStringLiteral("remove_path")) {
         removePath(call, sandboxRoot, completion);
         return;
     }
+
     if (call.name == QStringLiteral("describe_path")) {
         describePath(call, sandboxRoot, completion);
         return;
     }
+
     if (call.name == QStringLiteral("search_files")) {
         searchFiles(call, sandboxRoot, completion);
         return;
     }
+
     if (call.name == QStringLiteral("run_command")) {
         runCommand(call, sandboxRoot, completion);
         return;
     }
+
     if (call.name == QStringLiteral("fetch_url")) {
         fetchUrl(call, completion);
         return;
     }
+
     if (call.name == QStringLiteral("web_search")) {
         searchWeb(call, completion);
         return;
     }
+
     if (call.name == QStringLiteral("generate_image")) {
         generateImage(call, sandboxRoot, completion);
         return;
     }
+
     if (call.name == QStringLiteral("generate_speech")) {
         generateSpeech(call, sandboxRoot, completion);
         return;
     }
+
     if (call.name == QStringLiteral("list_voices")) {
         listVoices(call, completion);
         return;
     }
+
     if (call.name == QStringLiteral("list_skills")) {
         listSkills(sandboxRoot, completion, call);
         return;
     }
+
     if (call.name == QStringLiteral("search_skills")) {
         searchSkills(call, sandboxRoot, completion);
         return;
     }
+
     if (call.name == QStringLiteral("read_skill")) {
         readSkill(call, sandboxRoot, completion);
         return;
     }
+
     if (call.name == QStringLiteral("read_skill_file")) {
         readSkillFile(call, sandboxRoot, completion);
         return;
     }
+
     if (call.name == QStringLiteral("describe_task")) {
         describeTask(call, completion);
         return;
     }
+
     if (call.name == QStringLiteral("list_mcp_resources") || call.name == QStringLiteral("list_mcp_prompts")) {
         listServerCatalog(call, call.name == QStringLiteral("list_mcp_prompts"), completion);
         return;
     }
+
     if (call.name == QStringLiteral("read_mcp_resource")) {
         readServerResource(call, completion);
         return;
     }
+
     if (call.name == QStringLiteral("read_mcp_prompt")) {
         readServerPrompt(call, completion);
         return;
     }
+
     if (m_mcpTools.contains(call.name)) {
         callMcpTool(call, completion);
         return;
     }
+
     completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-unknown")).arg(call.name)));
 }
 
@@ -702,6 +758,7 @@ void AiToolRegistry::setMcpClients(const QList<AiMcpClient*>& clients) {
 void AiToolRegistry::listServerCatalog(const ToolCall& call, bool prompts, const ToolCompletion& completion) {
     auto sections = std::make_shared<QStringList>();
     auto remaining = std::make_shared<int>(static_cast<int>(m_mcpClients.size()));
+
     if (*remaining == 0) {
         completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.mcp-none"))));
         return;
@@ -742,12 +799,14 @@ AiMcpClient* AiToolRegistry::readyServer(const QString& serverId) const {
             return client.data();
         }
     }
+
     return nullptr;
 }
 
 void AiToolRegistry::readServerResource(const ToolCall& call, const ToolCompletion& completion) {
     AiMcpClient* client = readyServer(call.arguments.value(QStringLiteral("server")).toString());
     const QString uri = call.arguments.value(QStringLiteral("uri")).toString();
+
     if (client == nullptr || uri.isEmpty()) {
         completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.mcp-unavailable")).arg(call.name)));
         return;
@@ -772,6 +831,7 @@ void AiToolRegistry::readServerResource(const ToolCall& call, const ToolCompleti
 void AiToolRegistry::readServerPrompt(const ToolCall& call, const ToolCompletion& completion) {
     AiMcpClient* client = readyServer(call.arguments.value(QStringLiteral("server")).toString());
     const QString name = call.arguments.value(QStringLiteral("name")).toString();
+
     if (client == nullptr || name.isEmpty()) {
         completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.mcp-unavailable")).arg(call.name)));
         return;
@@ -795,6 +855,7 @@ void AiToolRegistry::readServerPrompt(const ToolCall& call, const ToolCompletion
 
 void AiToolRegistry::callMcpTool(const ToolCall& call, const ToolCompletion& completion) {
     const auto entry = m_mcpTools.value(call.name);
+
     if (entry.first.isNull() || !entry.first->ready()) {
         completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.mcp-unavailable")).arg(call.name)));
         return;
@@ -808,6 +869,7 @@ void AiToolRegistry::callMcpTool(const ToolCall& call, const ToolCompletion& com
 
 void AiToolRegistry::readFile(const ToolCall& call, const QString& sandboxRoot, const ToolCompletion& completion) {
     const auto resolved = resolveSandboxPath(sandboxRoot, call.arguments.value(QStringLiteral("path")).toString());
+
     if (!resolved.hasValue()) {
         completion(AiToolRegistryHelper::failure(call, resolved.error().message));
         return;
@@ -815,6 +877,7 @@ void AiToolRegistry::readFile(const ToolCall& call, const QString& sandboxRoot, 
 
     const int firstLine = call.arguments.value(QStringLiteral("start_line")).toInt(0);
     const int lastLine = call.arguments.value(QStringLiteral("end_line")).toInt(0);
+
     if (firstLine < 0 || lastLine < 0 || (firstLine > 0 && lastLine > 0 && lastLine < firstLine)) {
         completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-argument-value")).arg(call.name, QStringLiteral("start_line"))));
         return;
@@ -828,6 +891,7 @@ void AiToolRegistry::readFile(const ToolCall& call, const QString& sandboxRoot, 
 
 void AiToolRegistry::createDirectory(const ToolCall& call, const QString& sandboxRoot, const ToolCompletion& completion) {
     const auto resolved = resolveSandboxPath(sandboxRoot, call.arguments.value(QStringLiteral("path")).toString());
+
     if (!resolved.hasValue()) {
         completion(AiToolRegistryHelper::failure(call, resolved.error().message));
         return;
@@ -842,6 +906,7 @@ void AiToolRegistry::createDirectory(const ToolCall& call, const QString& sandbo
 void AiToolRegistry::movePath(const ToolCall& call, const QString& sandboxRoot, const ToolCompletion& completion) {
     const auto source = resolveSandboxPath(sandboxRoot, call.arguments.value(QStringLiteral("source")).toString());
     const auto destination = resolveSandboxPath(sandboxRoot, call.arguments.value(QStringLiteral("destination")).toString());
+
     if (!source.hasValue() || !destination.hasValue()) {
         completion(AiToolRegistryHelper::failure(call, source.hasValue() ? destination.error().message : source.error().message));
         return;
@@ -856,6 +921,7 @@ void AiToolRegistry::movePath(const ToolCall& call, const QString& sandboxRoot, 
 void AiToolRegistry::copyFile(const ToolCall& call, const QString& sandboxRoot, const ToolCompletion& completion) {
     const auto source = resolveSandboxPath(sandboxRoot, call.arguments.value(QStringLiteral("source")).toString());
     const auto destination = resolveSandboxPath(sandboxRoot, call.arguments.value(QStringLiteral("destination")).toString());
+
     if (!source.hasValue() || !destination.hasValue()) {
         completion(AiToolRegistryHelper::failure(call, source.hasValue() ? destination.error().message : source.error().message));
         return;
@@ -869,12 +935,14 @@ void AiToolRegistry::copyFile(const ToolCall& call, const QString& sandboxRoot, 
 
 void AiToolRegistry::removePath(const ToolCall& call, const QString& sandboxRoot, const ToolCompletion& completion) {
     const auto resolved = resolveSandboxPath(sandboxRoot, call.arguments.value(QStringLiteral("path")).toString());
+
     if (!resolved.hasValue()) {
         completion(AiToolRegistryHelper::failure(call, resolved.error().message));
         return;
     }
 
     const QFileInfo information(resolved.value());
+
     if (!information.exists()) {
         completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-path-missing")).arg(call.arguments.value(QStringLiteral("path")).toString())));
         return;
@@ -882,6 +950,7 @@ void AiToolRegistry::removePath(const ToolCall& call, const QString& sandboxRoot
 
     // Removing a directory takes everything inside it, so an agent that did not ask for that is told instead of losing the contents.
     const bool recursive = call.arguments.value(QStringLiteral("recursive")).toBool();
+
     if (information.isDir() && !recursive && !QDir(resolved.value()).isEmpty()) {
         completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-remove-not-empty")).arg(call.arguments.value(QStringLiteral("path")).toString())));
         return;
@@ -895,12 +964,14 @@ void AiToolRegistry::removePath(const ToolCall& call, const QString& sandboxRoot
 
 void AiToolRegistry::describePath(const ToolCall& call, const QString& sandboxRoot, const ToolCompletion& completion) const {
     const auto resolved = resolveSandboxPath(sandboxRoot, call.arguments.value(QStringLiteral("path")).toString());
+
     if (!resolved.hasValue()) {
         completion(AiToolRegistryHelper::failure(call, resolved.error().message));
         return;
     }
 
     const QFileInfo information(resolved.value());
+
     if (!information.exists()) {
         completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-path-missing")).arg(call.arguments.value(QStringLiteral("path")).toString())));
         return;
@@ -914,6 +985,7 @@ void AiToolRegistry::describePath(const ToolCall& call, const QString& sandboxRo
 void AiToolRegistry::searchFiles(const ToolCall& call, const QString& sandboxRoot, const ToolCompletion& completion) {
     const QString pattern = call.arguments.value(QStringLiteral("pattern")).toString().trimmed();
     const auto resolved = resolveSandboxPath(sandboxRoot, call.arguments.value(QStringLiteral("path")).toString());
+
     if (pattern.isEmpty() || !resolved.hasValue()) {
         completion(AiToolRegistryHelper::failure(call, resolved.hasValue() ? m_host.translate(QStringLiteral("ai.error.tool-argument-value")).arg(call.name, QStringLiteral("pattern")) : resolved.error().message));
         return;
@@ -947,12 +1019,14 @@ void AiToolRegistry::searchFiles(const ToolCall& call, const QString& sandboxRoo
 // A command the agent runs is bound to the same working directory its file tools are bound to.
 void AiToolRegistry::runCommand(const ToolCall& call, const QString& sandboxRoot, const ToolCompletion& completion) {
     const QString command = call.arguments.value(QStringLiteral("command")).toString().trimmed();
+
     if (command.isEmpty() || sandboxRoot.isEmpty()) {
         completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-sandbox-missing"))));
         return;
     }
 
     const int timeoutSeconds = call.arguments.value(QStringLiteral("timeout_seconds")).toInt(defaultCommandTimeoutSeconds);
+
     if (timeoutSeconds < 0) {
         completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-argument-value")).arg(call.name, QStringLiteral("timeout_seconds"))));
         return;
@@ -969,10 +1043,12 @@ void AiToolRegistry::runCommand(const ToolCall& call, const QString& sandboxRoot
 
 void AiToolRegistry::writeFile(const ToolCall& call, const QString& sandboxRoot, const ToolCompletion& completion) {
     const auto resolved = resolveSandboxPath(sandboxRoot, call.arguments.value(QStringLiteral("path")).toString());
+
     if (!resolved.hasValue()) {
         completion(AiToolRegistryHelper::failure(call, resolved.error().message));
         return;
     }
+
     auto future = m_host.writeFile(resolved.value(), call.arguments.value(QStringLiteral("content")).toString().toUtf8());
     const QString path = resolved.value();
     // clang-format off
@@ -983,10 +1059,12 @@ void AiToolRegistry::writeFile(const ToolCall& call, const QString& sandboxRoot,
 // A whole rewrite spends the output budget of the model and risks losing what it did not mean to touch, so an edit names the passage it replaces.
 void AiToolRegistry::editFile(const ToolCall& call, const QString& sandboxRoot, const ToolCompletion& completion) {
     const auto resolved = resolveSandboxPath(sandboxRoot, call.arguments.value(QStringLiteral("path")).toString());
+
     if (!resolved.hasValue()) {
         completion(AiToolRegistryHelper::failure(call, resolved.error().message));
         return;
     }
+
     if (call.arguments.value(QStringLiteral("old_text")).toString().isEmpty()) {
         completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-argument-value")).arg(call.name, QStringLiteral("old_text"))));
         return;
@@ -1031,18 +1109,21 @@ void AiToolRegistry::editFile(const ToolCall& call, const QString& sandboxRoot, 
 // A model that does not declare image input cannot be handed one, so the tool says which model refused instead of sending bytes it will reject.
 void AiToolRegistry::readImage(const ToolCall& call, const QString& sandboxRoot, const ToolCompletion& completion) {
     const ProviderDescriptor* provider = findProvider(m_taskConnection.providerId);
+
     if (provider == nullptr || !modelTraits(*provider, m_taskConnection.modelId).contains(ModelTrait::Vision)) {
         completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-image-unsupported")).arg(m_taskConnection.modelId)));
         return;
     }
 
     const auto resolved = resolveSandboxPath(sandboxRoot, call.arguments.value(QStringLiteral("path")).toString());
+
     if (!resolved.hasValue()) {
         completion(AiToolRegistryHelper::failure(call, resolved.error().message));
         return;
     }
 
     const QByteArray mediaType = AiToolRegistryHelper::imageMediaType(resolved.value());
+
     if (mediaType.isEmpty()) {
         completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-image-format")).arg(resolved.value())));
         return;
@@ -1067,6 +1148,7 @@ void AiToolRegistry::readImage(const ToolCall& call, const QString& sandboxRoot,
 
 void AiToolRegistry::listDirectory(const ToolCall& call, const QString& sandboxRoot, const ToolCompletion& completion) {
     const auto resolved = resolveSandboxPath(sandboxRoot, call.arguments.value(QStringLiteral("path")).toString());
+
     if (!resolved.hasValue()) {
         completion(AiToolRegistryHelper::failure(call, resolved.error().message));
         return;
@@ -1091,6 +1173,7 @@ void AiToolRegistry::listDirectory(const ToolCall& call, const QString& sandboxR
 
 void AiToolRegistry::fetchUrl(const ToolCall& call, const ToolCompletion& completion) {
     const QUrl url(call.arguments.value(QStringLiteral("url")).toString());
+
     if (!url.isValid() || (url.scheme() != QStringLiteral("http") && url.scheme() != QStringLiteral("https")) || url.host().isEmpty()) {
         completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-url")).arg(call.arguments.value(QStringLiteral("url")).toString())));
         return;
@@ -1122,14 +1205,17 @@ void AiToolRegistry::setMediaConfiguration(const ModelConnection& connection, co
 // A generated file lands exactly where the agent asked for it, inside the working directory the task declares.
 utils::Result<void> AiToolRegistry::writeGeneratedFile(const QString& path, const QByteArray& content) const {
     const QDir parent = QFileInfo(path).dir();
+
     if (!parent.exists() && !parent.mkpath(QStringLiteral("."))) {
         return utils::Result<void>::failure({"ai_tool_write_failed", "The destination directory is unavailable", parent.path()});
     }
 
     QFile file(path);
+
     if (!file.open(QIODevice::WriteOnly)) {
         return utils::Result<void>::failure({"ai_tool_write_failed", "The generated file could not be written", path});
     }
+
     file.write(content);
     return utils::Result<void>::success();
 }
@@ -1138,12 +1224,14 @@ utils::Result<void> AiToolRegistry::writeGeneratedFile(const QString& path, cons
 void AiToolRegistry::searchWeb(const ToolCall& call, const ToolCompletion& completion) {
     const QString query = call.arguments.value(QStringLiteral("query")).toString().trimmed();
     const QString address = m_searchAddress;
+
     if (query.isEmpty() || address.isEmpty()) {
         completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-search-unconfigured"))));
         return;
     }
 
     const auto apiKey = resolveSecret(m_search.apiKey);
+
     if (!apiKey.hasValue()) {
         completion(AiToolRegistryHelper::failure(call, apiKey.error().message));
         return;
@@ -1196,18 +1284,21 @@ void AiToolRegistry::searchWeb(const ToolCall& call, const ToolCompletion& compl
 
 void AiToolRegistry::generateImage(const ToolCall& call, const QString& sandboxRoot, const ToolCompletion& completion) {
     const QString prompt = call.arguments.value(QStringLiteral("prompt")).toString();
+
     if (prompt.trimmed().isEmpty() || m_mediaAddress.isEmpty()) {
         completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-image-unconfigured"))));
         return;
     }
 
     const auto destination = resolveSandboxPath(sandboxRoot, call.arguments.value(QStringLiteral("path")).toString());
+
     if (!destination.hasValue()) {
         completion(AiToolRegistryHelper::failure(call, destination.error().message));
         return;
     }
 
     const auto apiKey = resolveSecret(m_media.apiKey);
+
     if (!apiKey.hasValue()) {
         completion(AiToolRegistryHelper::failure(call, apiKey.error().message));
         return;
@@ -1218,12 +1309,14 @@ void AiToolRegistry::generateImage(const ToolCall& call, const QString& sandboxR
     QNetworkRequest request(endpoint);
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
     request.setTransferTimeout(imageTimeoutMs);
+
     if (!apiKey.value().isEmpty()) {
         request.setRawHeader(QByteArrayLiteral("authorization"), QByteArrayLiteral("Bearer ") + apiKey.value().toUtf8());
     }
 
     QJsonObject body{{QStringLiteral("model"), m_media.modelId}, {QStringLiteral("prompt"), prompt}, {QStringLiteral("response_format"), QStringLiteral("b64_json")}};
     const QString size = call.arguments.value(QStringLiteral("size")).toString();
+
     if (!size.isEmpty()) {
         body.insert(QStringLiteral("size"), size);
     }
@@ -1266,18 +1359,21 @@ void AiToolRegistry::setSpeechConfiguration(const SpeechSettings& settings, cons
 void AiToolRegistry::generateSpeech(const ToolCall& call, const QString& sandboxRoot, const ToolCompletion& completion) {
     const QString text = call.arguments.value(QStringLiteral("text")).toString();
     const QString voice = call.arguments.value(QStringLiteral("voice")).toString().trimmed().isEmpty() ? m_speech.voiceId : call.arguments.value(QStringLiteral("voice")).toString().trimmed();
+
     if (text.trimmed().isEmpty() || m_speechAddress.isEmpty() || voice.isEmpty()) {
         completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-speech-unconfigured"))));
         return;
     }
 
     const auto destination = resolveSandboxPath(sandboxRoot, call.arguments.value(QStringLiteral("path")).toString());
+
     if (!destination.hasValue()) {
         completion(AiToolRegistryHelper::failure(call, destination.error().message));
         return;
     }
 
     const auto apiKey = resolveSecret(m_speech.apiKey);
+
     if (!apiKey.hasValue()) {
         completion(AiToolRegistryHelper::failure(call, apiKey.error().message));
         return;
@@ -1289,6 +1385,7 @@ void AiToolRegistry::generateSpeech(const ToolCall& call, const QString& sandbox
     QNetworkRequest request(endpoint);
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
     request.setTransferTimeout(imageTimeoutMs);
+
     if (openAi) {
         request.setRawHeader(QByteArrayLiteral("authorization"), QByteArrayLiteral("Bearer ") + apiKey.value().toUtf8());
     } else {
@@ -1319,16 +1416,19 @@ void AiToolRegistry::generateSpeech(const ToolCall& call, const QString& sandbox
 // A service with a closed voice set answers from its own declaration, and an account catalog is read from the service.
 void AiToolRegistry::listVoices(const ToolCall& call, const ToolCompletion& completion) {
     const QStringList declared = speechProviderDeclaredVoices(m_speech.provider);
+
     if (!declared.isEmpty()) {
         completion({call.id, declared.join(QLatin1Char('\n')), false});
         return;
     }
+
     if (m_speechAddress.isEmpty()) {
         completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-speech-unconfigured"))));
         return;
     }
 
     const auto apiKey = resolveSecret(m_speech.apiKey);
+
     if (!apiKey.hasValue()) {
         completion(AiToolRegistryHelper::failure(call, apiKey.error().message));
         return;
@@ -1383,6 +1483,7 @@ void AiToolRegistry::listSkills(const QString& sandboxRoot, const ToolCompletion
 
 void AiToolRegistry::searchSkills(const ToolCall& call, const QString& sandboxRoot, const ToolCompletion& completion) {
     const QString query = call.arguments.value(QStringLiteral("query")).toString().trimmed();
+
     if (query.isEmpty()) {
         completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-argument-value")).arg(call.name, QStringLiteral("query"))));
         return;
@@ -1426,6 +1527,7 @@ void AiToolRegistry::readSkill(const ToolCall& call, const QString& sandboxRoot,
 void AiToolRegistry::readSkillFile(const ToolCall& call, const QString& sandboxRoot, const ToolCompletion& completion) {
     const QString name = call.arguments.value(QStringLiteral("name")).toString().trimmed();
     const QString relative = call.arguments.value(QStringLiteral("path")).toString().trimmed();
+
     if (relative.isEmpty()) {
         completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-argument-value")).arg(call.name, QStringLiteral("path"))));
         return;
@@ -1463,12 +1565,15 @@ void AiToolRegistry::setTaskContext(const AiTask& task, const ModelConnection& c
 
 void AiToolRegistry::describeTask(const ToolCall& call, const ToolCompletion& completion) const {
     QJsonObject described{{QStringLiteral("title"), m_task.title}, {QStringLiteral("description"), m_task.description}, {QStringLiteral("prompt"), m_task.prompt}, {QStringLiteral("column"), AiTaskRepository::columnName(m_task.column)}, {QStringLiteral("workingDirectory"), m_task.workdir}};
+
     if (!m_task.issueUrl.isEmpty()) {
         described.insert(QStringLiteral("issueUrl"), m_task.issueUrl);
     }
+
     if (m_task.schedule.has_value()) {
         described.insert(QStringLiteral("scheduled"), true);
     }
+
     completion({call.id, QString::fromUtf8(QJsonDocument(described).toJson(QJsonDocument::Indented)), false});
 }
 

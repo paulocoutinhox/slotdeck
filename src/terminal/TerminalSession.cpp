@@ -66,6 +66,7 @@ QString TerminalSession::status() const {
     case domain::TerminalProcessState::Failed:
         return QStringLiteral("Failed");
     }
+
     Q_UNREACHABLE_RETURN(QStringLiteral("Starting"));
 }
 
@@ -83,9 +84,11 @@ TerminalRenderSnapshot TerminalSession::snapshot() {
 
 void TerminalSession::setName(const QString& newName) {
     const QString normalized = newName.trimmed();
+
     if (normalized.isEmpty() || normalized == m_state.name) {
         return;
     }
+
     m_state.name = normalized;
     m_state.updatedAt = QDateTime::currentMSecsSinceEpoch();
     emit nameChanged();
@@ -94,10 +97,12 @@ void TerminalSession::setName(const QString& newName) {
 
 void TerminalSession::setTheme(const domain::TerminalTheme& theme) {
     const auto result = m_emulator.setTheme(theme);
+
     if (!result.hasValue()) {
         emit errorOccurred(result.error().message);
         return;
     }
+
     m_theme = theme;
     emit renderChanged();
 }
@@ -106,10 +111,12 @@ utils::Result<void> TerminalSession::start() {
     if (m_backend->running()) {
         return utils::Result<void>::failure({"terminal_already_running", "The terminal process is already running", m_state.id});
     }
+
     m_state.processState = domain::TerminalProcessState::Starting;
     emit statusChanged();
 
     const auto emulatorResult = m_emulator.initialize(m_columns, m_rows, m_cellWidth, m_cellHeight, m_theme);
+
     if (!emulatorResult.hasValue()) {
         m_state.processState = domain::TerminalProcessState::Failed;
         emit statusChanged();
@@ -117,6 +124,7 @@ utils::Result<void> TerminalSession::start() {
     }
 
     const auto backendResult = m_backend->start(m_profile, m_state.cwd, m_state.historyFile, m_columns, m_rows);
+
     if (!backendResult.hasValue()) {
         m_state.processState = domain::TerminalProcessState::Failed;
         emit statusChanged();
@@ -140,17 +148,21 @@ utils::Result<void> TerminalSession::writeLocalPaths(const QStringList& paths) {
 
 utils::Result<void> TerminalSession::sendKey(const QKeyEvent& event) {
     const auto encoded = m_emulator.encodeKey(event);
+
     if (!encoded.hasValue()) {
         return utils::Result<void>::failure(encoded.error());
     }
+
     return m_backend->write(encoded.value());
 }
 
 utils::Result<void> TerminalSession::paste(const QByteArray& text) {
     const auto encoded = m_emulator.encodePaste(text);
+
     if (!encoded.hasValue()) {
         return utils::Result<void>::failure(encoded.error());
     }
+
     return m_backend->write(encoded.value());
 }
 
@@ -168,6 +180,7 @@ bool TerminalSession::programWantsFocus() const {
 
 utils::Result<void> TerminalSession::sendMouse(const MouseReport& report) {
     const auto encoded = m_emulator.encodeMouse(report);
+
     if (!encoded.hasValue()) {
         return utils::Result<void>::failure(encoded.error());
     }
@@ -247,6 +260,7 @@ QString TerminalSession::selectionText() const {
 
 utils::Result<void> TerminalSession::sendFocus(bool gained) {
     const auto encoded = m_emulator.encodeFocus(gained);
+
     if (!encoded.hasValue()) {
         return utils::Result<void>::failure(encoded.error());
     }
@@ -260,6 +274,7 @@ utils::Result<void> TerminalSession::resize(int columns, int rows, int cellWidth
     }
 
     const auto emulatorResult = m_emulator.resize(columns, rows, cellWidth, cellHeight);
+
     if (!emulatorResult.hasValue()) {
         return emulatorResult;
     }
@@ -302,6 +317,7 @@ void TerminalSession::scrollToBottom() {
 void TerminalSession::restart() {
     terminate();
     const auto result = start();
+
     if (!result.hasValue()) {
         emit errorOccurred(result.error().message);
     }
@@ -319,11 +335,14 @@ void TerminalSession::processOutput(const QByteArray& bytes) {
     if (bytes.isEmpty()) {
         return;
     }
+
     m_pendingOutput.append(bytes);
+
     if (!m_outputPaused && m_pendingOutput.size() >= maximumPendingOutputSize) {
         m_outputPaused = true;
         m_backend->setOutputPaused(true);
     }
+
     if (!m_outputTimer.isActive()) {
         m_outputTimer.start(0);
     }
@@ -361,6 +380,7 @@ void TerminalSession::processError(const QString& message) {
 
 void TerminalSession::writeTerminalResponse(const QByteArray& bytes) {
     const auto result = m_backend->write(bytes);
+
     if (!result.hasValue()) {
         emit errorOccurred(result.error().message);
     }
@@ -375,9 +395,11 @@ void TerminalSession::updateTitle() {
 void TerminalSession::updateWorkingDirectory() {
     QString directory = m_emulator.workingDirectory();
     const QUrl url(directory);
+
     if (url.isValid() && url.isLocalFile()) {
         directory = url.toLocalFile();
     }
+
     setWorkingDirectory(directory);
 }
 
@@ -387,14 +409,17 @@ void TerminalSession::updateBackendWorkingDirectory(const QString& directory) {
 
 void TerminalSession::setWorkingDirectory(const QString& directory) {
     const QFileInfo candidate(directory);
+
     if (!candidate.isAbsolute() || !candidate.isDir()) {
         return;
     }
 
     const QString normalized = QDir::cleanPath(candidate.absoluteFilePath());
+
     if (normalized.isEmpty() || normalized == m_state.cwd) {
         return;
     }
+
     m_state.cwd = normalized;
     m_state.updatedAt = QDateTime::currentMSecsSinceEpoch();
     emit cwdChanged();

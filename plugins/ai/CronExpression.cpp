@@ -28,18 +28,22 @@ class CronExpressionHelper final {
 utils::Result<int> CronExpressionHelper::parseNumber(const QString& value, int minimum, int maximum) {
     bool valid = false;
     const int number = value.toInt(&valid);
+
     if (!valid || number < minimum || number > maximum) {
         return utils::Result<int>::failure({"ai_tasks_cron_value_invalid", "The cron expression contains an invalid value", value});
     }
+
     return utils::Result<int>::success(number);
 }
 
 utils::Result<ParsedField> CronExpressionHelper::parseField(const QString& field, int minimum, int maximum, bool normalizeSunday) {
     ParsedField parsed{QBitArray(maximum + 1), field == QStringLiteral("*")};
+
     if (parsed.wildcard) {
         parsed.values.fill(true, minimum, maximum + 1);
         return utils::Result<ParsedField>::success(std::move(parsed));
     }
+
     if (field.isEmpty()) {
         return utils::Result<ParsedField>::failure({"ai_tasks_cron_field_invalid", "The cron expression contains an empty field", {}});
     }
@@ -58,6 +62,7 @@ utils::Result<ParsedField> CronExpressionHelper::parseField(const QString& field
             parsed.values.setBit(normalizeSunday && value == 7 ? 0 : value);
         }
     }
+
     return utils::Result<ParsedField>::success(std::move(parsed));
 }
 
@@ -65,24 +70,29 @@ CronExpression::CronExpression(QBitArray minutes, QBitArray hours, QBitArray mon
 
 utils::Result<CronExpression> CronExpression::parse(const QString& expression) {
     const QStringList fields = expression.simplified().split(QLatin1Char(' '));
+
     if (fields.size() != 5) {
         return utils::Result<CronExpression>::failure({"ai_tasks_cron_field_count_invalid", "A POSIX cron expression requires five fields", expression});
     }
+
     const auto minutes = CronExpressionHelper::parseField(fields.at(0), 0, 59, false);
     const auto hours = CronExpressionHelper::parseField(fields.at(1), 0, 23, false);
     const auto monthDays = CronExpressionHelper::parseField(fields.at(2), 1, 31, false);
     const auto months = CronExpressionHelper::parseField(fields.at(3), 1, 12, false);
     const auto weekDays = CronExpressionHelper::parseField(fields.at(4), 0, 7, true);
+
     if (!minutes.hasValue() || !hours.hasValue() || !monthDays.hasValue() || !months.hasValue() || !weekDays.hasValue()) {
         const utils::Error error = !minutes.hasValue() ? minutes.error() : !hours.hasValue() ? hours.error() : !monthDays.hasValue() ? monthDays.error() : !months.hasValue() ? months.error() : weekDays.error();
         return utils::Result<CronExpression>::failure(error);
     }
+
     return utils::Result<CronExpression>::success(CronExpression(minutes.value().values, hours.value().values, monthDays.value().values, months.value().values, weekDays.value().values, monthDays.value().wildcard, weekDays.value().wildcard));
 }
 
 // A wall clock the calendar skips is answered by the first one it does carry, and a wall clock it repeats is answered by the first of the two.
 std::optional<QDateTime> CronExpressionHelper::instantOf(const QDate& date, const QTime& time, const QTimeZone& timeZone) {
     const QDateTime local(date, time, timeZone);
+
     if (!local.isValid()) {
         return std::nullopt;
     }
@@ -95,6 +105,7 @@ std::optional<QDateTime> CronExpressionHelper::instantOf(const QDate& date, cons
 
     // The clock moved forward over that wall time, so the occurrence is the instant the day really starts carrying it.
     const QDateTime midnight(date, QTime(0, 0), timeZone);
+
     for (int minute = 0; minute < minutesInHour * hoursInDay; ++minute) {
         const QDateTime probe = midnight.addSecs(secondsInMinute * minute);
         if (probe.date() > date || (probe.date() == date && probe.time() >= time)) {
@@ -114,6 +125,7 @@ utils::Result<QDateTime> CronExpression::nextAfter(const QDateTime& afterUtc, co
     const QDateTime local = afterUtc.toTimeZone(timeZone);
     const QDate startDate = local.date();
     const QTime startTime = local.time();
+
     for (QDate date = startDate; date < startDate.addYears(supportedSchedulingYears); date = date.addDays(1)) {
         if (!matchesDate(date)) {
             continue;
@@ -147,6 +159,7 @@ bool CronExpression::matchesDate(const QDate& date) const {
     const bool monthDayMatches = m_monthDays.testBit(date.day());
     const int weekDay = date.dayOfWeek() == 7 ? 0 : date.dayOfWeek();
     const bool weekDayMatches = m_weekDays.testBit(weekDay);
+
     if (m_weekDayWildcard) {
         return monthMatches && monthDayMatches;
     }
@@ -161,16 +174,19 @@ bool CronExpression::matches(const QDateTime& localDateTime) const {
     if (!localDateTime.isValid() || !m_minutes.testBit(localDateTime.time().minute()) || !m_hours.testBit(localDateTime.time().hour())) {
         return false;
     }
+
     const bool monthMatches = m_months.testBit(localDateTime.date().month());
     const bool monthDayMatches = m_monthDays.testBit(localDateTime.date().day());
     const int weekDay = localDateTime.date().dayOfWeek() == 7 ? 0 : localDateTime.date().dayOfWeek();
     const bool weekDayMatches = m_weekDays.testBit(weekDay);
+
     if (m_weekDayWildcard) {
         return monthMatches && monthDayMatches;
     }
     if (m_monthDayWildcard) {
         return monthMatches && weekDayMatches;
     }
+
     return monthMatches && (monthDayMatches || weekDayMatches);
 }
 

@@ -103,10 +103,12 @@ BrowserView::BrowserView(BrowserPlugin& plugin, QWidget* parent) : QWidget(paren
     root->addWidget(m_content, 1);
 
     m_rebuilding = true;
+
     for (const auto& tab : m_plugin.tabs()) {
         auto* view = appendTab(tab.id, tab.url, tab.title, tab.active);
         Q_UNUSED(view);
     }
+
     m_rebuilding = false;
     updateToolbar();
 
@@ -139,24 +141,29 @@ BrowserView::BrowserView(BrowserPlugin& plugin, QWidget* parent) : QWidget(paren
 
 QWebEngineView* BrowserView::createPopupTab(bool activate) {
     const auto created = m_plugin.createTab(QUrl(QStringLiteral("about:blank")), activate);
+
     if (!created.hasValue()) {
         return nullptr;
     }
+
     auto* view = findChild<QWebEngineView*>(created.value());
     return view;
 }
 
 void BrowserView::createTab() {
     auto* view = createPopupTab(true);
+
     if (view == nullptr) {
         showOperationError();
         return;
     }
+
     view->setUrl(m_plugin.homepage());
 }
 
 void BrowserView::closeTab(int index) {
     const auto result = m_plugin.closeTab(tabId(index));
+
     if (!result.hasValue()) {
         showOperationError();
     }
@@ -166,11 +173,14 @@ void BrowserView::selectTab(int index) {
     if (m_rebuilding || index < 0) {
         return;
     }
+
     const auto result = m_plugin.activateTab(tabId(index));
+
     if (!result.hasValue()) {
         showOperationError();
         return;
     }
+
     updateToolbar();
 }
 
@@ -178,7 +188,9 @@ void BrowserView::moveTab(int from, int to) {
     if (m_rebuilding) {
         return;
     }
+
     const auto result = m_plugin.moveTab(from, to);
+
     if (!result.hasValue()) {
         showOperationError();
     }
@@ -186,32 +198,42 @@ void BrowserView::moveTab(int from, int to) {
 
 void BrowserView::navigate() {
     const auto url = BrowserPlugin::normalizeAddress(m_address->text());
+
     if (!url.hasValue()) {
         showInvalidAddress();
         return;
     }
+
     auto* view = currentView();
+
     if (view == nullptr) {
         showOperationError();
         return;
     }
+
     view->setUrl(url.value());
 }
 
 void BrowserView::updateAddress(const QUrl& url) {
     auto* view = qobject_cast<QWebEngineView*>(sender());
+
     if (view == nullptr) {
         return;
     }
+
     const int index = m_tabs->indexOf(view);
+
     if (index < 0) {
         return;
     }
+
     const auto result = m_plugin.updateTabUrl(tabId(index), url);
+
     if (!result.hasValue()) {
         showOperationError();
         return;
     }
+
     if (view == currentView()) {
         m_address->setText(url.toString());
         updateToolbar();
@@ -221,11 +243,14 @@ void BrowserView::updateAddress(const QUrl& url) {
 void BrowserView::updateTitle(const QString& title) {
     auto* view = qobject_cast<QWebEngineView*>(sender());
     const int index = m_tabs->indexOf(view);
+
     if (index < 0 || title.trimmed().isEmpty()) {
         return;
     }
+
     m_tabs->setTabText(index, title);
     const auto result = m_plugin.updateTabTitle(tabId(index), title);
+
     if (!result.hasValue()) {
         showOperationError();
     }
@@ -234,6 +259,7 @@ void BrowserView::updateTitle(const QString& title) {
 void BrowserView::updateIcon(const QIcon& icon) {
     auto* view = qobject_cast<QWebEngineView*>(sender());
     const int index = m_tabs->indexOf(view);
+
     if (index >= 0) {
         m_tabs->setTabIcon(index, icon);
     }
@@ -241,6 +267,7 @@ void BrowserView::updateIcon(const QIcon& icon) {
 
 void BrowserView::updateLoadState(bool loading) {
     auto* view = qobject_cast<QWebEngineView*>(sender());
+
     if (view == currentView()) {
         m_reload->setVisible(!loading);
         m_stop->setVisible(loading);
@@ -250,10 +277,12 @@ void BrowserView::updateLoadState(bool loading) {
 
 void BrowserView::addCurrentPageBookmark() {
     auto* view = currentView();
+
     if (view == nullptr) {
         showOperationError();
         return;
     }
+
     m_bookmarks->beginAddBookmark(view->title(), view->url());
 }
 
@@ -267,7 +296,9 @@ void BrowserView::openBookmark(const QUrl& url, bool newTab) {
         view->setUrl(url);
         return;
     }
+
     const auto result = m_plugin.createTab(url, true);
+
     if (!result.hasValue()) {
         showOperationError();
     }
@@ -279,6 +310,7 @@ void BrowserView::toggleBookmarks(bool visible) {
 
 void BrowserView::synchronizeTabs() {
     m_rebuilding = true;
+
     for (int index = m_tabs->count() - 1; index >= 0; --index) {
         const QString existingId = tabId(index);
         bool exists = false;
@@ -291,6 +323,7 @@ void BrowserView::synchronizeTabs() {
             removed->deleteLater();
         }
     }
+
     for (int index = 0; index < m_plugin.tabs().size(); ++index) {
         const auto& tab = m_plugin.tabs().at(index);
         auto* view = findChild<QWebEngineView*>(tab.id);
@@ -305,6 +338,7 @@ void BrowserView::synchronizeTabs() {
             m_tabs->setCurrentIndex(index);
         }
     }
+
     m_rebuilding = false;
 
     m_pages->setCurrentWidget(m_tabs->count() > 0 ? static_cast<QWidget*>(m_tabs) : m_empty);
@@ -317,9 +351,11 @@ QWebEngineView* BrowserView::appendTab(const QString& tabId, const QUrl& url, co
     view->setPage(new QWebEnginePage(&m_plugin.profile(), view));
     const int index = m_tabs->addTab(view, title);
     m_tabs->setTabToolTip(index, url.toString());
+
     if (activate) {
         m_tabs->setCurrentIndex(index);
     }
+
     connect(view, &QWebEngineView::urlChanged, this, &BrowserView::updateAddress);
     connect(view, &QWebEngineView::titleChanged, this, &BrowserView::updateTitle);
     connect(view, &QWebEngineView::iconChanged, this, &BrowserView::updateIcon);
@@ -346,6 +382,7 @@ void BrowserView::showOperationError() {
 
 void BrowserView::updateToolbar() {
     auto* view = currentView();
+
     if (view == nullptr) {
         m_address->clear();
         m_back->setEnabled(false);
@@ -354,6 +391,7 @@ void BrowserView::updateToolbar() {
         m_stop->setEnabled(false);
         return;
     }
+
     m_reload->setEnabled(true);
     m_stop->setEnabled(true);
     m_address->setText(view->url().toString());

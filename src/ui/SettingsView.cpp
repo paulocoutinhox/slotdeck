@@ -57,6 +57,7 @@ SettingsView::SettingsView(plugins::PluginManager& pluginManager, QVector<CoreSe
             return;
         }
     }
+
     for (const auto& pluginSettings : m_pluginManager.settings()) {
         // clang-format off
         const auto createSection = [this, pluginId = pluginSettings.pluginId](const QString& groupId, const QString& sectionId, QWidget* sectionParent) { return m_pluginManager.createSettingsSection(pluginId, groupId, sectionId, sectionParent); };
@@ -70,6 +71,7 @@ SettingsView::SettingsView(plugins::PluginManager& pluginManager, QVector<CoreSe
     if (m_plugins->count() > 0) {
         m_plugins->setCurrentRow(0);
     }
+
     connect(m_plugins, &QListWidget::currentRowChanged, this, &SettingsView::selectPlugin);
     connect(search, &QLineEdit::textChanged, this, &SettingsView::filterSettings);
 }
@@ -129,6 +131,7 @@ bool SettingsView::appendGroup(const plugins::SettingsGroup& group, const Settin
 void SettingsView::filterSettings(const QString& query) {
     const QString normalized = query.trimmed();
     int firstVisible = -1;
+
     for (int index = 0; index < m_plugins->count(); ++index) {
         auto* item = m_plugins->item(index);
         const bool visible = normalized.isEmpty() || item->data(Qt::UserRole + 1).toString().contains(normalized, Qt::CaseInsensitive);
@@ -137,7 +140,9 @@ void SettingsView::filterSettings(const QString& query) {
             firstVisible = index;
         }
     }
+
     const auto* current = m_plugins->item(m_plugins->currentRow());
+
     if (firstVisible >= 0 && (current == nullptr || current->isHidden())) {
         m_plugins->setCurrentRow(firstVisible);
     }

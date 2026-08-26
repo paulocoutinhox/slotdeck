@@ -54,9 +54,11 @@ class WebServerRuntime final {
             m_workerThread.quit();
         }, Qt::QueuedConnection);
         // clang-format on
+
         if (!submitted) {
             m_workerThread.quit();
         }
+
         m_workerThread.wait();
     }
 
@@ -73,10 +75,12 @@ class WebServerRuntime final {
             promise->finish();
         }, Qt::QueuedConnection);
         // clang-format on
+
         if (!submitted) {
             promise->addResult(false);
             promise->finish();
         }
+
         return future;
     }
 
@@ -84,6 +88,7 @@ class WebServerRuntime final {
         if (!m_running.exchange(false)) {
             return;
         }
+
         m_port.store(0);
         QMetaObject::invokeMethod(m_server, &WebServerInstance::stop, Qt::QueuedConnection);
     }
@@ -111,10 +116,12 @@ class WebServerRuntime final {
             promise->finish();
         }, Qt::QueuedConnection);
         // clang-format on
+
         if (!submitted) {
             promise->addResult(false);
             promise->finish();
         }
+
         return future;
     }
 
@@ -176,22 +183,27 @@ utils::Result<void> WebServerPlugin::initialize(PluginHost& host) {
     if (m_host != nullptr) {
         return utils::Result<void>::failure({"web_server_already_initialized", "The Web Server plugin is already initialized", {}});
     }
+
     m_host = &host;
     m_asyncContext = std::make_unique<QObject>();
     const auto migrationResult = host.migrateDatabase({{1, {QStringLiteral("CREATE TABLE web_server_configurations(id TEXT PRIMARY KEY, name TEXT NOT NULL, root TEXT NOT NULL, bind_host TEXT NOT NULL, port INTEGER NOT NULL CHECK(port BETWEEN 1 AND 65535), terminal_id TEXT) STRICT"), QStringLiteral("CREATE UNIQUE INDEX web_server_configurations_terminal_index ON web_server_configurations(terminal_id) WHERE terminal_id IS NOT NULL")}}});
+
     if (!migrationResult.hasValue()) {
         shutdown();
         return migrationResult;
     }
 
     const auto result = restoreState();
+
     if (!result.hasValue()) {
         shutdown();
         return result;
     }
+
     if (host.pluginAvailable(QStringLiteral("terminal"))) {
         QTimer::singleShot(0, this, &WebServerPlugin::synchronizeTerminals);
     }
+
     return result;
 }
 
@@ -199,6 +211,7 @@ QWidget* WebServerPlugin::createNavigationView(const QString& itemId, QWidget* p
     if (itemId != QStringLiteral("manager") || m_host == nullptr) {
         return nullptr;
     }
+
     return new ui::WebServerView(*this, parent);
 }
 
@@ -231,23 +244,27 @@ void WebServerPlugin::handleRequest(const QString&, const QString& topic, const 
         openWebServerForFolder(payload.value(QStringLiteral("path")).toString(), reply);
         return;
     }
+
     reply(utils::Result<QJsonObject>::failure({"plugin_message_topic_unknown", "The Web Server plugin does not handle this topic", topic}));
 }
 
 // One folder is served by one configuration, so asking again for a folder already configured opens the form of that server instead of a second one for the same root.
 void WebServerPlugin::openWebServerForFolder(const QString& path, const PluginReply& reply) {
     const QString root = QFileInfo(path).canonicalFilePath();
+
     if (root.isEmpty() || !QFileInfo(root).isDir() || !QFileInfo(root).isReadable()) {
         reply(utils::Result<QJsonObject>::failure({"web_server_root_invalid", host().translate(QStringLiteral("web-server.error.root-invalid")), path}));
         return;
     }
 
     QString serverId;
+
     for (const auto& [configuredId, server] : m_webServers) {
         if (QFileInfo(server.root).canonicalFilePath() == root) {
             serverId = configuredId;
         }
     }
+
     if (serverId.isEmpty()) {
         serverId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     }
@@ -264,9 +281,11 @@ int WebServerPlugin::availablePort() const {
     // clang-format off
     const auto taken = [&](int candidate) { return std::any_of(m_webServers.cbegin(), m_webServers.cend(), [candidate](const auto& entry) { return entry.second.port == candidate; }); };
     // clang-format on
+
     while (port < 65535 && taken(port)) {
         ++port;
     }
+
     return port;
 }
 
@@ -274,6 +293,7 @@ void WebServerPlugin::handleEvent(const QString& senderPluginId, const QString& 
     if (senderPluginId != QStringLiteral("terminal")) {
         return;
     }
+
     if (topic == QStringLiteral("terminal.workspace.changed")) {
         if (!payload.isEmpty()) {
             host().notify(host().translate(QStringLiteral("web-server.plugin.title")), host().translate(QStringLiteral("web-server.error.message-invalid")), plugins::AlertSeverity::Error);
@@ -282,6 +302,7 @@ void WebServerPlugin::handleEvent(const QString& senderPluginId, const QString& 
         synchronizeTerminals();
         return;
     }
+
     if (topic == QStringLiteral("terminal.closed")) {
         if (!hasExactKeys(payload, {QStringLiteral("terminalId")}) || !payload.value(QStringLiteral("terminalId")).isString()) {
             host().notify(host().translate(QStringLiteral("web-server.plugin.title")), host().translate(QStringLiteral("web-server.error.message-invalid")), plugins::AlertSeverity::Error);
@@ -298,6 +319,7 @@ void WebServerPlugin::handleEvent(const QString& senderPluginId, const QString& 
 
 void WebServerPlugin::unlinkTerminal(const QString& terminalId) {
     m_terminals.remove(terminalId);
+
     if (m_activeTerminalId == terminalId) {
         m_activeTerminalId.clear();
     }
@@ -317,25 +339,32 @@ void WebServerPlugin::unlinkTerminal(const QString& terminalId) {
         });
         // clang-format on
     }
+
     emit webServerChanged({});
 }
 
 void WebServerPlugin::shutdown() {
     m_asyncContext.reset();
+
     for (auto& [serverId, server] : m_webServers) {
         Q_UNUSED(serverId);
         if (server.runtime != nullptr) {
             scheduleRuntimeCleanup(std::move(server.runtime));
         }
     }
+
     m_webServers.clear();
+
     for (auto& validation : m_rootValidationFutures) {
         validation.waitForFinished();
     }
+
     m_rootValidationFutures.clear();
+
     for (auto& cleanup : m_runtimeCleanupFutures) {
         cleanup.waitForFinished();
     }
+
     m_runtimeCleanupFutures.clear();
     m_pendingServerOperations.clear();
     m_cancelledServerOperations.clear();
@@ -360,10 +389,13 @@ QFuture<utils::Result<void>> WebServerPlugin::configureAndStartWebServer(const Q
     if (port < 1 || port > 65535) {
         return QtFuture::makeReadyValueFuture(startFailure(host().translate(QStringLiteral("web-server.error.port-range"))));
     }
+
     QHostAddress address;
+
     if (!address.setAddress(bindHost)) {
         return QtFuture::makeReadyValueFuture(startFailure(host().translate(QStringLiteral("web-server.error.host-invalid")), bindHost));
     }
+
     m_pendingServerOperations.insert(serverId);
     emit webServerChanged(serverId);
     // clang-format off
@@ -421,6 +453,7 @@ QFuture<utils::Result<void>> WebServerPlugin::startWebServer(const QString& serv
     if (webServerRunning(serverId)) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::success());
     }
+
     return startConfiguredWebServer(serverId);
 }
 
@@ -428,10 +461,12 @@ QFuture<utils::Result<void>> WebServerPlugin::removeWebServer(const QString& ser
     if (m_pendingServerOperations.contains(serverId)) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"web_server_operation_pending", "A Web Server operation is already pending", serverId}));
     }
+
     stopWebServer(serverId);
     m_pendingServerOperations.insert(serverId);
     emit webServerChanged(serverId);
     const auto server = m_webServers.find(serverId);
+
     if (server == m_webServers.end()) {
         m_pendingServerOperations.remove(serverId);
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"web_server_configuration_missing", "The Web Server configuration is unavailable", serverId}));
@@ -460,7 +495,9 @@ void WebServerPlugin::stopWebServer(const QString& serverId) {
     if (m_pendingServerOperations.contains(serverId)) {
         m_cancelledServerOperations.insert(serverId);
     }
+
     const auto server = m_webServers.find(serverId);
+
     if (server == m_webServers.end() || server->second.runtime == nullptr) {
         return;
     }
@@ -472,6 +509,7 @@ void WebServerPlugin::stopWebServer(const QString& serverId) {
 
 QUrl WebServerPlugin::webServerAddress(const QString& serverId) const {
     const auto server = m_webServers.find(serverId);
+
     if (server == m_webServers.end() || server->second.runtime == nullptr || !server->second.runtime->running()) {
         return {};
     }
@@ -491,15 +529,18 @@ bool WebServerPlugin::openWebServer(const QString& serverId) const {
 
 void WebServerPlugin::openWebServerInBrowser(const QString& serverId, QObject& callbackContext, PluginReply reply) {
     const QUrl url = webServerAddress(serverId);
+
     if (!url.isValid()) {
         reply(utils::Result<QJsonObject>::failure({"web_server_not_running", "The web server is not running", serverId}));
         return;
     }
+
     m_host->request(QStringLiteral("browser"), QStringLiteral("browser.open"), {{QStringLiteral("url"), url.toString()}}, callbackContext, std::move(reply));
 }
 
 QVariantList WebServerPlugin::configuredWebServers() const {
     QVariantList servers;
+
     for (const auto& [serverId, server] : m_webServers) {
         servers.append(QVariantMap{{QStringLiteral("serverId"), serverId}, {QStringLiteral("name"), server.name}, {QStringLiteral("root"), server.root}, {QStringLiteral("host"), server.host}, {QStringLiteral("port"), webServerPort(serverId)}, {QStringLiteral("terminalId"), server.terminalId}, {QStringLiteral("running"), webServerRunning(serverId)}, {QStringLiteral("pending"), webServerOperationPending(serverId)}});
     }
@@ -512,23 +553,28 @@ QVariantList WebServerPlugin::configuredWebServers() const {
 PluginRequestLogBatch WebServerPlugin::requestLogEntriesSince(const QString& serverId, quint64 cursor, int maximumEntries) const {
     PluginRequestLogBatch output{cursor, {}};
     const auto server = m_webServers.find(serverId);
+
     if (server == m_webServers.end() || server->second.runtime == nullptr || maximumEntries <= 0) {
         return output;
     }
 
     const auto batch = server->second.runtime->requestLog().entriesSince(cursor, maximumEntries);
     output.cursor = batch.cursor;
+
     for (const auto& entry : batch.entries) {
         output.entries.append(QVariantMap{{QStringLiteral("timestamp"), persistence::storedTimestamp(entry.timestamp)}, {QStringLiteral("method"), entry.method}, {QStringLiteral("path"), entry.path}, {QStringLiteral("status"), entry.status}, {QStringLiteral("durationMs"), entry.durationMilliseconds}, {QStringLiteral("responseBytes"), entry.responseBytes}, {QStringLiteral("remoteAddress"), entry.remoteAddress}});
     }
+
     return output;
 }
 
 QFuture<bool> WebServerPlugin::clearRequestLog(const QString& serverId) {
     const auto server = m_webServers.find(serverId);
+
     if (server == m_webServers.end() || server->second.runtime == nullptr) {
         return QtFuture::makeReadyValueFuture(false);
     }
+
     return server->second.runtime->clearRequestLog();
 }
 
@@ -547,9 +593,11 @@ bool WebServerPlugin::webServerOperationPending(const QString& serverId) const {
 
 quint16 WebServerPlugin::webServerPort(const QString& serverId) const {
     const auto server = m_webServers.find(serverId);
+
     if (server == m_webServers.end()) {
         return 0;
     }
+
     return server->second.runtime == nullptr ? server->second.port : server->second.runtime->port();
 }
 
@@ -577,11 +625,13 @@ QString WebServerPlugin::serverIdForTerminal(const QString& terminalId) const {
     if (terminalId.isEmpty()) {
         return {};
     }
+
     for (const auto& [serverId, server] : m_webServers) {
         if (server.terminalId == terminalId) {
             return serverId;
         }
     }
+
     return {};
 }
 
@@ -630,15 +680,19 @@ utils::Result<void> WebServerPlugin::restoreState() {
     plugins::SettingsReader reader(host().settings());
     int ratio = m_splitRatio;
     reader.readInteger(QStringLiteral("splitRatio"), ratio);
+
     if (ratio >= minimumSplitRatio && ratio <= maximumSplitRatio) {
         m_splitRatio = ratio;
     }
+
     m_committedSplitRatio = m_splitRatio;
 
     const auto configurationRows = host().queryBootstrapDatabase(QStringLiteral("SELECT id, name, root, bind_host, port, terminal_id FROM web_server_configurations ORDER BY name, id"));
+
     if (!configurationRows.hasValue()) {
         return utils::Result<void>::failure(configurationRows.error());
     }
+
     for (const auto& row : configurationRows.value()) {
         const QString serverId = row.value(QStringLiteral("id")).toString();
         const QString name = row.value(QStringLiteral("name")).toString();
@@ -652,6 +706,7 @@ utils::Result<void> WebServerPlugin::restoreState() {
         }
         m_webServers.insert_or_assign(serverId, WebServer{nullptr, name, root, bindHost, terminalId, static_cast<quint16>(port)});
     }
+
     return utils::Result<void>::success();
 }
 
@@ -721,6 +776,7 @@ QFuture<utils::Result<void>> WebServerPlugin::startConfiguredWebServer(const QSt
     if (m_pendingServerOperations.contains(serverId)) {
         return QtFuture::makeReadyValueFuture(startFailure(host().translate(QStringLiteral("web-server.error.operation-pending"))));
     }
+
     m_pendingServerOperations.insert(serverId);
     emit webServerChanged(serverId);
     auto future = startRuntime(serverId);
@@ -736,9 +792,11 @@ QFuture<utils::Result<void>> WebServerPlugin::startConfiguredWebServer(const QSt
 
 QFuture<utils::Result<void>> WebServerPlugin::startRuntime(const QString& serverId) {
     const auto server = m_webServers.find(serverId);
+
     if (server == m_webServers.end()) {
         return QtFuture::makeReadyValueFuture(startFailure(host().translate(QStringLiteral("web-server.error.configuration-unavailable"))));
     }
+
     server->second.runtime = std::make_unique<WebServerRuntime>();
     WebServerRuntime* runtime = server->second.runtime.get();
     const QString root = server->second.root;
@@ -764,9 +822,11 @@ QFuture<utils::Result<void>> WebServerPlugin::startRuntime(const QString& server
 
 QFuture<utils::Result<void>> WebServerPlugin::persistConfiguration(const QString& serverId) {
     const auto server = m_webServers.find(serverId);
+
     if (server == m_webServers.end()) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"web_server_configuration_missing", "The Web Server configuration is unavailable", serverId}));
     }
+
     const QVariant terminalId = server->second.terminalId.isEmpty() ? QVariant{} : QVariant(server->second.terminalId);
     return host().executeDatabase(QStringLiteral("INSERT INTO web_server_configurations(id, name, root, bind_host, port, terminal_id) VALUES(?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, root = excluded.root, bind_host = excluded.bind_host, port = excluded.port, terminal_id = excluded.terminal_id"), {serverId, server->second.name, server->second.root, server->second.host, server->second.port, terminalId});
 }

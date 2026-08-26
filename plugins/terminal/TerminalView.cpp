@@ -86,13 +86,16 @@ void TerminalView::moveTab(int from, int to) {
 
 void TerminalView::refreshTabs() {
     const QSignalBlocker blocker(m_tabBar);
+
     while (m_tabBar->count() > 0) {
         m_tabBar->removeTab(0);
     }
+
     for (int row = 0; row < m_manager.rowCount(); ++row) {
         const QModelIndex index = m_manager.index(row);
         m_tabBar->addTab(ui::icon(ui::IconName::Terminal, m_host.theme()), m_manager.data(index, workspace::WorkspaceManager::NameRole).toString());
     }
+
     m_tabBar->setCurrentIndex(m_manager.currentTabIndex());
 }
 
@@ -109,6 +112,7 @@ void TerminalView::selectTab(int index) {
 void TerminalView::requestCloseTab(int index) {
     const QString name = m_manager.data(m_manager.index(index), workspace::WorkspaceManager::NameRole).toString();
     const bool confirmed = m_host.confirm(this, m_host.translate(QStringLiteral("terminal.tabs.close-title")), m_host.translate(QStringLiteral("terminal.tabs.close-message")).arg(name), m_host.translate(QStringLiteral("terminal.tabs.close-detail")), m_host.translate(QStringLiteral("terminal.tabs.close-action")), true);
+
     if (confirmed) {
         m_manager.closeTab(index);
     }
@@ -118,9 +122,11 @@ void TerminalView::renameTab(int index) {
     if (index < 0) {
         return;
     }
+
     const QString currentName = m_manager.data(m_manager.index(index), workspace::WorkspaceManager::NameRole).toString();
     bool accepted = false;
     const QString name = QInputDialog::getText(this, m_host.translate(QStringLiteral("terminal.tabs.rename-title")), m_host.translate(QStringLiteral("terminal.tabs.name")), QLineEdit::Normal, currentName, &accepted);
+
     if (accepted) {
         m_manager.renameTab(index, name);
     }
@@ -128,6 +134,7 @@ void TerminalView::renameTab(int index) {
 
 void TerminalView::closeFocusedTerminal() {
     const QString sessionId = m_manager.currentFocusedSessionId();
+
     if (sessionId.isEmpty()) {
         return;
     }
@@ -137,6 +144,7 @@ void TerminalView::closeFocusedTerminal() {
 
 void TerminalView::requestCloseTerminal(QString terminalId, QString name) {
     const bool confirmed = m_host.confirm(this, m_host.translate(QStringLiteral("terminal.session.close-title")), m_host.translate(QStringLiteral("terminal.session.close-message")).arg(name), m_host.translate(QStringLiteral("terminal.session.close-detail")), m_host.translate(QStringLiteral("terminal.session.close-action")), true);
+
     if (confirmed) {
         m_manager.closeTerminal(std::move(terminalId));
     }
@@ -149,15 +157,18 @@ void TerminalView::showLayoutMenu() {
 
 void TerminalView::applyLayoutFromButton() {
     const auto* button = qobject_cast<QToolButton*>(sender());
+
     if (button == nullptr) {
         return;
     }
+
     m_layoutMenu->close();
     m_manager.changeLayout(button->property("layoutId").toString());
 }
 
 void TerminalView::updateLayoutSelection() {
     const QString presetId = m_manager.currentPresetId();
+
     for (auto* button : m_layoutPresetGroup->buttons()) {
         button->setChecked(button->property("layoutId").toString() == presetId);
     }
@@ -248,6 +259,7 @@ void TerminalView::createInterface() {
     m_layoutPresetGroup = new QButtonGroup(chooser);
     m_layoutPresetGroup->setExclusive(true);
     int presetIndex = 0;
+
     for (const auto& preset : m_manager.layoutPresets()) {
         const QVariantMap values = preset.toMap();
         auto* button = new QToolButton(chooser);
@@ -267,6 +279,7 @@ void TerminalView::createInterface() {
         connect(button, &QToolButton::clicked, this, &TerminalView::applyLayoutFromButton);
         ++presetIndex;
     }
+
     auto* chooserAction = new QWidgetAction(m_layoutMenu);
     chooserAction->setDefaultWidget(chooser);
     m_layoutMenu->addAction(chooserAction);

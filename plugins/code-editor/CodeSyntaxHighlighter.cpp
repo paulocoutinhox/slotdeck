@@ -27,9 +27,11 @@ QTextCharFormat CodeSyntaxHighlighterHelper::makeFormat(const QColor& color, QFo
 QString CodeSyntaxHighlighterHelper::keywordPattern(const QStringList& keywords) {
     QStringList escaped;
     escaped.reserve(keywords.size());
+
     for (const auto& keyword : keywords) {
         escaped.append(QRegularExpression::escape(keyword));
     }
+
     return QStringLiteral("\\b(?:%1)\\b").arg(escaped.join(QLatin1Char('|')));
 }
 
@@ -56,6 +58,7 @@ QTextCharFormat CodeSyntaxHighlighterHelper::roleFormat(HighlightRole role, cons
     case HighlightRole::Markup:
         return makeFormat(theme.color(ui::ThemeColor::Accent));
     }
+
     Q_UNREACHABLE_RETURN({});
 }
 
@@ -65,13 +68,17 @@ CodeSyntaxHighlighter::CodeSyntaxHighlighter(QTextDocument* document, LanguageDe
     if (!m_definition.keywords.isEmpty()) {
         m_rules.append({QRegularExpression(CodeSyntaxHighlighterHelper::keywordPattern(m_definition.keywords)), CodeSyntaxHighlighterHelper::roleFormat(HighlightRole::Keyword, theme)});
     }
+
     for (const auto& pattern : LanguageRegistry::commonPatterns()) {
         m_rules.append({QRegularExpression(pattern.pattern), CodeSyntaxHighlighterHelper::roleFormat(pattern.role, theme)});
     }
+
     for (const auto& pattern : m_definition.patterns) {
         m_rules.append({QRegularExpression(pattern.pattern), CodeSyntaxHighlighterHelper::roleFormat(pattern.role, theme)});
     }
+
     const QMap<QString, HighlightRole>& roles = LanguageRegistry::semanticRoles();
+
     for (auto entry = roles.constBegin(); entry != roles.constEnd(); ++entry) {
         m_semanticFormats.insert(entry.key(), CodeSyntaxHighlighterHelper::roleFormat(entry.value(), theme));
     }
@@ -85,6 +92,7 @@ CodeSyntaxHighlighter::CodeSyntaxHighlighter(QTextDocument* document, LanguageDe
 // Repainting the whole document on every answer costs the file, so only the lines whose tokens really changed are invalidated.
 void CodeSyntaxHighlighter::setSemanticTokens(const QVector<SemanticToken>& tokens) {
     QHash<int, QVector<SemanticToken>> updated;
+
     for (const auto& token : tokens) {
         if (m_semanticFormats.contains(token.type)) {
             updated[token.line].append(token);
@@ -92,26 +100,31 @@ void CodeSyntaxHighlighter::setSemanticTokens(const QVector<SemanticToken>& toke
     }
 
     QSet<int> changed;
+
     for (auto entry = updated.constBegin(); entry != updated.constEnd(); ++entry) {
         if (m_semanticTokens.value(entry.key()) != entry.value()) {
             changed.insert(entry.key());
         }
     }
+
     for (auto entry = m_semanticTokens.constBegin(); entry != m_semanticTokens.constEnd(); ++entry) {
         if (!updated.contains(entry.key())) {
             changed.insert(entry.key());
         }
     }
+
     if (changed.isEmpty()) {
         return;
     }
 
     m_semanticTokens = std::move(updated);
+
     // Invalidating one line at a time stops paying off once most of them changed, which is what the first answer for a file does.
     if (changed.size() * LanguageRegistry::limits().partialRepaintDivisor >= document()->blockCount()) {
         rehighlight();
         return;
     }
+
     for (const int line : changed) {
         const QTextBlock block = document()->findBlockByNumber(line);
         if (block.isValid()) {
@@ -128,6 +141,7 @@ void CodeSyntaxHighlighter::highlightBlock(const QString& text) {
         }
         applyBlockComments(text);
     }
+
     for (const auto& token : m_semanticTokens.value(currentBlock().blockNumber())) {
         if (token.startCharacter >= 0 && token.startCharacter + token.length <= text.size()) {
             setFormat(token.startCharacter, token.length, m_semanticFormats.value(token.type));
@@ -137,6 +151,7 @@ void CodeSyntaxHighlighter::highlightBlock(const QString& text) {
 
 void CodeSyntaxHighlighter::applyRule(const QString& text, const Rule& rule) {
     auto match = rule.expression.globalMatch(text);
+
     while (match.hasNext()) {
         const auto current = match.next();
         setFormat(static_cast<int>(current.capturedStart()), static_cast<int>(current.capturedLength()), rule.format);
@@ -150,6 +165,7 @@ void CodeSyntaxHighlighter::applyBlockComments(const QString& text) {
 
     setCurrentBlockState(0);
     qsizetype start = previousBlockState() == 1 ? 0 : text.indexOf(m_definition.blockCommentStart);
+
     while (start >= 0) {
         const qsizetype end = text.indexOf(m_definition.blockCommentEnd, start + m_definition.blockCommentStart.size());
         if (end < 0) {

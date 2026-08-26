@@ -286,14 +286,17 @@ inline AiTestsHelper::RecordedRuns AiTestsHelper::installExecutionRows(test::Tes
             // clang-format off
             if (statement.contains(QStringLiteral("ORDER BY started_at_utc DESC"))) { std::sort(ordered.begin(), ordered.end(), [](const TaskExecution& first, const TaskExecution& second) { return first.startedAtUtc > second.startedAtUtc; }); }
             // clang-format on
+
             for (const auto& execution : ordered) {
                 if (!wantedTask.isEmpty() && execution.taskId != wantedTask) {
                     continue;
                 }
                 rows.append({{QStringLiteral("id"), execution.id}, {QStringLiteral("task_id"), execution.taskId}, {QStringLiteral("status"), AiTaskRepository::executionStatusName(execution.status)}, {QStringLiteral("started_at_utc"), execution.startedAtUtc.toString(Qt::ISODateWithMs)}, {QStringLiteral("finished_at_utc"), execution.finishedAtUtc.toString(Qt::ISODateWithMs)}, {QStringLiteral("input_tokens"), execution.inputTokens}, {QStringLiteral("output_tokens"), execution.outputTokens}, {QStringLiteral("finish_reason"), execution.finishReason}, {QStringLiteral("error_message"), execution.errorMessage}, {QStringLiteral("content"), execution.content}, {QStringLiteral("stop_reason"), AiTaskRepository::agentStopReasonName(execution.stopReason)}});
             }
+
             return utils::Result<persistence::DatabaseRows>::success(rows);
         }
+
         if (statement.contains(QStringLiteral("FROM ai_tasks_logs"))) {
             persistence::DatabaseRows rows;
             const QString wantedExecution = statement.contains(QStringLiteral("execution_id = ?")) ? bindings.value(0).toString() : QString{};
@@ -309,6 +312,7 @@ inline AiTestsHelper::RecordedRuns AiTestsHelper::installExecutionRows(test::Tes
             }
             return utils::Result<persistence::DatabaseRows>::success(rows);
         }
+
         return previous(statement, bindings);
     };
     // clang-format on
@@ -320,12 +324,14 @@ inline persistence::DatabaseRows AiTestsHelper::selectedColumns(const QString& s
     const qsizetype from = statement.indexOf(QStringLiteral("FROM "));
     const QString selection = statement.mid(QStringLiteral("SELECT ").size(), from - QStringLiteral("SELECT ").size());
     QStringList columns;
+
     for (const auto& entry : selection.split(QLatin1Char(','), Qt::SkipEmptyParts)) {
         const QString named = entry.trimmed();
         columns.append(named.contains(QStringLiteral(" AS ")) ? named.section(QStringLiteral(" AS "), -1).trimmed() : named.section(QLatin1Char('.'), -1));
     }
 
     persistence::DatabaseRows filtered;
+
     for (const auto& row : rows) {
         QVariantMap kept;
         for (auto value = row.constBegin(); value != row.constEnd(); ++value) {
@@ -335,6 +341,7 @@ inline persistence::DatabaseRows AiTestsHelper::selectedColumns(const QString& s
         }
         filtered.append(kept);
     }
+
     return filtered;
 }
 
@@ -344,16 +351,20 @@ inline AiAgent AiTestsHelper::testAgent() {
 
 inline QJsonObject AiTestsHelper::settingsDocument(const QVector<ModelConnection>& connections, const QString& defaultConnectionKey, const QVector<AiAgent>& agents) {
     QJsonArray declared;
+
     for (const auto& connection : connections) {
         declared.append(QJsonObject{{QStringLiteral("providerId"), connection.providerId}, {QStringLiteral("modelId"), connection.modelId}, {QStringLiteral("displayName"), connection.displayName}, {QStringLiteral("apiKey"), connection.apiKey}, {QStringLiteral("address"), connection.address}, {QStringLiteral("parameters"), connection.parameters}, {QStringLiteral("extraParameters"), connection.extraParameters}});
     }
+
     QJsonArray declaredAgents;
+
     for (const auto& agent : agents) {
         if (connections.isEmpty()) {
             continue;
         }
         declaredAgents.append(QJsonObject{{QStringLiteral("id"), agent.id}, {QStringLiteral("name"), agent.name}, {QStringLiteral("description"), agent.description}, {QStringLiteral("systemPrompt"), agent.systemPrompt}, {QStringLiteral("connectionKey"), agent.connectionKey.isEmpty() ? connectionKey(connections.first()) : agent.connectionKey}, {QStringLiteral("maximumIterations"), agent.maximumIterations}});
     }
+
     return {{QStringLiteral("connections"), declared}, {QStringLiteral("defaultConnectionKey"), defaultConnectionKey}, {QStringLiteral("agents"), declaredAgents}};
 }
 

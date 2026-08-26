@@ -47,11 +47,13 @@ QString StateStoreHelper::normalizedDefinition(const QString& statement) {
 
 QSet<QString> StateStoreHelper::declaredObjects(const QVector<DatabaseMigration>& migrations) {
     QSet<QString> declared;
+
     for (const auto& migration : migrations) {
         for (const auto& statement : migration.statements) {
             declared.insert(normalizedDefinition(statement));
         }
     }
+
     return declared;
 }
 
@@ -59,6 +61,7 @@ utils::Result<void> StateStoreHelper::validatePluginStatementOwnership(const QSt
     const QString prefix = QString(pluginId).replace(QLatin1Char('-'), QLatin1Char('_')) + QLatin1Char('_');
     const QString command = statement.trimmed().section(QLatin1Char(' '), 0, 0).toUpper();
     const QSet<QString> supportedCommands{QStringLiteral("ALTER"), QStringLiteral("CREATE"), QStringLiteral("DELETE"), QStringLiteral("DROP"), QStringLiteral("INSERT"), QStringLiteral("SELECT"), QStringLiteral("UPDATE")};
+
     if (!supportedCommands.contains(command)) {
         return utils::Result<void>::failure({"plugin_database_statement_unsupported", "The plugin database statement type is unsupported", command});
     }
@@ -67,6 +70,7 @@ utils::Result<void> StateStoreHelper::validatePluginStatementOwnership(const QSt
     static const QRegularExpression commaSource(QStringLiteral("\\bFROM\\s+[a-z_][a-z0-9_]*(?:\\s+(?:AS\\s+)?(?!INDEXED\\b|NOT\\b|JOIN\\b|LEFT\\b|INNER\\b|CROSS\\b|WHERE\\b|ORDER\\b|GROUP\\b|LIMIT\\b)[a-z_][a-z0-9_]*)?(?:\\s+(?:INDEXED\\s+BY\\s+[a-z_][a-z0-9_]*|NOT\\s+INDEXED))?\\s*,"), QRegularExpression::CaseInsensitiveOption);
     static const QRegularExpression joinedCommaSource(QStringLiteral("\\bJOIN\\b(?:(?!\\b(?:WHERE|ORDER|GROUP|LIMIT|UNION|RETURNING)\\b)[\\s\\S])*?,\\s*[a-z_]"), QRegularExpression::CaseInsensitiveOption);
     static const QRegularExpression parenthesizedSource(QStringLiteral("\\b(?:FROM|JOIN)\\s*\\("), QRegularExpression::CaseInsensitiveOption);
+
     if (!supportedSyntax.match(statement.trimmed()).hasMatch() || statement.contains(QLatin1Char(';')) || statement.contains(QStringLiteral("--")) || statement.contains(QStringLiteral("/*")) || statement.contains(QStringLiteral("*/")) || statement.contains(QLatin1Char('"')) || statement.contains(QLatin1Char('`')) || statement.contains(QLatin1Char('[')) || statement.contains(QLatin1Char(']')) || commaSource.match(statement).hasMatch() || joinedCommaSource.match(statement).hasMatch() || parenthesizedSource.match(statement).hasMatch()) {
         return utils::Result<void>::failure({"plugin_database_statement_unsupported", "The plugin database statement syntax is unsupported", statement});
     }
@@ -74,6 +78,7 @@ utils::Result<void> StateStoreHelper::validatePluginStatementOwnership(const QSt
     static const QRegularExpression tablePattern(QStringLiteral("\\b(?:TABLE(?:\\s+IF\\s+(?:NOT\\s+)?EXISTS)?|INTO|UPDATE(?!\\s+SET\\b)|FROM|JOIN|REFERENCES)\\s+([a-z_][a-z0-9_]*)"), QRegularExpression::CaseInsensitiveOption);
     bool foundOwnedObject = false;
     auto matches = tablePattern.globalMatch(statement);
+
     while (matches.hasNext()) {
         const QString table = matches.next().captured(1);
         if (!table.startsWith(prefix)) {
@@ -84,14 +89,17 @@ utils::Result<void> StateStoreHelper::validatePluginStatementOwnership(const QSt
 
     static const QRegularExpression indexPattern(QStringLiteral("\\bCREATE\\s+(?:UNIQUE\\s+)?INDEX(?:\\s+IF\\s+NOT\\s+EXISTS)?\\s+([a-z_][a-z0-9_]*)\\s+ON\\s+([a-z_][a-z0-9_]*)"), QRegularExpression::CaseInsensitiveOption);
     const auto indexMatch = indexPattern.match(statement);
+
     if (indexMatch.hasMatch()) {
         if (!indexMatch.captured(1).startsWith(prefix) || !indexMatch.captured(2).startsWith(prefix)) {
             return utils::Result<void>::failure({"plugin_database_ownership_invalid", "A plugin database index accesses an object owned by another component", indexMatch.captured(1)});
         }
         foundOwnedObject = true;
     }
+
     static const QRegularExpression referencedIndexPattern(QStringLiteral("\\b(?:DROP\\s+INDEX(?:\\s+IF\\s+EXISTS)?|INDEXED\\s+BY)\\s+([a-z_][a-z0-9_]*)"), QRegularExpression::CaseInsensitiveOption);
     auto referencedIndexes = referencedIndexPattern.globalMatch(statement);
+
     while (referencedIndexes.hasNext()) {
         const QString index = referencedIndexes.next().captured(1);
         if (!index.startsWith(prefix)) {
@@ -99,6 +107,7 @@ utils::Result<void> StateStoreHelper::validatePluginStatementOwnership(const QSt
         }
         foundOwnedObject = true;
     }
+
     return foundOwnedObject ? utils::Result<void>::success() : utils::Result<void>::failure(utils::Error{"plugin_database_statement_unsupported", "The plugin database statement does not identify an owned table", statement});
 }
 
@@ -106,20 +115,25 @@ StateStore::StateStore(QString filePath) : m_filePath(std::move(filePath)), m_co
 
 StateStore::~StateStore() {
     const QMutexLocker locker(&m_mutex);
+
     if (m_database.isValid()) {
         m_database.close();
         m_database = {};
     }
+
     QSqlDatabase::removeDatabase(m_connectionName);
 }
 
 // A database this version cannot use is set aside and a new one takes its place, because nothing stored may keep the application from opening.
 utils::Result<void> StateStore::initialize() {
     const QMutexLocker locker(&m_mutex);
+
     if (m_database.isValid()) {
         return utils::Result<void>::failure({"database_already_initialized", "The application database is already initialized", m_filePath});
     }
+
     const QFileInfo databaseFile(m_filePath);
+
     if (m_filePath.isEmpty() || !databaseFile.isAbsolute() || !databaseFile.dir().exists() || (databaseFile.exists() && !databaseFile.isFile())) {
         return utils::Result<void>::failure({"database_path_invalid", "The application database path is invalid", m_filePath});
     }
@@ -136,6 +150,7 @@ utils::Result<void> StateStore::initialize() {
 utils::Result<void> StateStore::openDatabase() {
     m_database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_connectionName);
     m_database.setDatabaseName(m_filePath);
+
     if (!m_database.open()) {
         return utils::Result<void>::failure(StateStoreHelper::databaseError(QStringLiteral("database_open_failed"), QStringLiteral("The application database could not be opened"), m_database.lastError()));
     }
@@ -160,9 +175,11 @@ utils::Result<void> StateStore::replaceUnusableDatabase() {
 
     const QString backup = m_filePath + QStringLiteral(".unusable-") + QString::number(QDateTime::currentSecsSinceEpoch());
     const bool moved = QFileInfo::exists(m_filePath) && QFile::rename(m_filePath, backup);
+
     if (QFileInfo::exists(m_filePath)) {
         return utils::Result<void>::failure({"database_replace_failed", "The unusable application database could not be set aside", m_filePath});
     }
+
     // The write-ahead log holds what was committed last, so it goes with the database it belongs to and never stays beside the new one.
     for (const auto& suffix : {QStringLiteral("-wal"), QStringLiteral("-shm")}) {
         const QString sidecar = m_filePath + suffix;
@@ -173,9 +190,11 @@ utils::Result<void> StateStore::replaceUnusableDatabase() {
             QFile::remove(sidecar);
         }
     }
+
     m_replacedDatabasePath = QFileInfo::exists(backup) ? backup : QString{};
 
     const auto opened = openDatabase();
+
     if (!opened.hasValue()) {
         return opened;
     }
@@ -198,13 +217,17 @@ const QString& StateStore::filePath() const {
 utils::Result<bool> StateStore::wasCleanShutdown() const {
     const QMutexLocker locker(&m_mutex);
     const auto rows = query(QStringLiteral("SELECT clean_shutdown FROM core_state WHERE singleton = 1"));
+
     if (!rows.hasValue() || rows.value().size() != 1) {
         return utils::Result<bool>::failure(rows.hasValue() ? utils::Error{"database_state_invalid", "The application shutdown state is invalid", {}} : rows.error());
     }
+
     qint64 clean = -1;
+
     if (!readStoredInteger(rows.value().first().value(QStringLiteral("clean_shutdown")), clean) || (clean != 0 && clean != 1)) {
         return utils::Result<bool>::failure({"database_state_invalid", "The application shutdown state is invalid", {}});
     }
+
     return utils::Result<bool>::success(clean == 1);
 }
 
@@ -216,9 +239,11 @@ utils::Result<void> StateStore::markShutdown(bool clean) {
 QJsonObject StateStore::settings(const QString& ownerId) const {
     const QMutexLocker locker(&m_mutex);
     const auto rows = query(QStringLiteral("SELECT document FROM plugin_settings WHERE owner_id = ?"), {ownerId});
+
     if (!rows.hasValue() || rows.value().size() != 1) {
         return {};
     }
+
     return QJsonDocument::fromJson(rows.value().first().value(QStringLiteral("document")).toString().toUtf8()).object();
 }
 
@@ -236,11 +261,14 @@ utils::Result<int> StateStore::pluginSchemaVersion(const QString& pluginId) cons
     if (!StateStoreHelper::pluginIdPattern().match(pluginId).hasMatch()) {
         return utils::Result<int>::failure({"plugin_database_owner_invalid", "The plugin database owner is invalid", pluginId});
     }
+
     const QMutexLocker locker(&m_mutex);
     const auto rows = query(QStringLiteral("SELECT version FROM plugin_schema_versions WHERE plugin_id = ?"), {pluginId});
+
     if (!rows.hasValue()) {
         return utils::Result<int>::failure(rows.error());
     }
+
     return utils::Result<int>::success(rows.value().isEmpty() ? 0 : rows.value().first().value(QStringLiteral("version")).toInt());
 }
 
@@ -249,6 +277,7 @@ utils::Result<void> StateStore::migratePluginDatabase(const QString& pluginId, c
     if (!StateStoreHelper::pluginIdPattern().match(pluginId).hasMatch() || migrations.isEmpty()) {
         return utils::Result<void>::failure({"plugin_database_migration_invalid", "The plugin database migration plan is invalid", pluginId});
     }
+
     for (qsizetype index = 0; index < migrations.size(); ++index) {
         if (migrations.at(index).version != index + 1 || migrations.at(index).statements.isEmpty()) {
             return utils::Result<void>::failure({"plugin_database_migration_invalid", "Plugin database migrations must contain the complete consecutive schema history", pluginId});
@@ -256,16 +285,19 @@ utils::Result<void> StateStore::migratePluginDatabase(const QString& pluginId, c
     }
 
     const QMutexLocker locker(&m_mutex);
+
     if (const auto applied = applyPluginMigrations(pluginId, migrations); applied.hasValue()) {
         return applied;
     }
 
     const auto dropped = dropPluginSchema(pluginId);
+
     if (!dropped.hasValue()) {
         return dropped;
     }
 
     const auto rebuilt = applyPluginMigrations(pluginId, migrations);
+
     if (rebuilt.hasValue() && !m_rebuiltSchemas.contains(pluginId)) {
         m_rebuiltSchemas.append(pluginId);
     }
@@ -277,14 +309,17 @@ utils::Result<void> StateStore::migratePluginDatabase(const QString& pluginId, c
 utils::Result<void> StateStore::dropPluginSchema(const QString& pluginId) {
     const QString prefix = QString(pluginId).replace(QLatin1Char('-'), QLatin1Char('_')) + QLatin1Char('_');
     const auto rows = query(QStringLiteral("SELECT type, name FROM sqlite_schema WHERE type IN ('table', 'index') AND substr(name, 1, ?) = ?"), {prefix.size(), prefix});
+
     if (!rows.hasValue()) {
         return utils::Result<void>::failure(rows.error());
     }
 
     const auto transaction = beginTransaction();
+
     if (!transaction.hasValue()) {
         return transaction;
     }
+
     for (const auto& row : rows.value()) {
         const QString name = row.value(QStringLiteral("name")).toString();
         const QString type = row.value(QStringLiteral("type")).toString();
@@ -298,7 +333,9 @@ utils::Result<void> StateStore::dropPluginSchema(const QString& pluginId) {
             return dropped;
         }
     }
+
     const auto forgotten = execute(QStringLiteral("DELETE FROM plugin_schema_versions WHERE plugin_id = ?"), {pluginId});
+
     if (!forgotten.hasValue()) {
         rollbackTransaction();
         return forgotten;
@@ -309,18 +346,23 @@ utils::Result<void> StateStore::dropPluginSchema(const QString& pluginId) {
 
 utils::Result<void> StateStore::applyPluginMigrations(const QString& pluginId, const QVector<DatabaseMigration>& migrations) {
     const auto versionRows = query(QStringLiteral("SELECT version FROM plugin_schema_versions WHERE plugin_id = ?"), {pluginId});
+
     if (!versionRows.hasValue()) {
         return utils::Result<void>::failure(versionRows.error());
     }
+
     int currentVersion = versionRows.value().isEmpty() ? 0 : versionRows.value().first().value(QStringLiteral("version")).toInt();
+
     if (migrations.last().version < currentVersion) {
         return utils::Result<void>::failure({"plugin_database_version_newer", "The plugin database schema is newer than the plugin", pluginId});
     }
 
     const auto transaction = beginTransaction();
+
     if (!transaction.hasValue()) {
         return transaction;
     }
+
     for (const auto& migration : migrations) {
         if (migration.version <= currentVersion) {
             continue;
@@ -350,10 +392,12 @@ utils::Result<void> StateStore::applyPluginMigrations(const QString& pluginId, c
     }
 
     const auto schema = validatePluginSchema(pluginId, migrations);
+
     if (!schema.hasValue()) {
         rollbackTransaction();
         return schema;
     }
+
     return commitTransaction();
 }
 
@@ -361,17 +405,21 @@ utils::Result<void> StateStore::applyPluginMigrations(const QString& pluginId, c
 utils::Result<void> StateStore::validatePluginSchema(const QString& pluginId, const QVector<DatabaseMigration>& migrations) {
     const QString prefix = QString(pluginId).replace(QLatin1Char('-'), QLatin1Char('_')) + QLatin1Char('_');
     const auto rows = query(QStringLiteral("SELECT sql FROM sqlite_schema WHERE type IN ('table', 'index') AND sql IS NOT NULL AND substr(name, 1, ?) = ?"), {prefix.size(), prefix});
+
     if (!rows.hasValue()) {
         return utils::Result<void>::failure(rows.error());
     }
 
     QSet<QString> stored;
+
     for (const auto& row : rows.value()) {
         stored.insert(StateStoreHelper::normalizedDefinition(row.value(QStringLiteral("sql")).toString()));
     }
+
     if (stored != StateStoreHelper::declaredObjects(migrations)) {
         return utils::Result<void>::failure({"plugin_database_schema_invalid", "The stored plugin database schema does not match the one the plugin declares", pluginId});
     }
+
     return utils::Result<void>::success();
 }
 
@@ -379,10 +427,13 @@ utils::Result<void> StateStore::executePluginDatabase(const QString& pluginId, c
     if (!StateStoreHelper::pluginIdPattern().match(pluginId).hasMatch() || statement.trimmed().isEmpty()) {
         return utils::Result<void>::failure({"plugin_database_statement_invalid", "The plugin database statement is invalid", pluginId});
     }
+
     const auto ownershipResult = StateStoreHelper::validatePluginStatementOwnership(pluginId, statement);
+
     if (!ownershipResult.hasValue()) {
         return ownershipResult;
     }
+
     const QMutexLocker locker(&m_mutex);
     return execute(statement, bindings);
 }
@@ -404,6 +455,7 @@ utils::Result<void> StateStore::executePluginDatabaseTransaction(const QString& 
 
     const QMutexLocker locker(&m_mutex);
     const auto beginResult = beginTransaction();
+
     if (!beginResult.hasValue()) {
         return beginResult;
     }
@@ -423,20 +475,26 @@ utils::Result<DatabaseRows> StateStore::queryPluginDatabase(const QString& plugi
     if (!StateStoreHelper::pluginIdPattern().match(pluginId).hasMatch() || statement.trimmed().isEmpty()) {
         return utils::Result<DatabaseRows>::failure({"plugin_database_query_invalid", "The plugin database query is invalid", pluginId});
     }
+
     const auto ownershipResult = StateStoreHelper::validatePluginStatementOwnership(pluginId, statement);
+
     if (!ownershipResult.hasValue()) {
         return utils::Result<DatabaseRows>::failure(ownershipResult.error());
     }
+
     const QMutexLocker locker(&m_mutex);
     return query(statement, bindings);
 }
 
 utils::Result<void> StateStore::initializeCoreSchema() {
     const auto versionRows = query(QStringLiteral("PRAGMA user_version"));
+
     if (!versionRows.hasValue() || versionRows.value().size() != 1) {
         return utils::Result<void>::failure(versionRows.hasValue() ? utils::Error{"database_schema_invalid", "The application database schema version is unavailable", {}} : versionRows.error());
     }
+
     const int version = versionRows.value().first().constBegin().value().toInt();
+
     if (version == coreDatabaseSchemaVersion) {
         return validateCoreSchema();
     }
@@ -445,10 +503,13 @@ utils::Result<void> StateStore::initializeCoreSchema() {
     }
 
     const auto transaction = beginTransaction();
+
     if (!transaction.hasValue()) {
         return transaction;
     }
+
     const QStringList statements = {coreDatabaseTableSchemas().value(QStringLiteral("core_state")), coreDatabaseTableSchemas().value(QStringLiteral("plugin_settings")), coreDatabaseTableSchemas().value(QStringLiteral("plugin_schema_versions")), QStringLiteral("INSERT INTO core_state(singleton, clean_shutdown) VALUES(1, 1)")};
+
     for (const auto& statement : statements) {
         const auto result = execute(statement);
         if (!result.hasValue()) {
@@ -456,11 +517,14 @@ utils::Result<void> StateStore::initializeCoreSchema() {
             return result;
         }
     }
+
     const auto versionResult = execute(QStringLiteral("PRAGMA user_version = %1").arg(coreDatabaseSchemaVersion));
+
     if (!versionResult.hasValue()) {
         rollbackTransaction();
         return versionResult;
     }
+
     return commitTransaction();
 }
 
@@ -471,49 +535,61 @@ utils::Result<void> StateStore::validateCoreSchema() const {
 
 utils::Result<void> StateStore::execute(const QString& statement, const QVariantList& bindings) const {
     QSqlQuery sql(m_database);
+
     if (!sql.prepare(statement)) {
         return utils::Result<void>::failure(StateStoreHelper::databaseError(QStringLiteral("database_prepare_failed"), QStringLiteral("A database statement could not be prepared"), sql.lastError()));
     }
+
     for (const auto& binding : bindings) {
         sql.addBindValue(binding);
     }
+
     if (!sql.exec()) {
         return utils::Result<void>::failure(StateStoreHelper::databaseError(QStringLiteral("database_execute_failed"), QStringLiteral("A database statement could not be executed"), sql.lastError()));
     }
+
     return utils::Result<void>::success();
 }
 
 utils::Result<void> StateStore::executeSingleRowMutation(const QString& statement, const QVariantList& bindings) const {
     QSqlQuery sql(m_database);
+
     if (!sql.prepare(statement)) {
         return utils::Result<void>::failure(StateStoreHelper::databaseError(QStringLiteral("database_prepare_failed"), QStringLiteral("A database statement could not be prepared"), sql.lastError()));
     }
+
     for (const auto& binding : bindings) {
         sql.addBindValue(binding);
     }
+
     if (!sql.exec()) {
         return utils::Result<void>::failure(StateStoreHelper::databaseError(QStringLiteral("database_execute_failed"), QStringLiteral("A database statement could not be executed"), sql.lastError()));
     }
     if (sql.numRowsAffected() != 1) {
         return utils::Result<void>::failure({"database_state_invalid", "A core database row is unavailable", statement});
     }
+
     return utils::Result<void>::success();
 }
 
 utils::Result<DatabaseRows> StateStore::query(const QString& statement, const QVariantList& bindings) const {
     QSqlQuery sql(m_database);
+
     if (!sql.prepare(statement)) {
         return utils::Result<DatabaseRows>::failure(StateStoreHelper::databaseError(QStringLiteral("database_prepare_failed"), QStringLiteral("A database query could not be prepared"), sql.lastError()));
     }
+
     for (const auto& binding : bindings) {
         sql.addBindValue(binding);
     }
+
     if (!sql.exec()) {
         return utils::Result<DatabaseRows>::failure(StateStoreHelper::databaseError(QStringLiteral("database_query_failed"), QStringLiteral("A database query could not be executed"), sql.lastError()));
     }
 
     DatabaseRows rows;
     const QSqlRecord record = sql.record();
+
     while (sql.next()) {
         QVariantMap row;
         for (int index = 0; index < record.count(); ++index) {
@@ -521,6 +597,7 @@ utils::Result<DatabaseRows> StateStore::query(const QString& statement, const QV
         }
         rows.append(std::move(row));
     }
+
     return utils::Result<DatabaseRows>::success(std::move(rows));
 }
 
@@ -532,6 +609,7 @@ utils::Result<void> StateStore::commitTransaction() {
     if (m_database.commit()) {
         return utils::Result<void>::success();
     }
+
     const auto error = StateStoreHelper::databaseError(QStringLiteral("database_commit_failed"), QStringLiteral("A database transaction could not be committed"), m_database.lastError());
     m_database.rollback();
     return utils::Result<void>::failure(error);

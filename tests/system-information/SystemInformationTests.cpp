@@ -52,13 +52,16 @@ TEST(SystemInformationProviderTest, CollectsAValidSnapshotFromTheCurrentMachine)
     EXPECT_EQ(snapshot.capturedAtUtc.timeSpec(), Qt::UTC);
     EXPECT_TRUE(snapshot.operatingSystem.architectureBits == 0 || snapshot.operatingSystem.architectureBits == 32 || snapshot.operatingSystem.architectureBits == 64);
     EXPECT_LE(snapshot.memory.availableBytes, snapshot.memory.totalBytes);
+
     for (const auto& processor : snapshot.processors) {
         EXPECT_GE(processor.logicalCoreCount, processor.physicalCoreCount);
     }
+
     if (snapshot.processorUsage.utilization.has_value()) {
         EXPECT_GE(snapshot.processorUsage.utilization.value(), 0.0);
         EXPECT_LE(snapshot.processorUsage.utilization.value(), 1.0);
     }
+
 #if defined(Q_OS_MACOS)
     EXPECT_FALSE(snapshot.processorUsage.utilization.has_value());
     EXPECT_TRUE(snapshot.processorUsage.threadUtilization.isEmpty());
@@ -69,10 +72,12 @@ TEST(SystemInformationProviderTest, CollectsAValidSnapshotFromTheCurrentMachine)
     const auto printable = [](const QString& value) { return std::all_of(value.cbegin(), value.cend(), [](QChar character) { return character.isPrint(); }); };
     // clang-format on
     const QStringList operatingSystemValues{snapshot.operatingSystem.hostName, snapshot.operatingSystem.name, snapshot.operatingSystem.version, snapshot.operatingSystem.kernel};
+
     for (const auto& value : operatingSystemValues) {
         EXPECT_TRUE(printable(value)) << value.toStdString();
         EXPECT_EQ(value, value.trimmed());
     }
+
     for (const auto& processor : snapshot.processors) {
         EXPECT_TRUE(printable(processor.vendor)) << processor.vendor.toStdString();
         EXPECT_TRUE(printable(processor.model)) << processor.model.toStdString();
@@ -247,10 +252,12 @@ TEST(SystemInformationViewTest, RendersThemedHardwareSectionsAndRefreshState) {
     EXPECT_GE(view->findChildren<QProgressBar*>(QStringLiteral("systemInformationProgress")).size(), 3);
     bool foundProcessor = false;
     bool foundDisk = false;
+
     for (const auto* label : view->findChildren<QLabel*>(QStringLiteral("systemInformationValue"))) {
         foundProcessor = foundProcessor || label->text().contains(QStringLiteral("Test Processor"));
         foundDisk = foundDisk || label->text().contains(QStringLiteral("Test SSD"));
     }
+
     EXPECT_TRUE(foundProcessor);
     EXPECT_TRUE(foundDisk);
     auto* updated = view->findChild<QLabel*>(QStringLiteral("systemInformationUpdated"));
@@ -307,6 +314,7 @@ SystemSnapshot SystemInformationTestsHelper::sampleSnapshot() {
 
 void SystemInformationTestsHelper::installEnglishTranslations(test::TestPluginHost& host) {
     const auto values = translations::catalog().value(QStringLiteral("en"));
+
     for (auto entry = values.constBegin(); entry != values.constEnd(); ++entry) {
         host.translations.insert(entry.key(), entry.value());
     }

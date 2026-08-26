@@ -59,18 +59,22 @@ class FakePtyBackend final : public terminalcore::IPtyBackend {
         startedHistoryFile = historyFile;
         startedColumns = columns;
         startedRows = rows;
+
         if (startError.has_value()) {
             return utils::Result<void>::failure(startError.value());
         }
+
         isRunning = true;
         return utils::Result<void>::success();
     }
 
     utils::Result<void> write(const QByteArray& bytes) override {
         writes.append(bytes);
+
         if (writeError.has_value()) {
             return utils::Result<void>::failure(writeError.value());
         }
+
         return utils::Result<void>::success();
     }
 
@@ -80,9 +84,11 @@ class FakePtyBackend final : public terminalcore::IPtyBackend {
         resizedRows = rows;
         resizedCellWidth = cellWidth;
         resizedCellHeight = cellHeight;
+
         if (resizeError.has_value()) {
             return utils::Result<void>::failure(resizeError.value());
         }
+
         return utils::Result<void>::success();
     }
 
@@ -141,6 +147,7 @@ class FakePtyBackend final : public terminalcore::IPtyBackend {
 TEST(LayoutManagerTest, ExposesEveryPresetAndRejectsUnknownIdentifiers) {
     const auto presets = workspace::LayoutManager::presets();
     ASSERT_EQ(presets.size(), 17);
+
     for (const auto& preset : presets) {
         EXPECT_FALSE(preset.id.isEmpty());
         EXPECT_FALSE(preset.name.isEmpty());
@@ -150,6 +157,7 @@ TEST(LayoutManagerTest, ExposesEveryPresetAndRejectsUnknownIdentifiers) {
         ASSERT_TRUE(workspace::LayoutManager::preset(preset.id).hasValue());
         EXPECT_EQ(workspace::LayoutManager::preset(preset.id).value().slotCount, preset.slotCount);
     }
+
     EXPECT_EQ(workspace::LayoutManager::preset(QStringLiteral("unknown")).error().code, QStringLiteral("terminal_layout_preset_unknown"));
 }
 
@@ -229,6 +237,7 @@ TEST(TerminalShortcutsTest, SeparatesPluginApplicationAndTerminalOwnedInput) {
 #endif
 
     const QList<QKeySequence> applicationSequences{ui::shortcuts::increaseContentFont(), ui::shortcuts::decreaseContentFont(), ui::shortcuts::resetContentFont(), ui::shortcuts::quit()};
+
     for (const auto& sequence : applicationSequences) {
         ASSERT_GT(sequence.count(), 0);
         const QKeyCombination combination = sequence[0];
@@ -397,9 +406,11 @@ TEST(ShellProfileTest, QuotesLocalPathsAndResolvesExecutableProfiles) {
     const QByteArray declaredShell = qgetenv("SHELL");
     qunsetenv("SHELL");
     const auto fromAccount = terminalcore::ShellProfileResolver::systemDefault();
+
     if (!declaredShell.isEmpty()) {
         qputenv("SHELL", declaredShell);
     }
+
     EXPECT_FALSE(fromAccount.id.isEmpty());
     EXPECT_TRUE(QFileInfo(fromAccount.executable).isExecutable());
 #endif
@@ -434,6 +445,7 @@ TEST(PosixPtyBackendTest, DeliversWhatAProgramWroteBeforeItReportsThatItEnded) {
 TEST(TerminalThemeCatalogTest, ProvidesCompleteThemesAndRejectsUnknownTheme) {
     const auto& themes = terminalcore::terminalThemes();
     ASSERT_EQ(themes.size(), 3);
+
     for (const auto& theme : themes) {
         EXPECT_TRUE(terminalcore::terminalThemeExists(theme.id));
         ASSERT_NE(terminalcore::terminalTheme(theme.id), nullptr);
@@ -445,6 +457,7 @@ TEST(TerminalThemeCatalogTest, ProvidesCompleteThemesAndRejectsUnknownTheme) {
             EXPECT_TRUE(color.isValid());
         }
     }
+
     EXPECT_FALSE(terminalcore::terminalThemeExists(QStringLiteral("unknown")));
     EXPECT_EQ(terminalcore::terminalTheme(QStringLiteral("unknown")), nullptr);
 }
@@ -614,9 +627,11 @@ TEST(GhosttyTerminalAdapterTest, FindsAQueryThroughTheHistoryAndRevealsWhereItIs
     terminalcore::GhosttyTerminalAdapter adapter;
     ASSERT_TRUE(adapter.initialize(40, 4, 8, 16, *terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
     adapter.write(QByteArrayLiteral("needle at the top\r\n"));
+
     for (int line = 0; line < 30; ++line) {
         adapter.write(QStringLiteral("filler %1\r\n").arg(line).toUtf8());
     }
+
     adapter.write(QByteArrayLiteral("needless and needle again\r\n"));
 
     // A query is answered against the history as well as against the rows on view.
@@ -697,6 +712,7 @@ TEST(GhosttyTerminalAdapterTest, SelectsWordsLinesAndDragsThroughTheEmulator) {
     for (int line = 0; line < 20; ++line) {
         adapter.write(QStringLiteral("line %1\r\n").arg(line).toUtf8());
     }
+
     adapter.scrollToTop();
     ASSERT_TRUE(adapter.beginSelection(cellCenter(0, 0), 2'000'000'000, repeatInterval, repeatDistance, false).hasValue());
     ASSERT_TRUE(adapter.beginSelection(cellCenter(0, 0), 2'100'000'000, repeatInterval, repeatDistance, false).hasValue());
@@ -766,6 +782,7 @@ TEST(WorkspaceManagerTest, SurvivesManyTerminalsCreatedClosedAndMovedAcrossTabsA
     ASSERT_TRUE(manager.initialize().hasValue());
 
     const QStringList presets{QStringLiteral("single"), QStringLiteral("2-columns"), QStringLiteral("2-rows"), QStringLiteral("grid-4")};
+
     for (int round = 0; round < 40; ++round) {
         manager.createTab();
         manager.changeLayout(presets.at(round % presets.size()));
@@ -949,6 +966,7 @@ TEST(TerminalUiTest, ConnectsWorkspacePaneShelfAndToolbarInteractions) {
     ASSERT_TRUE(test::waitUntil([&]() { terminalWidget->selectAll(); return terminalWidget->selectedText().contains(QStringLiteral("example.org")); }));
     // clang-format on
     terminalWidget->clearSelection();
+
     // The size of a cell comes from the platform font, so the address is looked for across the surface instead of at a guessed pixel.
     for (int y = 2; y < terminalWidget->height() && links.isEmpty(); y += 4) {
         for (int x = 2; x < terminalWidget->width() && links.isEmpty(); x += 4) {
@@ -956,6 +974,7 @@ TEST(TerminalUiTest, ConnectsWorkspacePaneShelfAndToolbarInteractions) {
             QTest::mouseRelease(terminalWidget, Qt::LeftButton, terminalcore::shortcuts::applicationModifier, QPoint(x, y));
         }
     }
+
     ASSERT_EQ(links.count(), 1);
     EXPECT_EQ(links.first().first().toString(), QStringLiteral("https://example.org/page"));
     terminalWidget->clearSelection();
@@ -1002,11 +1021,13 @@ TEST(TerminalUiTest, ConnectsWorkspacePaneShelfAndToolbarInteractions) {
     auto* terminalMenu = terminalWidget->findChild<QMenu*>();
     ASSERT_NE(terminalMenu, nullptr);
     QStringList menuLabels;
+
     for (auto* action : terminalMenu->actions()) {
         if (!action->isSeparator()) {
             menuLabels.append(action->text());
         }
     }
+
     EXPECT_EQ(menuLabels, QStringList({QStringLiteral("terminal.menu.copy"), QStringLiteral("terminal.menu.paste"), QStringLiteral("terminal.menu.select-all"), QStringLiteral("terminal.menu.clear")}));
 
     // Selecting everything reaches what the drag never covered, and clearing takes the whole buffer with it.
@@ -1084,6 +1105,7 @@ TEST(TerminalUiTest, ConnectsWorkspacePaneShelfAndToolbarInteractions) {
 
     QSignalSpy closeRequested(&pane, &ui::TerminalPane::closeRequested);
     QSignalSpy focusRequested(&pane, &ui::TerminalPane::focusModeRequested);
+
     for (auto* button : pane.findChildren<QToolButton*>()) {
         if (button->toolTip() == QStringLiteral("terminal.actions.close-terminal")) {
             QTest::mouseClick(button, Qt::LeftButton);
@@ -1092,27 +1114,32 @@ TEST(TerminalUiTest, ConnectsWorkspacePaneShelfAndToolbarInteractions) {
             QTest::mouseClick(button, Qt::LeftButton);
         }
     }
+
     EXPECT_EQ(closeRequested.count(), 1);
     EXPECT_EQ(focusRequested.count(), 1);
 
     // The directory the shell stands in is offered to the editor, and the editor decides what to do with it.
     host.availablePlugins = {QStringLiteral("code-editor"), QStringLiteral("web-server")};
     QToolButton* actionsButton = nullptr;
+
     for (auto* button : pane.findChildren<QToolButton*>()) {
         if (button->toolTip() == QStringLiteral("terminal.actions.menu")) {
             actionsButton = button;
         }
     }
+
     ASSERT_NE(actionsButton, nullptr);
     actionsButton->click();
     auto* menu = pane.findChild<QMenu*>();
     ASSERT_NE(menu, nullptr);
     QAction* openInEditor = nullptr;
+
     for (auto* action : menu->actions()) {
         if (action->data().toString() == QStringLiteral("editor")) {
             openInEditor = action;
         }
     }
+
     ASSERT_NE(openInEditor, nullptr);
     openInEditor->trigger();
     menu->close();
@@ -1123,11 +1150,13 @@ TEST(TerminalUiTest, ConnectsWorkspacePaneShelfAndToolbarInteractions) {
 
     // The same directory is offered to the Web Server, which answers with the form that configures one.
     QAction* serveDirectory = nullptr;
+
     for (auto* action : menu->actions()) {
         if (action->data().toString() == QStringLiteral("server")) {
             serveDirectory = action;
         }
     }
+
     ASSERT_NE(serveDirectory, nullptr);
     serveDirectory->trigger();
     ASSERT_EQ(host.requests.size(), 2);
@@ -1139,6 +1168,7 @@ TEST(TerminalUiTest, ConnectsWorkspacePaneShelfAndToolbarInteractions) {
     host.availablePlugins.clear();
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
     actionsButton->click();
+
     for (auto* candidate : pane.findChildren<QMenu*>()) {
         // clang-format off
         const auto actions = candidate->actions();
@@ -1156,9 +1186,11 @@ TEST(TerminalUiTest, ConnectsWorkspacePaneShelfAndToolbarInteractions) {
     QSignalSpy shelfClose(&chip, &ui::ShelfSessionChip::closeRequested);
     QTest::keyClick(&chip, Qt::Key_Enter);
     QTest::mouseClick(&chip, Qt::LeftButton);
+
     for (auto* button : chip.findChildren<QToolButton*>()) {
         QTest::mouseClick(button, Qt::LeftButton);
     }
+
     EXPECT_EQ(activated.count(), 2);
     EXPECT_EQ(shelfClose.count(), 1);
 
@@ -1176,12 +1208,14 @@ TEST(TerminalUiTest, ConnectsWorkspacePaneShelfAndToolbarInteractions) {
     EXPECT_NE(view->findChild<ui::WorkspaceView*>(), nullptr);
     const int initialTabs = manager.rowCount();
     const int initialSessions = manager.terminalCount();
+
     for (auto* action : view->actions()) {
         EXPECT_EQ(action->shortcutContext(), Qt::WidgetWithChildrenShortcut);
         if (action->text() == QStringLiteral("terminal.actions.new-tab") || action->text() == QStringLiteral("terminal.actions.new-terminal")) {
             action->trigger();
         }
     }
+
     EXPECT_EQ(manager.rowCount(), initialTabs + 1);
     EXPECT_EQ(manager.terminalCount(), initialSessions + 1);
     EXPECT_EQ(backends.size(), initialSessions + 1);
@@ -1206,9 +1240,11 @@ TEST(TerminalUiTest, ConnectsWorkspacePaneShelfAndToolbarInteractions) {
     EXPECT_EQ(manager.terminalCount(), hiddenViewTerminalCount);
 
     qsizetype terminalWriteCount = 0;
+
     for (const auto* backend : backends) {
         terminalWriteCount += backend->writes.size();
     }
+
     QApplication::clipboard()->setText(QStringLiteral("focused plugin text"));
 #ifdef Q_OS_MACOS
     QTest::keyClick(otherPluginEditor, Qt::Key_V, Qt::MetaModifier);
@@ -1218,9 +1254,11 @@ TEST(TerminalUiTest, ConnectsWorkspacePaneShelfAndToolbarInteractions) {
     EXPECT_TRUE(otherPluginEditor->hasFocus());
     EXPECT_FALSE(otherPluginEditor->text().isEmpty());
     qsizetype unchangedTerminalWriteCount = 0;
+
     for (const auto* backend : backends) {
         unchangedTerminalWriteCount += backend->writes.size();
     }
+
     EXPECT_EQ(unchangedTerminalWriteCount, terminalWriteCount);
 
     pane.deactivate();

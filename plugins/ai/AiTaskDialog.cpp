@@ -109,10 +109,13 @@ QWidget* AiTaskDialog::createGeneralPage() {
 
     m_agent = new ui::ComboBox(m_host.theme(), page);
     m_agent->setObjectName(QStringLiteral("aiTaskAgent"));
+
     for (const auto& agent : m_agents) {
         m_agent->addItem(agent.name, agent.id);
     }
+
     ui::sortComboBoxItems(m_agent);
+
     if (m_original.has_value() && !m_original->agentId.isEmpty()) {
         m_agent->setCurrentIndex(std::max(0, m_agent->findData(m_original->agentId)));
     }
@@ -224,6 +227,7 @@ void AiTaskDialog::updateScheduleFields() {
 
 std::optional<TaskSchedule> AiTaskDialog::buildSchedule() const {
     const QString kind = m_scheduleKind->currentData().toString();
+
     if (kind.isEmpty()) {
         return std::nullopt;
     }
@@ -245,23 +249,29 @@ void AiTaskDialog::showValidation(const QString& messageKey) {
 
 void AiTaskDialog::submit() {
     m_validation->hide();
+
     if (m_title->text().trimmed().isEmpty()) {
         showValidation(QStringLiteral("ai.validation.title"));
         m_title->setFocus();
         return;
     }
+
     const bool command = m_executionKind->currentData().toString() == AiTaskRepository::taskExecutionKindName(TaskExecutionKind::Command);
+
     if (!command && m_prompt->toPlainText().trimmed().isEmpty()) {
         showValidation(QStringLiteral("ai.validation.prompt"));
         m_prompt->setFocus();
         return;
     }
+
     if (command && m_command->text().trimmed().isEmpty()) {
         showValidation(QStringLiteral("ai.validation.command"));
         m_command->setFocus();
         return;
     }
+
     const QString workdir = m_workdir->text().trimmed();
+
     if ((command || !workdir.isEmpty()) && (!QDir(workdir).isAbsolute() || !QDir(workdir).exists())) {
         showValidation(QStringLiteral("ai.validation.workdir"));
         m_workdir->setFocus();
@@ -275,6 +285,7 @@ void AiTaskDialog::submit() {
     }
 
     const QUrl issue(m_issueUrl->text().trimmed());
+
     if (!m_issueUrl->text().trimmed().isEmpty() && (!issue.isValid() || issue.host().isEmpty() || (issue.scheme() != QStringLiteral("http") && issue.scheme() != QStringLiteral("https")))) {
         showValidation(QStringLiteral("ai.validation.issue-url"));
         m_issueUrl->setFocus();
@@ -282,11 +293,13 @@ void AiTaskDialog::submit() {
     }
 
     const auto schedule = buildSchedule();
+
     if (schedule.has_value() && schedule->kind == ScheduleKind::Once && schedule->onceAtUtc <= QDateTime::currentDateTimeUtc()) {
         showValidation(QStringLiteral("ai.validation.schedule-past"));
         m_scheduleAt->setFocus();
         return;
     }
+
     if (schedule.has_value() && schedule->kind == ScheduleKind::Cron && !CronExpression::parse(schedule->cronExpression).hasValue()) {
         showValidation(QStringLiteral("ai.validation.cron"));
         m_scheduleCron->setFocus();

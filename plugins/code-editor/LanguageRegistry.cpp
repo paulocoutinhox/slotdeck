@@ -28,6 +28,7 @@ LanguageDefinition LanguageRegistryHelper::plainText() {
 // The catalog is data, so a language or a server is added by one entry in the file and never by interface code.
 QJsonObject LanguageRegistryHelper::readCatalog(utils::Result<void>& outcome) {
     QFile file(QStringLiteral(":/slotdeck/code-editor/assets/languages.json"));
+
     if (!file.open(QIODevice::ReadOnly)) {
         outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The language catalog is unavailable", {}});
         return {};
@@ -35,10 +36,12 @@ QJsonObject LanguageRegistryHelper::readCatalog(utils::Result<void>& outcome) {
 
     QJsonParseError error;
     const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &error);
+
     if (error.error != QJsonParseError::NoError || !document.isObject() || !document.object().value(QStringLiteral("languages")).isArray() || !document.object().value(QStringLiteral("servers")).isArray()) {
         outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The language catalog is not a catalog", error.errorString()});
         return {};
     }
+
     return document.object();
 }
 
@@ -46,12 +49,14 @@ QStringList LanguageRegistryHelper::textList(const QJsonObject& entry, const QSt
     if (!entry.contains(key)) {
         return {};
     }
+
     if (!entry.value(key).isArray()) {
         valid = false;
         return {};
     }
 
     QStringList values;
+
     for (const auto& value : entry.value(key).toArray()) {
         if (!value.isString() || value.toString().isEmpty()) {
             valid = false;
@@ -59,6 +64,7 @@ QStringList LanguageRegistryHelper::textList(const QJsonObject& entry, const QSt
         }
         values.append(value.toString());
     }
+
     return values;
 }
 
@@ -69,6 +75,7 @@ std::optional<HighlightRole> LanguageRegistryHelper::roleFromIdentifier(const QS
 
 QVector<HighlightPattern> LanguageRegistryHelper::patternList(const QJsonArray& entries, bool& valid) {
     QVector<HighlightPattern> patterns;
+
     for (const auto& value : entries) {
         const QJsonObject entry = value.toObject();
         const auto role = roleFromIdentifier(entry.value(QStringLiteral("role")).toString());
@@ -79,18 +86,21 @@ QVector<HighlightPattern> LanguageRegistryHelper::patternList(const QJsonArray& 
         }
         patterns.append({expression, *role});
     }
+
     return patterns;
 }
 
 QVector<LanguageDefinition> LanguageRegistryHelper::createLanguages() {
     utils::Result<void>& outcome = LanguageRegistry::mutableCatalogError();
     const QJsonObject catalog = readCatalog(outcome);
+
     if (!outcome.hasValue()) {
         return {plainText()};
     }
 
     QVector<LanguageDefinition> languages;
     QStringList claimed;
+
     for (const auto& value : catalog.value(QStringLiteral("languages")).toArray()) {
         const QJsonObject entry = value.toObject();
         bool valid = entry.value(QStringLiteral("id")).isString() && entry.value(QStringLiteral("name")).isString();
@@ -127,17 +137,20 @@ QVector<LanguageDefinition> LanguageRegistryHelper::createLanguages() {
         outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The language catalog does not end with plain text", {}});
         return {plainText()};
     }
+
     return languages;
 }
 
 QVector<LanguageServerDefinition> LanguageRegistryHelper::createLanguageServers() {
     utils::Result<void>& outcome = LanguageRegistry::mutableCatalogError();
     const QJsonObject catalog = readCatalog(outcome);
+
     if (!outcome.hasValue()) {
         return {};
     }
 
     QVector<LanguageServerDefinition> servers;
+
     for (const auto& value : catalog.value(QStringLiteral("servers")).toArray()) {
         const QJsonObject entry = value.toObject();
         LanguageServerDefinition definition;
@@ -157,6 +170,7 @@ QVector<LanguageServerDefinition> LanguageRegistryHelper::createLanguageServers(
         }
         servers.append(definition);
     }
+
     return servers;
 }
 
@@ -178,10 +192,12 @@ const QVector<HighlightPattern>& LanguageRegistry::commonPatterns() {
         const QJsonObject catalog = LanguageRegistryHelper::readCatalog(outcome);
         bool valid = true;
         QVector<HighlightPattern> values = LanguageRegistryHelper::patternList(catalog.value(QStringLiteral("highlighting")).toObject().value(QStringLiteral("common")).toArray(), valid);
+
         if (!valid || values.isEmpty()) {
             outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The catalog highlighting patterns are invalid", {}});
             return QVector<HighlightPattern>{};
         }
+
         return values;
     }();
     return patterns;
@@ -193,6 +209,7 @@ const QMap<QString, HighlightRole>& LanguageRegistry::semanticRoles() {
         const QJsonObject catalog = LanguageRegistryHelper::readCatalog(outcome);
         const QJsonObject declared = catalog.value(QStringLiteral("highlighting")).toObject().value(QStringLiteral("semantic")).toObject();
         QMap<QString, HighlightRole> values;
+
         for (auto entry = declared.constBegin(); entry != declared.constEnd(); ++entry) {
             const auto role = LanguageRegistryHelper::roleFromIdentifier(entry.value().toString());
             if (!role.has_value()) {
@@ -201,9 +218,11 @@ const QMap<QString, HighlightRole>& LanguageRegistry::semanticRoles() {
             }
             values.insert(entry.key(), *role);
         }
+
         if (values.isEmpty()) {
             outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The catalog declares no semantic token", {}});
         }
+
         return values;
     }();
     return roles;
@@ -217,10 +236,12 @@ const EditorLimits& LanguageRegistry::limits() {
         bool valid = true;
         const auto read = [&declared, &valid](const QString& key, int minimum, int maximum) {
             const QJsonValue value = declared.value(key);
+
             if (!value.isDouble() || value.toInteger() < minimum || value.toInteger() > maximum) {
                 valid = false;
                 return 0LL;
             }
+
             return value.toInteger();
         };
 
@@ -241,10 +262,12 @@ const EditorLimits& LanguageRegistry::limits() {
         limits.maximumProblems = static_cast<int>(read(QStringLiteral("maximumProblems"), 10, 100000));
         limits.bottomPanelMinimumHeight = static_cast<int>(read(QStringLiteral("bottomPanelMinimumHeight"), 40, 2000));
         limits.bottomPanelInitialHeight = static_cast<int>(read(QStringLiteral("bottomPanelInitialHeight"), 40, 2000));
+
         if (!valid || limits.bottomPanelInitialHeight < limits.bottomPanelMinimumHeight) {
             outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The catalog limits are invalid", {}});
             return EditorLimits{};
         }
+
         return limits;
     }();
     return values;
@@ -256,6 +279,7 @@ const LanguageDefinition* LanguageRegistry::languageForId(const QString& languag
             return &language;
         }
     }
+
     return nullptr;
 }
 
@@ -271,11 +295,13 @@ const QVector<LanguageServerDefinition>& LanguageRegistry::languageServers() {
 
 const LanguageDefinition& LanguageRegistry::languageForPath(const QString& path) {
     const QFileInfo information(path);
+
     for (const auto& language : languages()) {
         if (language.fileNames.contains(information.fileName(), Qt::CaseInsensitive) || language.extensions.contains(information.suffix(), Qt::CaseInsensitive)) {
             return language;
         }
     }
+
     static const LanguageDefinition fallback = LanguageRegistryHelper::plainText();
     return fallback;
 }
@@ -283,9 +309,11 @@ const LanguageDefinition& LanguageRegistry::languageForPath(const QString& path)
 // The protocol names C and C++ separately even though one server answers for both, so the identifier follows the file rather than the server.
 QString LanguageRegistry::protocolLanguageId(const QString& path) {
     const LanguageDefinition& language = languageForPath(path);
+
     if (language.id == QStringLiteral("cpp") && QFileInfo(path).suffix() == QStringLiteral("c")) {
         return QStringLiteral("c");
     }
+
     return language.id;
 }
 
@@ -296,6 +324,7 @@ std::optional<ResolvedLanguageServer> LanguageRegistry::resolveServer(const Lang
             return ResolvedLanguageServer{definition.languageId, path, candidate.arguments};
         }
     }
+
     return std::nullopt;
 }
 

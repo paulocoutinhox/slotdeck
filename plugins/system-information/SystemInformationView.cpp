@@ -54,11 +54,13 @@ QString SystemInformationViewHelper::formatBytes(PluginHost& host, quint64 bytes
     if (bytes == 0) {
         return host.translate(QStringLiteral("system-information.common.unavailable"));
     }
+
     static constexpr quint64 kibibyte = 1024;
     static constexpr quint64 mebibyte = kibibyte * 1024;
     static constexpr quint64 gibibyte = mebibyte * 1024;
     static constexpr quint64 tebibyte = gibibyte * 1024;
     const QLocale locale = QLocale::system();
+
     if (bytes >= tebibyte) {
         return QStringLiteral("%1 TiB").arg(locale.toString(static_cast<double>(bytes) / static_cast<double>(tebibyte), 'f', 2));
     }
@@ -71,6 +73,7 @@ QString SystemInformationViewHelper::formatBytes(PluginHost& host, quint64 bytes
     if (bytes >= kibibyte) {
         return QStringLiteral("%1 KiB").arg(locale.toString(static_cast<double>(bytes) / static_cast<double>(kibibyte), 'f', 1));
     }
+
     return QStringLiteral("%1 B").arg(locale.toString(bytes));
 }
 
@@ -78,10 +81,13 @@ QString SystemInformationViewHelper::formatFrequency(PluginHost& host, quint64 f
     if (frequencyHz == 0) {
         return host.translate(QStringLiteral("system-information.common.unavailable"));
     }
+
     const QLocale locale = QLocale::system();
+
     if (frequencyHz >= 1000000000ULL) {
         return QStringLiteral("%1 GHz").arg(locale.toString(static_cast<double>(frequencyHz) / 1000000000.0, 'f', 2));
     }
+
     return QStringLiteral("%1 MHz").arg(locale.toString(static_cast<double>(frequencyHz) / 1000000.0, 'f', 0));
 }
 
@@ -105,6 +111,7 @@ QString SystemInformationViewHelper::translatedValue(PluginHost& host, const QSt
     if (value == QStringLiteral("unknown")) {
         return host.translate(QStringLiteral("system-information.common.unknown"));
     }
+
     return availableText(host, value);
 }
 
@@ -182,20 +189,24 @@ void SystemInformationViewHelper::addEmptyState(Section& section, PluginHost& ho
 QString SystemInformationViewHelper::processorCoreDetails(PluginHost& host, const Processor& processor) {
     QStringList details;
     details.reserve(processor.cores.size());
+
     for (const auto& core : processor.cores) {
         const QString smt = core.simultaneousMultithreading ? QStringLiteral("SMT") : QStringLiteral("—");
         details.append(host.translate(QStringLiteral("system-information.common.core-format")).arg(QLocale::system().toString(core.id), formatFrequency(host, core.maximumFrequencyHz), formatBytes(host, core.l1DataBytes + core.l1InstructionBytes), formatBytes(host, core.l2Bytes), formatBytes(host, core.l3Bytes), smt));
     }
+
     return details.join(QLatin1Char('\n'));
 }
 
 QString SystemInformationViewHelper::processorThreadDetails(PluginHost& host, const ProcessorUsage& usage) {
     QStringList details;
     details.reserve(usage.threadUtilization.size());
+
     for (qsizetype index = 0; index < usage.threadUtilization.size(); ++index) {
         const quint64 frequency = index < usage.threadFrequencyHz.size() && usage.threadFrequencyHz.at(index) > 0 ? static_cast<quint64>(usage.threadFrequencyHz.at(index)) : 0;
         details.append(host.translate(QStringLiteral("system-information.common.thread-format")).arg(QLocale::system().toString(index), formatPercent(usage.threadUtilization.at(index)), formatFrequency(host, frequency)));
     }
+
     return details.join(QLatin1Char('\n'));
 }
 
@@ -240,6 +251,7 @@ SystemInformationView::SystemInformationView(SystemInformationPlugin& plugin, Pl
     } else if (!m_plugin.isRefreshing()) {
         requestRefresh();
     }
+
     m_refresh->setEnabled(!m_plugin.isRefreshing());
 }
 
@@ -251,12 +263,15 @@ void SystemInformationView::render(const SystemSnapshot& snapshot) {
     SystemInformationViewHelper::addRow(overview, m_host, QStringLiteral("system-information.field.name"), SystemInformationViewHelper::availableText(m_host, snapshot.operatingSystem.name));
     SystemInformationViewHelper::addRow(overview, m_host, QStringLiteral("system-information.field.model"), snapshot.processors.isEmpty() ? m_host.translate(QStringLiteral("system-information.common.unavailable")) : SystemInformationViewHelper::availableText(m_host, snapshot.processors.front().model));
     SystemInformationViewHelper::addRow(overview, m_host, QStringLiteral("system-information.field.total"), SystemInformationViewHelper::formatBytes(m_host, snapshot.memory.totalBytes));
+
     if (snapshot.processorUsage.utilization.has_value()) {
         SystemInformationViewHelper::addProgress(overview, m_host, QStringLiteral("system-information.field.utilization"), snapshot.processorUsage.utilization.value());
     }
+
     if (snapshot.memory.totalBytes > 0 && snapshot.memory.availableBytes <= snapshot.memory.totalBytes) {
         SystemInformationViewHelper::addProgress(overview, m_host, QStringLiteral("system-information.field.used"), static_cast<double>(snapshot.memory.totalBytes - snapshot.memory.availableBytes) / static_cast<double>(snapshot.memory.totalBytes));
     }
+
     m_contentLayout->addWidget(overview.frame);
 
     Section operatingSystem = SystemInformationViewHelper::createSection(m_content, m_host, QStringLiteral("system-information.section.operating-system"), ui::IconName::System);
@@ -269,15 +284,19 @@ void SystemInformationView::render(const SystemSnapshot& snapshot) {
     m_contentLayout->addWidget(operatingSystem.frame);
 
     Section processors = SystemInformationViewHelper::createSection(m_content, m_host, QStringLiteral("system-information.section.processor"), ui::IconName::Processor);
+
     if (snapshot.processors.isEmpty()) {
         SystemInformationViewHelper::addEmptyState(processors, m_host);
     }
+
     if (snapshot.processorUsage.utilization.has_value()) {
         SystemInformationViewHelper::addProgress(processors, m_host, QStringLiteral("system-information.field.utilization"), snapshot.processorUsage.utilization.value());
     }
+
     if (!snapshot.processorUsage.threadUtilization.isEmpty()) {
         SystemInformationViewHelper::addRow(processors, m_host, QStringLiteral("system-information.field.utilization"), SystemInformationViewHelper::processorThreadDetails(m_host, snapshot.processorUsage));
     }
+
     for (qsizetype index = 0; index < snapshot.processors.size(); ++index) {
         const auto& processor = snapshot.processors.at(index);
         SystemInformationViewHelper::addDeviceTitle(processors, m_host.translate(QStringLiteral("system-information.common.processor-name")).arg(index + 1));
@@ -292,12 +311,14 @@ void SystemInformationView::render(const SystemSnapshot& snapshot) {
             SystemInformationViewHelper::addRow(processors, m_host, QStringLiteral("system-information.field.capabilities"), processor.flags.join(QStringLiteral(", ")));
         }
     }
+
     m_contentLayout->addWidget(processors.frame);
 
     Section memory = SystemInformationViewHelper::createSection(m_content, m_host, QStringLiteral("system-information.section.memory"), ui::IconName::Memory);
     SystemInformationViewHelper::addRow(memory, m_host, QStringLiteral("system-information.field.total"), SystemInformationViewHelper::formatBytes(m_host, snapshot.memory.totalBytes));
     SystemInformationViewHelper::addRow(memory, m_host, QStringLiteral("system-information.field.available"), SystemInformationViewHelper::formatBytes(m_host, snapshot.memory.availableBytes));
     SystemInformationViewHelper::addRow(memory, m_host, QStringLiteral("system-information.field.free"), SystemInformationViewHelper::formatBytes(m_host, snapshot.memory.freeBytes));
+
     for (qsizetype index = 0; index < snapshot.memory.modules.size(); ++index) {
         const auto& module = snapshot.memory.modules.at(index);
         SystemInformationViewHelper::addDeviceTitle(memory, m_host.translate(QStringLiteral("system-information.common.module-name")).arg(index + 1));
@@ -308,12 +329,15 @@ void SystemInformationView::render(const SystemSnapshot& snapshot) {
         SystemInformationViewHelper::addRow(memory, m_host, QStringLiteral("system-information.field.size"), SystemInformationViewHelper::formatBytes(m_host, module.sizeBytes));
         SystemInformationViewHelper::addRow(memory, m_host, QStringLiteral("system-information.field.frequency"), SystemInformationViewHelper::formatFrequency(m_host, module.frequencyHz));
     }
+
     m_contentLayout->addWidget(memory.frame);
 
     Section graphics = SystemInformationViewHelper::createSection(m_content, m_host, QStringLiteral("system-information.section.graphics"), ui::IconName::Graphics);
+
     if (snapshot.graphicsProcessors.isEmpty()) {
         SystemInformationViewHelper::addEmptyState(graphics, m_host);
     }
+
     for (qsizetype index = 0; index < snapshot.graphicsProcessors.size(); ++index) {
         const auto& graphicsProcessor = snapshot.graphicsProcessors.at(index);
         SystemInformationViewHelper::addDeviceTitle(graphics, m_host.translate(QStringLiteral("system-information.common.graphics-name")).arg(index + 1));
@@ -327,6 +351,7 @@ void SystemInformationView::render(const SystemSnapshot& snapshot) {
         SystemInformationViewHelper::addRow(graphics, m_host, QStringLiteral("system-information.field.frequency"), SystemInformationViewHelper::formatFrequency(m_host, graphicsProcessor.frequencyHz));
         SystemInformationViewHelper::addRow(graphics, m_host, QStringLiteral("system-information.field.cores"), SystemInformationViewHelper::formatInteger(m_host, graphicsProcessor.coreCount));
     }
+
     m_contentLayout->addWidget(graphics.frame);
 
     Section mainboard = SystemInformationViewHelper::createSection(m_content, m_host, QStringLiteral("system-information.section.mainboard"), ui::IconName::Mainboard);
@@ -337,9 +362,11 @@ void SystemInformationView::render(const SystemSnapshot& snapshot) {
     m_contentLayout->addWidget(mainboard.frame);
 
     Section storage = SystemInformationViewHelper::createSection(m_content, m_host, QStringLiteral("system-information.section.storage"), ui::IconName::Storage);
+
     if (snapshot.disks.isEmpty()) {
         SystemInformationViewHelper::addEmptyState(storage, m_host);
     }
+
     for (qsizetype index = 0; index < snapshot.disks.size(); ++index) {
         const auto& disk = snapshot.disks.at(index);
         SystemInformationViewHelper::addDeviceTitle(storage, m_host.translate(QStringLiteral("system-information.common.disk-name")).arg(index + 1));
@@ -354,12 +381,15 @@ void SystemInformationView::render(const SystemSnapshot& snapshot) {
         }
         SystemInformationViewHelper::addRow(storage, m_host, QStringLiteral("system-information.field.volumes"), volumes.isEmpty() ? m_host.translate(QStringLiteral("system-information.common.unavailable")) : volumes.join(QLatin1Char('\n')));
     }
+
     m_contentLayout->addWidget(storage.frame);
 
     Section batteries = SystemInformationViewHelper::createSection(m_content, m_host, QStringLiteral("system-information.section.batteries"), ui::IconName::Battery);
+
     if (snapshot.batteries.isEmpty()) {
         SystemInformationViewHelper::addEmptyState(batteries, m_host);
     }
+
     for (qsizetype index = 0; index < snapshot.batteries.size(); ++index) {
         const auto& battery = snapshot.batteries.at(index);
         SystemInformationViewHelper::addDeviceTitle(batteries, m_host.translate(QStringLiteral("system-information.common.battery-name")).arg(index + 1));
@@ -373,12 +403,15 @@ void SystemInformationView::render(const SystemSnapshot& snapshot) {
         }
         SystemInformationViewHelper::addRow(batteries, m_host, QStringLiteral("system-information.field.energy"), m_host.translate(QStringLiteral("system-information.common.energy-format")).arg(SystemInformationViewHelper::formatInteger(m_host, battery.currentEnergy), SystemInformationViewHelper::formatInteger(m_host, battery.fullEnergy)));
     }
+
     m_contentLayout->addWidget(batteries.frame);
 
     Section network = SystemInformationViewHelper::createSection(m_content, m_host, QStringLiteral("system-information.section.network"), ui::IconName::Network);
+
     if (snapshot.networkInterfaces.isEmpty()) {
         SystemInformationViewHelper::addEmptyState(network, m_host);
     }
+
     for (qsizetype index = 0; index < snapshot.networkInterfaces.size(); ++index) {
         const auto& networkInterface = snapshot.networkInterfaces.at(index);
         SystemInformationViewHelper::addDeviceTitle(network, m_host.translate(QStringLiteral("system-information.common.network-name")).arg(index + 1));
@@ -388,12 +421,14 @@ void SystemInformationView::render(const SystemSnapshot& snapshot) {
         SystemInformationViewHelper::addRow(network, m_host, QStringLiteral("system-information.field.ipv4-address"), SystemInformationViewHelper::availableText(m_host, networkInterface.ipv4Address));
         SystemInformationViewHelper::addRow(network, m_host, QStringLiteral("system-information.field.ipv6-address"), SystemInformationViewHelper::availableText(m_host, networkInterface.ipv6Address));
     }
+
     m_contentLayout->addWidget(network.frame);
     m_contentLayout->addStretch();
 }
 
 void SystemInformationView::clearContent() {
     m_state = nullptr;
+
     while (m_contentLayout->count() > 0) {
         QLayoutItem* item = m_contentLayout->takeAt(0);
         if (QWidget* widget = item->widget(); widget != nullptr) {
@@ -406,6 +441,7 @@ void SystemInformationView::clearContent() {
 
 void SystemInformationView::requestRefresh() {
     const auto result = m_plugin.refresh();
+
     if (!result.hasValue() && result.error().code != QStringLiteral("system_information_refresh_in_progress")) {
         m_host.notify(m_host.translate(QStringLiteral("system-information.error.title")), m_host.translate(QStringLiteral("system-information.error.message")), AlertSeverity::Error);
     }
@@ -419,11 +455,13 @@ void SystemInformationView::renderSnapshot() {
 
 void SystemInformationView::updateRefreshState(bool refreshing) {
     m_refresh->setEnabled(!refreshing);
+
     if (m_plugin.snapshot().has_value()) {
         return;
     }
 
     m_updated->setText(m_host.translate(refreshing ? QStringLiteral("system-information.view.collecting") : QStringLiteral("system-information.error.message")));
+
     if (m_state != nullptr) {
         m_state->setText(m_updated->text());
     }

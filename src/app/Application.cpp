@@ -38,11 +38,13 @@ utils::Result<void> Application::initialize() {
     }
 
     m_instanceLock = std::make_unique<QLockFile>(QDir(m_dataPath).filePath(QStringLiteral("instance.lock")));
+
     if (!m_instanceLock->tryLock() && (!m_instanceLock->removeStaleLockFile() || !m_instanceLock->tryLock())) {
         return utils::Result<void>::failure({"application_already_running", "Another SlotDeck instance is already running", m_dataPath});
     }
 
     const auto pluginResult = m_pluginManager.loadPlugins();
+
     if (!pluginResult.hasValue()) {
         return pluginResult;
     }
@@ -51,22 +53,28 @@ utils::Result<void> Application::initialize() {
     m_pendingImportPath = QDir(m_dataPath).filePath(QStringLiteral("slotdeck-import.sqlite3"));
     m_importBackupPath = QDir(m_dataPath).filePath(QStringLiteral("slotdeck-before-import.sqlite3"));
     const auto importResult = persistence::ConfigurationTransfer::beginPendingImport(m_statePath, m_pendingImportPath, m_importBackupPath, m_pluginManager.databaseSchemaVersions());
+
     if (!importResult.hasValue()) {
         return utils::Result<void>::failure(importResult.error());
     }
+
     m_importInProgress = importResult.value();
     m_stateStore = std::make_unique<persistence::StateStore>(m_statePath);
     m_databaseExecutor = std::make_unique<persistence::DatabaseExecutor>(m_statePath);
     m_settings = std::make_unique<ApplicationSettingsStore>(*m_stateStore, *m_databaseExecutor);
     m_configurationManager = std::make_unique<ConfigurationManager>(*m_databaseExecutor, m_pendingImportPath, m_pluginManager.databaseSchemaVersions());
     const auto settingsResult = m_settings->initialize();
+
     if (!settingsResult.hasValue()) {
         return settingsResult;
     }
+
     const auto localeResult = m_pluginManager.setLocale(m_settings->language());
+
     if (!localeResult.hasValue()) {
         return localeResult;
     }
+
     ui::themeManager().loadTheme(m_settings->themeId());
     m_pluginManager.setTheme(ui::themeManager().theme());
     QApplication::setPalette(ui::themeManager().theme().palette());
@@ -76,11 +84,14 @@ utils::Result<void> Application::initialize() {
     connect(m_configurationManager.get(), &ConfigurationManager::restartRequested, this, &Application::restartAfterImport);
 
     const auto shutdownState = m_stateStore->wasCleanShutdown();
+
     if (!shutdownState.hasValue()) {
         return utils::Result<void>::failure(shutdownState.error());
     }
+
     const bool recovered = !shutdownState.value();
     const auto markerResult = m_stateStore->markShutdown(false);
+
     if (!markerResult.hasValue()) {
         return markerResult;
     }
@@ -100,11 +111,13 @@ utils::Result<void> Application::completeStartup() {
     }
 
     const auto runtimeResult = initializePlugins();
+
     if (!runtimeResult.hasValue()) {
         return runtimeResult;
     }
 
     const auto built = m_mainWindow->buildInterface();
+
     if (!built.hasValue()) {
         return built;
     }
@@ -119,6 +132,7 @@ utils::Result<void> Application::completeStartup() {
         QMetaObject::invokeMethod(&m_pluginManager, showReplacedAlert, Qt::QueuedConnection);
         // clang-format on
     }
+
     if (!m_stateStore->rebuiltSchemas().isEmpty()) {
         const QString names = m_stateStore->rebuiltSchemas().join(QStringLiteral(", "));
         // clang-format off
@@ -137,6 +151,7 @@ utils::Result<void> Application::completeStartup() {
         QMetaObject::invokeMethod(&m_pluginManager, showRecoveryAlert, Qt::QueuedConnection);
         // clang-format on
     }
+
     if (m_importInProgress) {
         const auto finalizeImport = persistence::ConfigurationTransfer::finalizePendingImport(m_pendingImportPath, m_importBackupPath);
         if (!finalizeImport.hasValue()) {
@@ -144,6 +159,7 @@ utils::Result<void> Application::completeStartup() {
         }
         m_importInProgress = false;
     }
+
     return utils::Result<void>::success();
 }
 
@@ -165,10 +181,12 @@ utils::Result<void> Application::loadInterface() {
 
 void Application::applyLanguage(const QString& language) {
     const auto result = m_pluginManager.setLocale(language);
+
     if (!result.hasValue()) {
         qCritical().noquote() << result.error().message << result.error().detail;
         return;
     }
+
     if (m_mainWindow != nullptr) {
         m_mainWindow->reloadTranslations();
     }
@@ -176,14 +194,17 @@ void Application::applyLanguage(const QString& language) {
 
 void Application::applyTheme(const QString& themeId) {
     const auto result = ui::themeManager().selectTheme(themeId);
+
     if (!result.hasValue()) {
         qCritical().noquote() << result.error().message << result.error().detail;
         return;
     }
+
     const auto& theme = ui::themeManager().theme();
     m_pluginManager.setTheme(theme);
     QApplication::setPalette(theme.palette());
     QApplication::setFont(theme.font(ui::ThemeFont::Interface));
+
     if (m_mainWindow != nullptr) {
         m_mainWindow->reloadTheme();
     }
@@ -200,9 +221,11 @@ void Application::replaceProcess() {
     const QString executable = QCoreApplication::applicationFilePath();
     const QStringList arguments = QCoreApplication::arguments().mid(1);
     shutdown();
+
     if (!QProcess::startDetached(executable, arguments)) {
         qCritical().noquote() << "The application could not restart after importing configuration";
     }
+
     QCoreApplication::quit();
 }
 
@@ -218,18 +241,21 @@ void Application::shutdown() {
     if (m_shutdownComplete) {
         return;
     }
+
     m_shutdownComplete = true;
 
     if (m_quitEventFilterInstalled && QCoreApplication::instance() != nullptr) {
         QCoreApplication::instance()->removeEventFilter(this);
         m_quitEventFilterInstalled = false;
     }
+
     m_mainWindow.reset();
     m_pluginManager.shutdown();
     m_settings.reset();
     m_configurationManager.reset();
     m_databaseExecutor.reset();
     m_pluginManager.unloadPlugins();
+
     if (m_importInProgress) {
         m_stateStore.reset();
         const auto rollback = persistence::ConfigurationTransfer::rollbackPendingImport(m_statePath, m_pendingImportPath, m_importBackupPath);
@@ -244,14 +270,17 @@ void Application::shutdown() {
         }
         m_stateStore.reset();
     }
+
     m_instanceLock.reset();
 }
 
 utils::Result<void> Application::initializePlugins() {
     const auto pluginStateResult = m_pluginManager.initialize(m_dataPath, *m_stateStore, *m_databaseExecutor);
+
     if (!pluginStateResult.hasValue()) {
         return pluginStateResult;
     }
+
     return utils::Result<void>::success();
 }
 

@@ -63,6 +63,7 @@ QString plainCommandOutput(QString& pending, const QString& chunk) {
     QString plain;
     plain.reserve(source.size());
     qsizetype index = 0;
+
     while (index < source.size()) {
         const QChar character = source.at(index);
         if (character == QLatin1Char('\x1b')) {
@@ -122,6 +123,7 @@ QString plainCommandOutput(QString& pending, const QString& chunk) {
         plain.append(character);
         ++index;
     }
+
     return plain;
 }
 
@@ -153,16 +155,19 @@ void AiCommandRunner::start(const QString& command, const QString& workdir, int 
         reportFailure({"ai_command_busy", "The runner is already running a command", {}});
         return;
     }
+
     if (command.trimmed().isEmpty()) {
         reportFailure({"ai_command_invalid", "The command is required", {}});
         return;
     }
 
     const QDir directory(workdir);
+
     if (!directory.isAbsolute() || !directory.exists()) {
         reportFailure({"ai_command_workdir_invalid", "The command working directory is unavailable", workdir});
         return;
     }
+
     if (timeoutSeconds < 0) {
         reportFailure({"ai_command_invalid", "The command time limit is invalid", QString::number(timeoutSeconds)});
         return;
@@ -186,6 +191,7 @@ void AiCommandRunner::start(const QString& command, const QString& workdir, int 
     if (timeoutSeconds > 0) {
         m_timeout.start(timeoutSeconds * 1000);
     }
+
     m_process->start(AiCommandRunnerHelper::shellExecutable(), AiCommandRunnerHelper::shellArguments(command));
 }
 
@@ -215,14 +221,17 @@ void AiCommandRunner::readOutput() {
     }
 
     const QString chunk = plainCommandOutput(m_pendingControl, QString::fromUtf8(m_process->readAllStandardOutput()));
+
     if (chunk.isEmpty()) {
         return;
     }
+
     if (m_output.size() + chunk.size() > maximumOutputCharacters) {
         reportFailure({"ai_command_output_too_large", "The command output exceeded the permitted size", {}});
         stopProcess();
         return;
     }
+
     m_output.append(chunk);
     emit outputReceived(chunk);
 }
@@ -235,15 +244,18 @@ void AiCommandRunner::completeProcess(int exitCode, QProcess::ExitStatus status)
     readOutput();
     m_timeout.stop();
     release();
+
     if (m_completed) {
         return;
     }
+
     m_completed = true;
 
     if (status == QProcess::CrashExit) {
         emit failed({"ai_command_failed", "The command terminated abnormally", QString::number(exitCode)});
         return;
     }
+
     emit finished(exitCode, m_output);
 }
 
@@ -251,6 +263,7 @@ void AiCommandRunner::release() {
     if (m_process == nullptr) {
         return;
     }
+
     QProcess* process = m_process;
     m_process = nullptr;
     process->disconnect(this);
@@ -261,6 +274,7 @@ void AiCommandRunner::reportFailure(const utils::Error& error) {
     if (m_completed) {
         return;
     }
+
     m_completed = true;
     emit failed(error);
 }

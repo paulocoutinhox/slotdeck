@@ -51,6 +51,7 @@ QString formatLocalPathsForShell(const ShellProfile& profile, const QStringList&
     quotedPaths.reserve(paths.size());
 
 #ifdef Q_OS_WIN
+
     if (profile.id == QStringLiteral("cmd")) {
         for (const auto& path : paths) {
             quotedPaths.append(ShellProfileHelper::quoteCommandPromptPath(path));
@@ -60,11 +61,14 @@ QString formatLocalPathsForShell(const ShellProfile& profile, const QStringList&
             quotedPaths.append(ShellProfileHelper::quotePowerShellPath(path));
         }
     }
+
 #else
     Q_UNUSED(profile)
+
     for (const auto& path : paths) {
         quotedPaths.append(ShellProfileHelper::quotePosixPath(path));
     }
+
 #endif
 
     return quotedPaths.join(QLatin1Char(' ')) + QLatin1Char(' ');
@@ -73,16 +77,21 @@ QString formatLocalPathsForShell(const ShellProfile& profile, const QStringList&
 ShellProfile ShellProfileResolver::systemDefault() {
 #ifdef Q_OS_WIN
     const QString powerShell = QStandardPaths::findExecutable(QStringLiteral("pwsh.exe"));
+
     if (!powerShell.isEmpty()) {
         return ShellProfileHelper::createProfile(powerShell);
     }
+
     const QString windowsPowerShell = QStandardPaths::findExecutable(QStringLiteral("powershell.exe"));
+
     if (!windowsPowerShell.isEmpty()) {
         return ShellProfileHelper::createProfile(windowsPowerShell);
     }
+
     return ShellProfileHelper::createProfile(QDir::toNativeSeparators(qEnvironmentVariable("COMSPEC")));
 #else
     const QString environmentShell = qEnvironmentVariable("SHELL");
+
     if (QFileInfo(environmentShell).isExecutable()) {
         return ShellProfileHelper::createProfile(environmentShell);
     }
@@ -91,6 +100,7 @@ ShellProfile ShellProfileResolver::systemDefault() {
     passwd account{};
     passwd* found = nullptr;
     std::array<char, 4096> buffer{};
+
     if (::getpwuid_r(::getuid(), &account, buffer.data(), buffer.size(), &found) == 0 && found != nullptr && found->pw_shell != nullptr) {
         const QString accountShell = QString::fromLocal8Bit(found->pw_shell);
         if (QFileInfo(accountShell).isExecutable()) {

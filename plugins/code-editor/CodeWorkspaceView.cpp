@@ -43,6 +43,7 @@ QString CodeWorkspaceViewHelper::charsetName(TextCharset charset) {
     case TextCharset::Latin1:
         return QStringLiteral("Latin-1");
     }
+
     Q_UNREACHABLE_RETURN(QStringLiteral("UTF-8"));
 }
 
@@ -55,6 +56,7 @@ CodeWorkspaceView::CodeWorkspaceView(CodeWorkspaceState state, QVector<ResolvedL
     if (const QString canonicalRoot = QFileInfo(m_initialState.rootPath).canonicalFilePath(); !canonicalRoot.isEmpty()) {
         m_initialState.rootPath = canonicalRoot;
     }
+
     m_fileModel->setFilter(QDir::AllDirs | QDir::Files | QDir::NoDotAndDotDot);
     m_fileModel->setReadOnly(true);
     m_fileModel->setRootPath(m_initialState.rootPath);
@@ -62,6 +64,7 @@ CodeWorkspaceView::CodeWorkspaceView(CodeWorkspaceState state, QVector<ResolvedL
     m_tree->setRootIndex(m_fileModel->index(m_initialState.rootPath));
     m_tree->setHeaderHidden(true);
     m_tree->setContextMenuPolicy(Qt::CustomContextMenu);
+
     for (int column = 1; column < m_fileModel->columnCount(); ++column) {
         m_tree->hideColumn(column);
     }
@@ -232,6 +235,7 @@ CodeWorkspaceView::CodeWorkspaceView(CodeWorkspaceState state, QVector<ResolvedL
     connect(&m_editorConfigWatcher, &QFileSystemWatcher::fileChanged, this, [this](const QString& changed) { FileWatch::rearm(m_editorConfigWatcher, changed); reloadEditorConfigs(); });
     connect(&m_editorConfigWatcher, &QFileSystemWatcher::directoryChanged, this, [this](const QString& changed) { FileWatch::rearm(m_editorConfigWatcher, changed); reloadEditorConfigs(); });
     // clang-format on
+
     if (!QFileInfo(m_initialState.rootPath).isDir()) {
         // clang-format off
         QTimer::singleShot(0, this, [this]() { emit operationFailed(m_host.translate(QStringLiteral("code-editor.error.workspace-unavailable")) + QStringLiteral("\n") + m_initialState.rootPath); });
@@ -244,11 +248,13 @@ CodeWorkspaceView::CodeWorkspaceView(CodeWorkspaceState state, QVector<ResolvedL
             openFile(documentState.path, documentState.cursorPosition);
         }
     }
+
     for (int index = 0; index < m_initialState.documents.size(); ++index) {
         if (m_initialState.documents.at(index).active && index < m_documents->count()) {
             m_documents->setCurrentIndex(index);
         }
     }
+
     updateStatusBar();
 }
 
@@ -270,10 +276,12 @@ CodeWorkspaceState CodeWorkspaceView::state() const {
     CodeWorkspaceState current = m_initialState;
     current.documents.clear();
     current.updatedAtUtc = QDateTime::currentDateTimeUtc();
+
     for (int index = 0; index < m_documents->count(); ++index) {
         auto* openDocument = qobject_cast<CodeDocument*>(m_documents->widget(index));
         current.documents.append({openDocument->path(), index, openDocument->cursorPosition(), index == m_documents->currentIndex()});
     }
+
     return current;
 }
 
@@ -284,15 +292,18 @@ bool CodeWorkspaceView::canClose() {
             return false;
         }
     }
+
     return true;
 }
 
 void CodeWorkspaceView::openFile(const QString& path, int cursorPosition) {
     const QString normalized = containedPath(path);
+
     if (normalized.isEmpty() || !QFileInfo(normalized).isFile()) {
         emit operationFailed(m_host.translate(QStringLiteral("code-editor.error.path-outside")));
         return;
     }
+
     if (auto* existing = document(normalized); existing != nullptr) {
         m_documents->setCurrentWidget(existing);
         return;
@@ -323,10 +334,12 @@ void CodeWorkspaceView::openFile(const QString& path, int cursorPosition) {
 // A definition or a diagnostic can point at a file that is not open yet, so the location decides which document carries the cursor.
 void CodeWorkspaceView::openLocation(const QString& path, int line, int character) {
     const QString normalized = containedPath(path);
+
     if (normalized.isEmpty() || !QFileInfo(normalized).isFile()) {
         emit operationFailed(m_host.translate(QStringLiteral("code-editor.error.path-outside")));
         return;
     }
+
     if (auto* target = document(normalized); target != nullptr) {
         m_documents->setCurrentWidget(target);
         target->setCursorLocation(line, character);
@@ -335,6 +348,7 @@ void CodeWorkspaceView::openLocation(const QString& path, int line, int characte
 
     openFile(normalized);
     auto* opened = document(normalized);
+
     if (opened == nullptr) {
         return;
     }
@@ -347,6 +361,7 @@ void CodeWorkspaceView::openLocation(const QString& path, int line, int characte
 // The outline is answered again on every analysis, so rebuilding it is worth doing only when it actually says something different.
 void CodeWorkspaceView::updateOutline(const QString& path, const QVector<DocumentSymbolNode>& symbols) {
     auto* current = qobject_cast<CodeDocument*>(m_documents->currentWidget());
+
     if (current == nullptr || current->path() != path || !m_symbolSearch->text().isEmpty()) {
         return;
     }
@@ -376,6 +391,7 @@ void CodeWorkspaceView::updateOutline(const QString& path, const QVector<Documen
 // A symbol used everywhere would answer with more rows than anyone reads, so the list is bounded and the tab says how many arrived.
 void CodeWorkspaceView::showReferences(const QVector<SourceLocation>& locations) {
     m_references->clear();
+
     for (const auto& location : locations.mid(0, LanguageRegistry::limits().maximumReferences)) {
         auto* item = new QTreeWidgetItem({QFileInfo(location.path).fileName(), QString::number(location.line + 1), QDir(m_initialState.rootPath).relativeFilePath(location.path)});
         item->setData(0, Qt::UserRole, location.path);
@@ -398,6 +414,7 @@ void CodeWorkspaceView::showWorkspaceSymbols(const QVector<WorkspaceSymbolEntry>
     m_outlinePath.clear();
     m_outline.clear();
     m_symbols->clear();
+
     for (const auto& symbol : symbols) {
         auto* item = new QTreeWidgetItem(QStringList{symbol.container.isEmpty() ? symbol.name : symbol.container + QStringLiteral("::") + symbol.name});
         item->setData(0, Qt::UserRole, symbol.location.path);
@@ -413,6 +430,7 @@ void CodeWorkspaceView::searchSymbols(const QString& query) {
         refreshSymbolPanel();
         return;
     }
+
     for (auto* server : m_languageServers) {
         server->requestWorkspaceSymbols(query);
     }
@@ -420,18 +438,21 @@ void CodeWorkspaceView::searchSymbols(const QString& query) {
 
 void CodeWorkspaceView::refreshSymbolPanel() {
     auto* current = qobject_cast<CodeDocument*>(m_documents->currentWidget());
+
     if (current == nullptr) {
         m_outlinePath.clear();
         m_outline.clear();
         m_symbols->clear();
         return;
     }
+
     current->refreshAnalysis();
 }
 
 // A rule file that appears, changes or disappears decides how the open documents are indented from that moment on.
 void CodeWorkspaceView::refreshEditorConfigWatch() {
     QStringList directories;
+
     for (int index = 0; index < m_documents->count(); ++index) {
         QDir directory = QFileInfo(qobject_cast<CodeDocument*>(m_documents->widget(index))->path()).dir();
         while (containsPath(directory.absolutePath()) || directory.absolutePath() == m_initialState.rootPath) {
@@ -446,17 +467,21 @@ void CodeWorkspaceView::refreshEditorConfigWatch() {
     }
 
     QStringList files;
+
     for (const auto& directory : directories) {
         const QString candidate = QDir(directory).filePath(QStringLiteral(".editorconfig"));
         if (QFileInfo::exists(candidate)) {
             files.append(candidate);
         }
     }
+
     // Qt drops a watched path it saw disappear, so the workspace keeps its own list of what it asked to watch.
     if (!m_watchedEditorConfigPaths.isEmpty()) {
         m_editorConfigWatcher.removePaths(m_watchedEditorConfigPaths);
     }
+
     m_watchedEditorConfigPaths = directories + files;
+
     if (!m_watchedEditorConfigPaths.isEmpty()) {
         m_editorConfigWatcher.addPaths(m_watchedEditorConfigPaths);
     }
@@ -470,6 +495,7 @@ void CodeWorkspaceView::reloadEditorConfigs() {
     for (int index = 0; index < m_documents->count(); ++index) {
         qobject_cast<CodeDocument*>(m_documents->widget(index))->reloadEditorConfig();
     }
+
     refreshEditorConfigWatch();
     updateStatusBar();
 }
@@ -477,11 +503,13 @@ void CodeWorkspaceView::reloadEditorConfigs() {
 // A file the analysis depends on can change without ever being opened, so every running server hears about the tree it is indexing.
 void CodeWorkspaceView::notifyWatchedChange(const QStringList& paths, int changeType) {
     QStringList contained;
+
     for (const auto& path : paths) {
         if (containsPath(path)) {
             contained.append(path);
         }
     }
+
     for (auto* server : m_languageServers) {
         server->notifyWatchedFilesChanged(contained, changeType);
     }
@@ -504,6 +532,7 @@ void CodeWorkspaceView::saveAll() {
 void CodeWorkspaceView::setLanguageServers(QVector<ResolvedLanguageServer> languageServers) {
     m_availableLanguageServers = std::move(languageServers);
     QVector<LanguageServerClient*> removedServers;
+
     for (auto server = m_languageServers.begin(); server != m_languageServers.end();) {
         bool available = false;
         for (const auto& candidate : m_availableLanguageServers) {
@@ -516,21 +545,26 @@ void CodeWorkspaceView::setLanguageServers(QVector<ResolvedLanguageServer> langu
         removedServers.append(server.value());
         server = m_languageServers.erase(server);
     }
+
     for (int index = 0; index < m_documents->count(); ++index) {
         auto* openDocument = qobject_cast<CodeDocument*>(m_documents->widget(index));
         openDocument->setLanguageServer(languageServer(openDocument->language()));
     }
+
     for (auto* server : removedServers) {
         connect(server, &LanguageServerClient::stopped, server, &QObject::deleteLater);
         server->stop();
     }
+
     if (m_availableLanguageServers.isEmpty()) {
         m_problems->clear();
         m_references->clear();
         m_symbols->clear();
         m_analysis->clear();
     }
+
     m_bottomPanel->setVisible(!m_availableLanguageServers.isEmpty());
+
     if (auto* panel = m_symbolSearch->parentWidget(); panel != nullptr) {
         panel->setVisible(!m_availableLanguageServers.isEmpty());
     }
@@ -538,6 +572,7 @@ void CodeWorkspaceView::setLanguageServers(QVector<ResolvedLanguageServer> langu
 
 void CodeWorkspaceView::setEditorFont(const CodeEditorFont& font) {
     m_font = font;
+
     for (int index = 0; index < m_documents->count(); ++index) {
         qobject_cast<CodeDocument*>(m_documents->widget(index))->setEditorFont(font);
     }
@@ -546,6 +581,7 @@ void CodeWorkspaceView::setEditorFont(const CodeEditorFont& font) {
 void CodeWorkspaceView::setWordWrap(bool enabled) {
     m_wordWrapEnabled = enabled;
     m_wordWrap->setChecked(enabled);
+
     for (int index = 0; index < m_documents->count(); ++index) {
         qobject_cast<CodeDocument*>(m_documents->widget(index))->setWordWrap(enabled);
     }
@@ -563,6 +599,7 @@ void CodeWorkspaceView::closeCurrentDocument() {
 
 void CodeWorkspaceView::updateStatusBar() {
     auto* current = qobject_cast<CodeDocument*>(m_documents->currentWidget());
+
     if (current == nullptr) {
         m_cursorLocation->clear();
         m_indentation->clear();
@@ -607,19 +644,23 @@ void CodeWorkspaceView::showContextMenu(const QPoint& position) {
 QString CodeWorkspaceView::promptedEntryPath(const QString& titleKey, const QString& directory) {
     bool accepted = false;
     const QString name = QInputDialog::getText(this, m_host.translate(titleKey), m_host.translate(QStringLiteral("code-editor.actions.name")), QLineEdit::Normal, {}, &accepted).trimmed();
+
     if (!accepted || !CodeWorkspaceViewHelper::validEntryName(name)) {
         return {};
     }
 
     const QString path = containedPath(QDir(directory).filePath(name));
+
     if (path.isEmpty()) {
         emit operationFailed(m_host.translate(QStringLiteral("code-editor.error.path-outside")));
     }
+
     return path;
 }
 
 void CodeWorkspaceView::createFile(const QString& directory) {
     const QString path = promptedEntryPath(QStringLiteral("code-editor.actions.new-file"), directory);
+
     if (path.isEmpty()) {
         return;
     }
@@ -632,6 +673,7 @@ void CodeWorkspaceView::createFile(const QString& directory) {
 
 void CodeWorkspaceView::createDirectory(const QString& directory) {
     const QString path = promptedEntryPath(QStringLiteral("code-editor.actions.new-folder"), directory);
+
     if (path.isEmpty()) {
         return;
     }
@@ -646,9 +688,11 @@ void CodeWorkspaceView::renamePath(const QString& path) {
     bool accepted = false;
     const QFileInfo source(path);
     const QString name = QInputDialog::getText(this, m_host.translate(QStringLiteral("code-editor.actions.rename")), m_host.translate(QStringLiteral("code-editor.actions.name")), QLineEdit::Normal, source.fileName(), &accepted);
+
     if (!accepted || name == source.fileName()) {
         return;
     }
+
     renameEntry(path, name);
 }
 
@@ -661,6 +705,7 @@ void CodeWorkspaceView::renameEntry(const QString& path, const QString& name) {
 
     const QString source = containedPath(path);
     const QString destination = containedPath(QDir(QFileInfo(path).absolutePath()).filePath(name));
+
     if (source.isEmpty() || destination.isEmpty()) {
         emit operationFailed(m_host.translate(QStringLiteral("code-editor.error.path-outside")));
         return;
@@ -675,9 +720,11 @@ void CodeWorkspaceView::renameEntry(const QString& path, const QString& name) {
 void CodeWorkspaceView::movePath(const QString& path) {
     const QString directory = QFileDialog::getExistingDirectory(this, m_host.translate(QStringLiteral("code-editor.actions.move")), m_initialState.rootPath);
     const QString containedDirectory = containedPath(directory);
+
     if (directory.isEmpty() || containedDirectory.isEmpty()) {
         return;
     }
+
     const QString source = containedPath(path);
     const QString destination = QDir(containedDirectory).filePath(QFileInfo(path).fileName());
     auto future = m_host.movePath(source, destination);
@@ -688,10 +735,13 @@ void CodeWorkspaceView::movePath(const QString& path) {
 
 void CodeWorkspaceView::removePath(const QString& path) {
     const QFileInfo information(path);
+
     if (!m_host.confirm(this, m_host.translate(QStringLiteral("code-editor.delete.title")), m_host.translate(information.isDir() ? QStringLiteral("code-editor.delete.folder-message") : QStringLiteral("code-editor.delete.file-message")), path, m_host.translate(QStringLiteral("code-editor.actions.delete")), true)) {
         return;
     }
+
     const QString removed = containedPath(path);
+
     if (removed.isEmpty()) {
         emit operationFailed(m_host.translate(QStringLiteral("code-editor.error.path-outside")));
         return;
@@ -705,12 +755,14 @@ void CodeWorkspaceView::removePath(const QString& path) {
 
 void CodeWorkspaceView::closeDocument(int index) {
     auto* openDocument = qobject_cast<CodeDocument*>(m_documents->widget(index));
+
     if (openDocument == nullptr) {
         return;
     }
     if (openDocument->dirty() && !m_host.confirm(this, m_host.translate(QStringLiteral("code-editor.close.title")), m_host.translate(QStringLiteral("code-editor.close.file-message")), openDocument->path(), m_host.translate(QStringLiteral("code-editor.close.discard")), true)) {
         return;
     }
+
     const QString closedPath = openDocument->path();
     m_documents->removeTab(index);
     openDocument->deleteLater();
@@ -748,6 +800,7 @@ void CodeWorkspaceView::showFileFinder() {
 
 void CodeWorkspaceView::showEncodingMenu() {
     auto* document = qobject_cast<CodeDocument*>(m_documents->currentWidget());
+
     if (document == nullptr) {
         return;
     }
@@ -756,6 +809,7 @@ void CodeWorkspaceView::showEncodingMenu() {
     menu->setAttribute(Qt::WA_DeleteOnClose);
     auto* reopen = menu->addMenu(m_host.translate(QStringLiteral("code-editor.status.reopen-with-encoding")));
     auto* save = menu->addMenu(m_host.translate(QStringLiteral("code-editor.status.save-with-encoding")));
+
     for (const auto charset : textCharsets()) {
         const QString name = CodeWorkspaceViewHelper::charsetName(charset);
         auto* reopenEntry = reopen->addAction(name);
@@ -763,6 +817,7 @@ void CodeWorkspaceView::showEncodingMenu() {
         auto* saveEntry = save->addAction(name);
         saveEntry->setData(QStringLiteral("save/") + textCharsetName(charset));
     }
+
     connect(menu, &QMenu::triggered, this, &CodeWorkspaceView::applyEncodingChoice);
     menu->popup(QCursor::pos());
 }
@@ -770,19 +825,23 @@ void CodeWorkspaceView::showEncodingMenu() {
 // Reading the bytes again replaces what the buffer holds, so a document with unsaved work is asked about first.
 void CodeWorkspaceView::applyEncodingChoice(QAction* action) {
     auto* document = qobject_cast<CodeDocument*>(m_documents->currentWidget());
+
     if (document == nullptr) {
         return;
     }
 
     const QString choice = action->data().toString();
     const auto charset = parseTextCharset(choice.section(QLatin1Char('/'), 1));
+
     if (!charset.has_value()) {
         return;
     }
+
     if (choice.startsWith(QStringLiteral("save/"))) {
         document->saveWithCharset(*charset);
         return;
     }
+
     if (document->dirty() && !m_host.confirm(this, m_host.translate(QStringLiteral("code-editor.plugin.title")), m_host.translate(QStringLiteral("code-editor.status.reopen-title")), m_host.translate(QStringLiteral("code-editor.status.reopen-message")), m_host.translate(QStringLiteral("code-editor.status.reopen-action")), true)) {
         return;
     }
@@ -792,6 +851,7 @@ void CodeWorkspaceView::applyEncodingChoice(QAction* action) {
 
 void CodeWorkspaceView::updateDocumentTitle(CodeDocument* document) {
     const int index = m_documents->indexOf(document);
+
     if (index >= 0) {
         m_documents->setTabText(index, document->title());
         m_documents->setTabToolTip(index, document->path());
@@ -810,6 +870,7 @@ bool CodeWorkspaceView::narrowTree(const QModelIndex& parent) {
     }
 
     bool anyVisible = false;
+
     for (int row = 0; row < m_fileModel->rowCount(parent); ++row) {
         const QModelIndex entry = m_fileModel->index(row, 0, parent);
         const bool named = entry.data(Qt::DisplayRole).toString().contains(m_fileNeedle, Qt::CaseInsensitive);
@@ -824,11 +885,13 @@ bool CodeWorkspaceView::narrowTree(const QModelIndex& parent) {
 
 void CodeWorkspaceView::revealInTree(int index) {
     auto* openDocument = qobject_cast<CodeDocument*>(m_documents->widget(index));
+
     if (openDocument == nullptr) {
         return;
     }
 
     const QModelIndex entry = m_fileModel->index(openDocument->path());
+
     if (!entry.isValid()) {
         return;
     }
@@ -850,6 +913,7 @@ void CodeWorkspaceView::updateDocumentPaths(const QString& source, const QString
         }
         openDocument->setLanguageServer(languageServer(openDocument->language()));
     }
+
     for (int index = 0; index < m_problems->topLevelItemCount(); ++index) {
         auto* item = m_problems->topLevelItem(index);
         const QString path = item->data(0, Qt::UserRole).toString();
@@ -860,17 +924,20 @@ void CodeWorkspaceView::updateDocumentPaths(const QString& source, const QString
         item->setText(0, QFileInfo(updatedPath).fileName());
         item->setData(0, Qt::UserRole, updatedPath);
     }
+
     emit stateChanged();
 }
 
 // An empty answer for a file is the server saying it has nothing left to report there, which is how a fixed problem disappears.
 void CodeWorkspaceView::updateDiagnostics(const QString& languageId, const QString& path, const QVector<LanguageDiagnostic>& diagnostics) {
     const QString contained = containedPath(path);
+
     if (contained.isEmpty()) {
         return;
     }
 
     auto& owned = m_diagnostics[languageId];
+
     if (diagnostics.isEmpty()) {
         if (!owned.remove(contained)) {
             return;
@@ -881,11 +948,13 @@ void CodeWorkspaceView::updateDiagnostics(const QString& languageId, const QStri
         }
         owned.insert(contained, diagnostics);
     }
+
     refreshProblems();
 }
 
 void CodeWorkspaceView::refreshProblems() {
     QVector<QPair<QString, LanguageDiagnostic>> rows;
+
     for (const auto& owned : m_diagnostics) {
         for (auto entry = owned.constBegin(); entry != owned.constEnd(); ++entry) {
             for (const auto& diagnostic : entry.value()) {
@@ -899,6 +968,7 @@ void CodeWorkspaceView::refreshProblems() {
 
     // The panel carries every file the workspace analysed, so a written filter is what narrows it to the one being looked for.
     const QString filter = m_problemFilter->text().trimmed();
+
     if (!filter.isEmpty()) {
         // clang-format off
         rows.removeIf([&filter](const QPair<QString, LanguageDiagnostic>& row) { return !row.first.contains(filter, Qt::CaseInsensitive) && !row.second.message.contains(filter, Qt::CaseInsensitive); });
@@ -906,6 +976,7 @@ void CodeWorkspaceView::refreshProblems() {
     }
 
     m_problems->clear();
+
     for (const auto& row : rows.mid(0, LanguageRegistry::limits().maximumProblems)) {
         auto* item = new QTreeWidgetItem({QFileInfo(row.first).fileName(), QString::number(row.second.startLine + 1), row.second.message});
         item->setData(0, Qt::UserRole, row.first);
@@ -924,6 +995,7 @@ CodeDocument* CodeWorkspaceView::document(const QString& path) const {
             return openDocument;
         }
     }
+
     return nullptr;
 }
 
@@ -934,6 +1006,7 @@ LanguageServerClient* CodeWorkspaceView::languageServer(const LanguageDefinition
     if (m_languageServers.contains(language.id)) {
         return m_languageServers.value(language.id);
     }
+
     for (const auto& configuration : m_availableLanguageServers) {
         if (configuration.languageId != language.id) {
             continue;
@@ -952,6 +1025,7 @@ LanguageServerClient* CodeWorkspaceView::languageServer(const LanguageDefinition
         server->start();
         return server;
     }
+
     return nullptr;
 }
 
@@ -971,6 +1045,7 @@ bool CodeWorkspaceView::containsPath(const QString& path) const {
 QString CodeWorkspaceView::containedPath(const QString& path) const {
     const QFileInfo information(QDir::cleanPath(path));
     QString resolved;
+
     if (information.exists() || information.isSymLink()) {
         resolved = information.canonicalFilePath();
     } else {
@@ -979,10 +1054,13 @@ QString CodeWorkspaceView::containedPath(const QString& path) const {
             resolved = QDir(parent).filePath(information.fileName());
         }
     }
+
     resolved = QDir::cleanPath(resolved);
+
     if (resolved == m_initialState.rootPath || resolved.startsWith(m_initialState.rootPath + QLatin1Char('/'))) {
         return resolved;
     }
+
     return {};
 }
 

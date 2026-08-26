@@ -61,6 +61,7 @@ QString AiPluginHelper::identifier() {
 QVector<ToolCall> AiPluginHelper::toolCallsFromDocument(const QJsonArray& calls) {
     QVector<ToolCall> parsed;
     parsed.reserve(calls.size());
+
     for (const auto& value : calls) {
         const QJsonObject call = value.toObject();
         parsed.append({call.value(QStringLiteral("id")).toString(), call.value(QStringLiteral("name")).toString(), call.value(QStringLiteral("arguments")).toObject()});
@@ -71,6 +72,7 @@ QVector<ToolCall> AiPluginHelper::toolCallsFromDocument(const QJsonArray& calls)
 
 QJsonArray AiPluginHelper::toolCallsDocument(const QVector<ToolCall>& calls) {
     QJsonArray document;
+
     for (const auto& call : calls) {
         document.append(QJsonObject{{QStringLiteral("id"), call.id}, {QStringLiteral("name"), call.name}, {QStringLiteral("arguments"), call.arguments}});
     }
@@ -90,15 +92,18 @@ utils::Result<AiTask> AiPluginHelper::prepareTaskSchedule(AiTask task, const QDa
     auto& schedule = task.schedule.value();
     schedule.enabled = true;
     schedule.lastTriggeredAtUtc = {};
+
     if (schedule.kind == ScheduleKind::Once) {
         schedule.nextRunAtUtc = schedule.onceAtUtc;
         if (!schedule.onceAtUtc.isValid() || schedule.onceAtUtc.timeSpec() != Qt::UTC || schedule.onceAtUtc <= nowUtc) {
             return utils::Result<AiTask>::failure({"ai_tasks_schedule_once_past", "The one-time schedule must be in the future", {}});
         }
     }
+
     if (schedule.kind == ScheduleKind::Interval) {
         schedule.nextRunAtUtc = nowUtc.addSecs(schedule.intervalSeconds);
     }
+
     if (schedule.kind == ScheduleKind::Cron) {
         const auto expression = CronExpression::parse(schedule.cronExpression);
         if (!expression.hasValue()) {
@@ -117,11 +122,13 @@ utils::Result<AiTask> AiPluginHelper::prepareTaskSchedule(AiTask task, const QDa
 
 utils::Result<TaskSchedule> AiPluginHelper::advanceSchedule(TaskSchedule schedule, const QDateTime& triggeredAtUtc) {
     schedule.lastTriggeredAtUtc = triggeredAtUtc;
+
     if (schedule.kind == ScheduleKind::Once) {
         schedule.enabled = false;
         schedule.nextRunAtUtc = {};
         return utils::Result<TaskSchedule>::success(std::move(schedule));
     }
+
     if (schedule.kind == ScheduleKind::Interval) {
         do {
             schedule.nextRunAtUtc = schedule.nextRunAtUtc.addSecs(schedule.intervalSeconds);
@@ -130,13 +137,17 @@ utils::Result<TaskSchedule> AiPluginHelper::advanceSchedule(TaskSchedule schedul
     }
 
     const auto expression = CronExpression::parse(schedule.cronExpression);
+
     if (!expression.hasValue()) {
         return utils::Result<TaskSchedule>::failure(expression.error());
     }
+
     const auto next = expression.value().nextAfter(triggeredAtUtc, QTimeZone(schedule.timeZoneId));
+
     if (!next.hasValue()) {
         return utils::Result<TaskSchedule>::failure(next.error());
     }
+
     schedule.nextRunAtUtc = next.value();
     return utils::Result<TaskSchedule>::success(std::move(schedule));
 }
@@ -200,6 +211,7 @@ utils::Result<void> AiPlugin::initialize(PluginHost& host) {
     m_repository = std::make_unique<AiTaskRepository>(host);
     m_tools = std::make_unique<AiToolRegistry>(host);
     const auto migration = m_repository->initialize();
+
     if (!migration.hasValue()) {
         shutdown();
         return migration;
@@ -219,6 +231,7 @@ utils::Result<void> AiPlugin::initialize(PluginHost& host) {
     restartMcpClients();
 
     const auto state = reloadState();
+
     if (!state.hasValue()) {
         shutdown();
         return state;
@@ -242,6 +255,7 @@ QWidget* AiPlugin::createNavigationView(const QString& itemId, QWidget* parent) 
     if (itemId == QStringLiteral("tasks")) {
         return new AiTasksView(*this, *m_host, parent);
     }
+
     return nullptr;
 }
 
@@ -252,15 +266,18 @@ QWidget* AiPlugin::createSettingsSection(const QString& groupId, const QString& 
     if (groupId == QStringLiteral("connections")) {
         return sectionId == QStringLiteral("general") ? new AiConnectionSettingsView(*this, *m_host, parent) : nullptr;
     }
+
     if (groupId == QStringLiteral("providers")) {
         if (sectionId == QStringLiteral("selection")) {
             return createProviderSelectionSection(parent);
         }
         return sectionId == QStringLiteral("rate-limits") ? new AiRateLimitSettingsView(*this, *m_host, m_providerScope, parent) : nullptr;
     }
+
     if (groupId == QStringLiteral("agents")) {
         return sectionId == QStringLiteral("general") ? new AiAgentSettingsView(*this, *m_host, parent) : nullptr;
     }
+
     if (groupId == QStringLiteral("tools")) {
         if (sectionId == QStringLiteral("mcp")) {
             return new AiMcpSettingsView(*this, *m_host, parent);
@@ -270,6 +287,7 @@ QWidget* AiPlugin::createSettingsSection(const QString& groupId, const QString& 
         }
         return sectionId == QStringLiteral("speech") ? new AiSpeechSettingsView(*this, *m_host, parent) : nullptr;
     }
+
     if (groupId != QStringLiteral("general") || sectionId != QStringLiteral("general")) {
         return nullptr;
     }
@@ -284,9 +302,11 @@ QWidget* AiPlugin::createProviderSelectionSection(QWidget* parent) {
     auto* form = ui::settingsForm();
     auto* provider = new ui::ComboBox(m_host->theme(), page);
     provider->setObjectName(QStringLiteral("aiScopeProvider"));
+
     for (const auto& descriptor : providerCatalog()) {
         provider->addItem(m_host->translate(descriptor.titleKey), descriptor.id);
     }
+
     ui::sortComboBoxItems(provider);
     const int selected = provider->findData(m_providerScope.providerId());
     provider->setCurrentIndex(selected < 0 ? 0 : selected);
@@ -346,12 +366,14 @@ void AiPlugin::handleRequest(const QString&, const QString& topic, const QJsonOb
         // clang-format on
         return;
     }
+
     reply(utils::Result<QJsonObject>::failure({"ai_tasks_request_invalid", "The AI request is invalid", topic}));
 }
 
 // The chat is a content surface, so it answers the zoom the shell broadcasts like every other one.
 void AiPlugin::handleEvent(const QString&, const QString& topic, const QJsonObject& payload) {
     ContentFontStep step = ContentFontStep::Reset;
+
     if (topic != QString::fromLatin1(contentFontStepTopic) || !parseContentFontStep(payload, step)) {
         return;
     }
@@ -367,6 +389,7 @@ void AiPlugin::handleEvent(const QString&, const QString& topic, const QJsonObje
 void AiPlugin::shutdown() {
     m_scheduleTimer.stop();
     QStringList unfinishedCalls;
+
     for (auto& execution : m_active) {
         for (const auto& pending : execution->toolCalls) {
             if (pending.deadline != nullptr) {
@@ -393,18 +416,22 @@ void AiPlugin::shutdown() {
             execution->runner->deleteLater();
         }
     }
+
     m_active.clear();
+
     // The answer of a cancelled command reaches an execution that is already gone, so the runs are cleared before the commands are stopped.
     for (const auto& callId : unfinishedCalls) {
         if (m_tools != nullptr) {
             m_tools->cancel(callId);
         }
     }
+
     for (auto* client : m_mcpClients) {
         client->disconnect(this);
         client->stop();
         client->deleteLater();
     }
+
     m_mcpClients.clear();
     // A transport thread outlives the client that asked it to end, so this waits for the ones still finishing before the library they run is unloaded.
     AiMcpClient::drainTransports();
@@ -445,6 +472,7 @@ TaskRunState AiPlugin::runState(const QString& taskId) const {
     if (m_active.contains(taskId)) {
         return TaskRunState::Running;
     }
+
     return m_queue.contains(taskId) ? TaskRunState::Waiting : TaskRunState::Idle;
 }
 
@@ -483,6 +511,7 @@ QString AiPlugin::phaseName(ExecutionPhase phase) {
     case ExecutionPhase::Running:
         return QStringLiteral("running");
     }
+
     Q_UNREACHABLE_RETURN(QStringLiteral("idle"));
 }
 
@@ -490,25 +519,30 @@ ExecutionPhase AiPlugin::executionPhase(const QString& taskId) const {
     if (const auto phase = m_phases.constFind(taskId); phase != m_phases.constEnd()) {
         return phase.value();
     }
+
     return m_queue.contains(taskId) ? ExecutionPhase::Queued : ExecutionPhase::Idle;
 }
 
 // The card says what the run is doing, so a turn calling tools names them instead of saying only that a tool is running.
 QString AiPlugin::executionDetail(const QString& taskId) const {
     const std::shared_ptr<ActiveExecution> position = m_active.value(taskId);
+
     if (position == nullptr || m_host == nullptr) {
         return {};
     }
 
     QStringList running;
+
     for (const auto& pending : position->toolCalls) {
         if (pending.started && !pending.finished) {
             running.append(pending.call.name);
         }
     }
+
     if (running.size() == 1) {
         return running.first();
     }
+
     return running.isEmpty() ? QString{} : m_host->translate(QStringLiteral("ai.phase.tool-count")).arg(QString::number(running.size()));
 }
 
@@ -528,6 +562,7 @@ std::optional<ModelConnection> AiPlugin::defaultConnection() const {
 // A task is handed to an agent, so an agent that was removed fails the run with its own name instead of silently running on another one.
 utils::Result<AiAgent> AiPlugin::agentForTask(const AiTask& task) const {
     const AiAgent* agent = findAgent(m_settings.agents, task.agentId);
+
     if (agent == nullptr) {
         return utils::Result<AiAgent>::failure({"ai_agent_unknown", "The agent this task runs on is not configured", task.agentId});
     }
@@ -537,6 +572,7 @@ utils::Result<AiAgent> AiPlugin::agentForTask(const AiTask& task) const {
 
 utils::Result<ModelConnection> AiPlugin::connectionForAgent(const AiAgent& agent) const {
     const ModelConnection* connection = findConnection(m_settings.connections, agent.connectionKey);
+
     if (connection == nullptr) {
         return utils::Result<ModelConnection>::failure({"ai_connection_unknown", "The connection this agent runs on is not configured", agent.connectionKey});
     }
@@ -554,12 +590,15 @@ const ExecutionSettings& AiPlugin::executionSettings() const {
 
 SpeechSettings AiPlugin::effectiveSpeechSettings() const {
     SpeechSettings effective = m_settings.speech;
+
     if (effective.apiKey.isEmpty()) {
         effective.apiKey = declaredSpeechSettings(effective.provider).apiKey;
     }
+
     if (effective.voiceId.isEmpty()) {
         effective.voiceId = speechProviderDefaultVoice(effective.provider);
     }
+
     return effective;
 }
 
@@ -610,6 +649,7 @@ QFuture<utils::Result<QVector<TaskExecution>>> AiPlugin::executions(const QStrin
     if (m_repository == nullptr) {
         return QtFuture::makeReadyValueFuture(utils::Result<QVector<TaskExecution>>::failure({"ai_tasks_not_initialized", "The AI plugin is not initialized", {}}));
     }
+
     return m_repository->executions(taskId);
 }
 
@@ -617,6 +657,7 @@ QFuture<utils::Result<QVector<ExecutionLogEntry>>> AiPlugin::executionLogs(const
     if (m_repository == nullptr) {
         return QtFuture::makeReadyValueFuture(utils::Result<QVector<ExecutionLogEntry>>::failure({"ai_tasks_not_initialized", "The AI plugin is not initialized", {}}));
     }
+
     return m_repository->executionLogs(executionId);
 }
 
@@ -628,12 +669,15 @@ QFuture<utils::Result<void>> AiPlugin::replaceConnection(const QString& previous
 
     const QString nextKey = connectionKey(connection);
     QVector<ModelConnection> connections = m_settings.connections;
+
     for (auto& stored : connections) {
         if (connectionKey(stored) == previousKey) {
             stored = connection;
         }
     }
+
     const auto validated = validateConnectionSet(connections);
+
     if (!validated.hasValue()) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure(validated.error()));
     }
@@ -641,6 +685,7 @@ QFuture<utils::Result<void>> AiPlugin::replaceConnection(const QString& previous
     AiSettings next = m_settings;
     next.connections = connections;
     next.defaultConnectionKey = m_settings.defaultConnectionKey == previousKey ? nextKey : m_settings.defaultConnectionKey;
+
     for (auto& agent : next.agents) {
         if (agent.connectionKey == previousKey) {
             agent.connectionKey = nextKey;
@@ -655,6 +700,7 @@ QFuture<utils::Result<void>> AiPlugin::replaceConnection(const QString& previous
 
 QFuture<utils::Result<void>> AiPlugin::saveConnections(const QVector<ModelConnection>& connections, const QString& defaultConnectionKey) {
     const auto validated = validateConnectionSet(connections);
+
     if (!validated.hasValue()) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure(validated.error()));
     }
@@ -681,6 +727,7 @@ QFuture<utils::Result<void>> AiPlugin::saveConnections(const QVector<ModelConnec
 // The pace belongs to the service, so every connection and every workspace that reaches it waits behind the same limit.
 QFuture<utils::Result<void>> AiPlugin::saveRateLimits(const QVector<ProviderRateLimit>& limits) {
     QSet<QString> providers;
+
     for (const auto& limit : limits) {
         if (findProvider(limit.providerId) == nullptr) {
             return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_rate_limit_invalid", "The provider is not supported", limit.providerId}));
@@ -730,6 +777,7 @@ QFuture<utils::Result<void>> AiPlugin::loadConversation(const QString& taskId) {
 // A reader scrolling up asks for the page before the oldest one on screen, which answers whether there was one.
 QFuture<utils::Result<bool>> AiPlugin::loadOlderConversation(const QString& taskId) {
     const QVector<ConversationMessage>& loaded = m_conversations[taskId];
+
     if (m_repository == nullptr || loaded.isEmpty()) {
         return QtFuture::makeReadyValueFuture(utils::Result<bool>::success(false));
     }
@@ -804,6 +852,7 @@ QFuture<utils::Result<void>> AiPlugin::recordConversation(const QString& taskId,
 // A message typed while a turn is running joins the conversation at once and is claimed at the next iteration of that turn.
 QFuture<utils::Result<void>> AiPlugin::sendMessage(const QString& taskId, const QString& text) {
     const auto* target = task(taskId);
+
     if (m_repository == nullptr || target == nullptr || text.trimmed().isEmpty()) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_conversation_invalid", "The message is invalid", taskId}));
     }
@@ -867,11 +916,13 @@ QVector<AiAgent> AiPlugin::agents() const {
 // An agent that is removed stops the tasks it was running, because a task without its specialist has nobody to answer it.
 QFuture<utils::Result<void>> AiPlugin::saveAgents(const QVector<AiAgent>& agents) {
     const auto validated = validateAgentSet(agents, m_settings.connections);
+
     if (!validated.hasValue()) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure(validated.error()));
     }
 
     QStringList orphaned;
+
     for (const auto& task : m_tasks) {
         if (task.executionKind == TaskExecutionKind::Agent && findAgent(agents, task.agentId) == nullptr) {
             orphaned.append(task.id);
@@ -893,6 +944,7 @@ void AiPlugin::continueWhenAnswerIsPending(const QString& taskId, qint64 deliver
     const QVector<ConversationMessage>& conversation = m_conversations[taskId];
     const bool pending = std::any_of(conversation.constBegin(), conversation.constEnd(), [deliveredSequence](const ConversationMessage& message) { return message.role == ConversationRole::User && message.summarizedUntil == 0 && message.sequence > deliveredSequence; });
     // clang-format on
+
     if (!pending || runState(taskId) != TaskRunState::Idle) {
         return;
     }
@@ -978,6 +1030,7 @@ QFuture<utils::Result<void>> AiPlugin::removeWorkspace(const QString& workspaceI
     if (m_repository == nullptr || m_workspaces.size() <= 1) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_tasks_workspace_required", "The last AI workspace cannot be removed", workspaceId}));
     }
+
     for (const auto& task : m_tasks) {
         if (task.workspaceId == workspaceId && runState(task.id) != TaskRunState::Idle) {
             return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_tasks_workspace_busy", "The AI workspace still has active tasks", workspaceId}));
@@ -985,18 +1038,21 @@ QFuture<utils::Result<void>> AiPlugin::removeWorkspace(const QString& workspaceI
     }
 
     QStringList removedTaskIds;
+
     for (const auto& task : m_tasks) {
         removedTaskIds.append(task.workspaceId == workspaceId ? QStringList{task.id} : QStringList{});
     }
 
     QVector<AiWorkspace> remaining;
     bool removedActiveWorkspace = false;
+
     for (const auto& workspace : m_workspaces) {
         removedActiveWorkspace = removedActiveWorkspace || (workspace.id == workspaceId && workspace.active);
         if (workspace.id != workspaceId) {
             remaining.append(workspace);
         }
     }
+
     for (int index = 0; index < remaining.size(); ++index) {
         remaining[index].position = index;
         remaining[index].active = removedActiveWorkspace ? index == 0 : remaining.at(index).active;
@@ -1054,11 +1110,14 @@ QFuture<utils::Result<void>> AiPlugin::saveTask(AiTask task) {
     task.createdAtUtc = existing == nullptr ? now : existing->createdAtUtc;
     task.updatedAtUtc = now;
     int columnSize = 0;
+
     for (const auto& candidate : m_tasks) {
         columnSize += candidate.workspaceId == task.workspaceId && candidate.column == task.column ? 1 : 0;
     }
+
     task.position = existing == nullptr ? columnSize : existing->position;
     const auto prepared = AiPluginHelper::prepareTaskSchedule(std::move(task), now);
+
     if (!prepared.hasValue()) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure(prepared.error()));
     }
@@ -1121,6 +1180,7 @@ QFuture<utils::Result<void>> AiPlugin::removeTask(const QString& taskId) {
 
 QFuture<utils::Result<void>> AiPlugin::moveTask(const QString& taskId, TaskColumn column) {
     const auto* moved = task(taskId);
+
     if (m_repository == nullptr || moved == nullptr) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_tasks_task_unknown", "The AI task is unknown", taskId}));
     }
@@ -1132,9 +1192,11 @@ QFuture<utils::Result<void>> AiPlugin::moveTask(const QString& taskId, TaskColum
     }
 
     int position = 0;
+
     for (const auto& candidate : m_tasks) {
         position += candidate.workspaceId == moved->workspaceId && candidate.column == column ? 1 : 0;
     }
+
     const QDateTime now = QDateTime::currentDateTimeUtc();
     auto future = m_repository->moveTask(taskId, column, position, now);
     // clang-format off
@@ -1156,12 +1218,14 @@ QFuture<utils::Result<void>> AiPlugin::moveTask(const QString& taskId, TaskColum
 
 QFuture<utils::Result<void>> AiPlugin::startTask(const QString& taskId) {
     const auto* started = task(taskId);
+
     if (m_repository == nullptr || started == nullptr) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_tasks_task_unknown", "The AI task is unknown", taskId}));
     }
     if (runState(taskId) != TaskRunState::Idle) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_tasks_task_busy", "The AI task is already queued or running", taskId}));
     }
+
     if (started->executionKind == TaskExecutionKind::Agent) {
         const auto agent = agentForTask(*started);
         if (!agent.hasValue()) {
@@ -1200,6 +1264,7 @@ QFuture<utils::Result<void>> AiPlugin::startTask(const QString& taskId) {
 // The task is queued before its row is written, because a second start asked for while that write is in flight would reach storage as a duplicate.
 QFuture<utils::Result<void>> AiPlugin::enqueueRun(const QString& taskId) {
     const AiTask* queued = task(taskId);
+
     if (queued == nullptr) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_tasks_task_unknown", "The AI task is unknown", taskId}));
     }
@@ -1280,30 +1345,41 @@ bool AiPlugin::hasCapacity() const {
 
 utils::Result<void> AiPlugin::reloadState() {
     const auto workspaces = m_repository->workspaces();
+
     if (!workspaces.hasValue()) {
         return utils::Result<void>::failure(workspaces.error());
     }
+
     const auto tasks = m_repository->tasks();
+
     if (!tasks.hasValue()) {
         return utils::Result<void>::failure(tasks.error());
     }
+
     const auto queued = m_repository->queuedTaskIds();
+
     if (!queued.hasValue()) {
         return utils::Result<void>::failure(queued.error());
     }
+
     const auto outcomes = m_repository->lastOutcomes();
+
     if (!outcomes.hasValue()) {
         return utils::Result<void>::failure(outcomes.error());
     }
+
     const auto sequences = m_repository->conversationSequences();
+
     if (!sequences.hasValue()) {
         return utils::Result<void>::failure(sequences.error());
     }
+
     m_conversationSequences = sequences.value();
 
     m_workspaces = workspaces.value();
     m_tasks = tasks.value();
     m_queue = queued.value();
+
     // A card says what happened to its task, so a restart restores the outcome of its newest run and the reason a failure gave.
     for (auto outcome = outcomes.value().constBegin(); outcome != outcomes.value().constEnd(); ++outcome) {
         m_lastStatuses.insert(outcome.key(), outcome.value().status);
@@ -1312,11 +1388,13 @@ utils::Result<void> AiPlugin::reloadState() {
             m_lastErrors.insert(outcome.key(), outcome.value().errorMessage);
         }
     }
+
     for (const auto& task : m_tasks) {
         if (task.column == TaskColumn::Doing && !m_queue.contains(task.id)) {
             m_queue.append(task.id);
         }
     }
+
     return utils::Result<void>::success();
 }
 
@@ -1326,6 +1404,7 @@ void AiPlugin::dispatchQueue() {
     }
 
     const QStringList pending = m_queue;
+
     for (const auto& taskId : pending) {
         const auto* candidate = task(taskId);
         if (candidate == nullptr || m_active.contains(taskId) || !hasCapacity()) {
@@ -1359,6 +1438,7 @@ void AiPlugin::startExecution(const AiTask& task) {
         startCommandExecution(task, record.id);
         return;
     }
+
     startAgentExecution(task, record.id);
 }
 
@@ -1403,6 +1483,7 @@ void AiPlugin::startCommandExecution(const AiTask& task, const QString& executio
 void AiPlugin::startAgentExecution(const AiTask& task, const QString& executionId) {
     const QString taskId = task.id;
     const auto agent = agentForTask(task);
+
     if (!agent.hasValue()) {
         appendLog(executionId, ExecutionLogLevel::Error, ExecutionLogKind::Failed, agent.error().message);
         m_lastErrors.insert(taskId, agent.error().message);
@@ -1410,7 +1491,9 @@ void AiPlugin::startAgentExecution(const AiTask& task, const QString& executionI
         completeExecution(taskId, ExecutionStatus::Failed, agent.error().message, AgentStopReason::Failed);
         return;
     }
+
     const auto connection = connectionForAgent(agent.value());
+
     if (!connection.hasValue()) {
         appendLog(executionId, ExecutionLogLevel::Error, ExecutionLogKind::Failed, connection.error().message);
         m_lastErrors.insert(taskId, connection.error().message);
@@ -1506,12 +1589,14 @@ void AiPlugin::startAgentExecution(const AiTask& task, const QString& executionI
 
 void AiPlugin::continueAgent(const QString& taskId) {
     const std::shared_ptr<ActiveExecution> position = m_active.value(taskId);
+
     if (position == nullptr) {
         return;
     }
 
     // A zero limit lets the agent run until it stops asking for tools.
     ++position->iteration;
+
     if (position->maximumIterations > 0 && position->iteration > position->maximumIterations) {
         completeExecution(taskId, ExecutionStatus::Succeeded, {}, AgentStopReason::IterationLimit);
         return;
@@ -1522,11 +1607,13 @@ void AiPlugin::continueAgent(const QString& taskId) {
     const qint64 limit = fittingTokenLimit(model == nullptr ? 0 : model->contextWindow, reservedContextTokens(position->connection));
     QVector<qint64> sequences;
     QJsonArray projected = projectConversation(position->instructions, position->connection, m_conversations.value(taskId), position->seenImages, &sequences);
+
     if (const qsizetype pruned = pruneToolResults(projected, limit); pruned > 0) {
         appendLog(position->record.id, ExecutionLogLevel::Info, ExecutionLogKind::Compacted, m_host->translate(QStringLiteral("ai.log.pruned")).arg(QString::number(pruned)));
     }
 
     FittedConversation fitted = fitConversation(projected, limit);
+
     if (!fitted.dropped.isEmpty()) {
         appendLog(position->record.id, ExecutionLogLevel::Warning, ExecutionLogKind::Compacted, m_host->translate(QStringLiteral("ai.log.compacted")).arg(QString::number(fitted.dropped.size())));
         const qsizetype lastDropped = fitted.preservedHead + fitted.dropped.size() - 1;
@@ -1564,6 +1651,7 @@ qint64 AiPlugin::reservedContextTokens(const ModelConnection& connection) const 
 // What no longer fits the window is replaced by one summary, so the agent keeps what it learned instead of only what is recent.
 void AiPlugin::summarizeDroppedTurns(const QString& taskId, const FittedConversation& fitted) {
     const std::shared_ptr<ActiveExecution> position = m_active.value(taskId);
+
     if (position == nullptr) {
         return;
     }
@@ -1578,9 +1666,11 @@ void AiPlugin::summarizeDroppedTurns(const QString& taskId, const FittedConversa
     const ModelDescriptor* model = findModelDescriptor(position->connection);
     const qint64 summaryLimit = fittingTokenLimit(model == nullptr ? 0 : model->contextWindow, aiLimits().summaryMaximumTokens);
     const qsizetype prunedForSummary = pruneToolResults(dropped, summaryLimit);
+
     if (prunedForSummary > 0) {
         appendLog(executionId, ExecutionLogLevel::Info, ExecutionLogKind::Compacted, m_host->translate(QStringLiteral("ai.log.pruned")).arg(QString::number(prunedForSummary)));
     }
+
     const QString transcript = QString::fromUtf8(QJsonDocument(fitConversation(dropped, summaryLimit).messages).toJson(QJsonDocument::Compact));
     const QJsonArray request{QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), instruction + QStringLiteral("\n\n") + transcript}}};
 
@@ -1618,9 +1708,11 @@ void AiPlugin::reportThrottle(const QString& taskId, const QString& executionId,
 
     const QString key = reason == ThrottleReason::Retry ? QStringLiteral("ai.log.retry-delay") : QStringLiteral("ai.log.rate-limit-delay");
     appendLog(executionId, ExecutionLogLevel::Info, ExecutionLogKind::Throttled, m_host->translate(key).arg(QString::number(milliseconds)));
+
     if (m_phases.value(taskId) != ExecutionPhase::Throttled) {
         m_phasesBeforeThrottle.insert(taskId, m_phases.value(taskId, ExecutionPhase::Sending));
     }
+
     m_phases.insert(taskId, ExecutionPhase::Throttled);
     emit taskRunStateChanged(taskId);
 }
@@ -1629,16 +1721,19 @@ void AiPlugin::releaseSummaryClient(const QString& taskId, AiChatClient* client)
     if (const std::shared_ptr<ActiveExecution> position = m_active.value(taskId); position != nullptr && position->summaryClient == client) {
         position->summaryClient = nullptr;
     }
+
     client->deleteLater();
 }
 
 void AiPlugin::applySummary(const QString& taskId, const QString& executionId, const FittedConversation& fitted, const QString& summary) {
     const std::shared_ptr<ActiveExecution> position = m_active.value(taskId);
+
     if (position == nullptr || position->record.id != executionId) {
         return;
     }
 
     QJsonArray messages = fitted.messages;
+
     if (!summary.trimmed().isEmpty()) {
         const QString text = m_host->translate(QStringLiteral("ai.agent.summary")).arg(summary.trimmed());
         messages.insert(fitted.preservedHead, QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), text}});
@@ -1661,6 +1756,7 @@ void AiPlugin::applySummary(const QString& taskId, const QString& executionId, c
 
 void AiPlugin::handleToolCalls(const QString& taskId, const QString& content, const QVector<ToolCall>& calls) {
     const std::shared_ptr<ActiveExecution> position = m_active.value(taskId);
+
     if (position == nullptr) {
         return;
     }
@@ -1694,6 +1790,7 @@ void AiPlugin::handleToolCalls(const QString& taskId, const QString& content, co
 // A call starts as soon as nothing running can reach what it touches, so reads of one turn still run together while two writes to one file take their turn.
 void AiPlugin::dispatchPendingTools(const QString& taskId, const QString& executionId) {
     bool dispatched = false;
+
     for (;;) {
         const std::shared_ptr<ActiveExecution> position = m_active.value(taskId);
         if (position == nullptr || position->record.id != executionId) {
@@ -1752,11 +1849,13 @@ void AiPlugin::dispatchPendingTools(const QString& taskId, const QString& execut
 // A tool that answers after its run was stopped belongs to that run, so its result never joins the one the card started next.
 void AiPlugin::completeToolCall(const QString& taskId, const QString& executionId, const QString& name, ToolResult result) {
     const std::shared_ptr<ActiveExecution> position = m_active.value(taskId);
+
     if (position == nullptr || position->record.id != executionId) {
         return;
     }
 
     PendingToolCall* pending = nullptr;
+
     for (auto& candidate : position->toolCalls) {
         if (candidate.started && !candidate.finished && candidate.call.id == result.callId) {
             pending = &candidate;
@@ -1769,16 +1868,20 @@ void AiPlugin::completeToolCall(const QString& taskId, const QString& executionI
     }
 
     appendLog(executionId, result.failed ? ExecutionLogLevel::Warning : ExecutionLogLevel::Info, ExecutionLogKind::ToolReturned, QStringLiteral("%1 %2").arg(name, result.text));
+
     if (!result.imageData.isEmpty()) {
         position->seenImages.insert(result.callId, result);
     }
+
     if (result.failed) {
         position->lastToolFailures.insert(name, result.text);
     } else {
         position->lastToolFailures.remove(name);
     }
+
     pending->finished = true;
     pending->result = std::move(result);
+
     // The completion can be reached from the deadline that is emitting, so its destruction is deferred.
     if (pending->deadline != nullptr) {
         pending->deadline->stop();
@@ -1787,6 +1890,7 @@ void AiPlugin::completeToolCall(const QString& taskId, const QString& executionI
     }
 
     QVector<ToolResult> completed;
+
     for (const auto& answeredCall : position->toolCalls) {
         if (!answeredCall.finished) {
             dispatchPendingTools(taskId, executionId);
@@ -1797,12 +1901,14 @@ void AiPlugin::completeToolCall(const QString& taskId, const QString& executionI
 
     // The results are answered in the order the model asked for them, so a turn reads the same however its calls were scheduled.
     QVector<ConversationMessage> answered;
+
     for (const auto& completedCall : completed) {
         ConversationMessage message = buildMessage(taskId, ConversationRole::Tool, completedCall.text, {}, completedCall.callId);
         message.imageData = completedCall.imageData;
         message.imageMediaType = completedCall.imageMediaType;
         answered.append(message);
     }
+
     std::ignore = recordConversation(taskId, answered);
     position->toolCalls.clear();
     continueAgent(taskId);
@@ -1815,9 +1921,11 @@ const QVector<McpServerDescriptor>& AiPlugin::mcpServers() const {
 // Storage holds only what the user changed, so an untouched credential resolves to the reference its service declares.
 SearchSettings AiPlugin::effectiveSearchSettings() const {
     SearchSettings effective = m_settings.search;
+
     if (effective.apiKey.isEmpty()) {
         effective.apiKey = declaredSearchSettings(effective.provider).apiKey;
     }
+
     return effective;
 }
 
@@ -1852,7 +1960,9 @@ void AiPlugin::restartMcpClients() {
         client->stop();
         client->deleteLater();
     }
+
     m_mcpClients.clear();
+
     if (m_tools != nullptr) {
         m_tools->setMcpClients({});
     }
@@ -1872,12 +1982,14 @@ void AiPlugin::restartMcpClients() {
 
 void AiPlugin::runSampling(const QJsonObject& parameters, int maximumTokens, McpReply reply) {
     const auto selected = defaultConnection();
+
     if (!selected.has_value()) {
         reply(utils::Result<QJsonObject>::failure({"ai_provider_unconfigured", "No AI provider is configured", {}}));
         return;
     }
 
     ModelConnection connection = selected.value();
+
     if (maximumTokens > 0) {
         setOutputBudget(connection, maximumTokens);
     }
@@ -1896,12 +2008,15 @@ void AiPlugin::refreshToolConfiguration() {
     if (m_tools == nullptr) {
         return;
     }
+
     m_tools->setSpeechConfiguration(effectiveSpeechSettings(), speechProviderAddress(m_settings.speech.provider));
     m_tools->setSearchConfiguration(effectiveSearchSettings(), searchAddress(m_settings.search));
     const auto selected = defaultConnection();
+
     if (!selected.has_value()) {
         return;
     }
+
     m_tools->setMediaConfiguration(selected.value(), connectionAddress(selected.value()));
 }
 
@@ -1911,9 +2026,11 @@ QString AiPlugin::environmentSection() const {
     const QLocale locale = QLocale::system();
     QStringList lines{m_host->translate(QStringLiteral("ai.agent.environment"))};
     const QString user = qEnvironmentVariable("USER", qEnvironmentVariable("USERNAME"));
+
     if (!user.isEmpty()) {
         lines.append(QStringLiteral("- user: %1").arg(user));
     }
+
     lines.append(QStringLiteral("- home directory: %1").arg(QDir::homePath()));
     lines.append(QStringLiteral("- local time: %1 (%2)").arg(now.toString(Qt::ISODate), QString::fromUtf8(now.timeZone().id())));
     lines.append(QStringLiteral("- utc time: %1").arg(persistence::storedTimestamp(now)));
@@ -1930,10 +2047,13 @@ QString AiPlugin::systemPromptData(const AiTask& task, const QVector<SkillDescri
     sections.append(environmentSection());
 
     const QStringList contextFiles = readContextFiles(task.workdir);
+
     for (const auto& instructions : contextFiles) {
         sections.append(instructions);
     }
+
     const QString catalog = skillCatalog(skills);
+
     if (!catalog.isEmpty()) {
         sections.append(catalog);
     }
@@ -1948,6 +2068,7 @@ QString AiPlugin::skillCatalog(const QVector<SkillDescriptor>& skills) const {
     }
 
     QStringList catalog{m_host->translate(QStringLiteral("ai.agent.skills"))};
+
     for (const auto& skill : skills) {
         catalog.append(QStringLiteral("- %1: %2").arg(skill.name, skill.description));
     }
@@ -1958,11 +2079,13 @@ QString AiPlugin::skillCatalog(const QVector<SkillDescriptor>& skills) const {
 // The servers an agent may call are the ones connected right now, because a server that is not ready answers nothing.
 QString AiPlugin::serverCatalog() const {
     QStringList names;
+
     for (auto client = m_mcpClients.constBegin(); client != m_mcpClients.constEnd(); ++client) {
         if (client.value() != nullptr && client.value()->ready()) {
             names.append(client.key());
         }
     }
+
     names.sort();
 
     return names.isEmpty() ? m_host->translate(QStringLiteral("ai.capability.servers-none")) : m_host->translate(QStringLiteral("ai.capability.servers")).arg(names.join(QStringLiteral(", ")));
@@ -1972,6 +2095,7 @@ QString AiPlugin::renderedSystemPrompt(const AiTask& task, const AiAgent& agent,
     const QDateTime now = QDateTime::currentDateTime();
     const QLocale locale = QLocale::system();
     QStringList toolNames;
+
     for (const auto& schema : m_tools == nullptr ? QVector<ToolSchema>{} : m_tools->schemas()) {
         toolNames.append(schema.name);
     }
@@ -2002,9 +2126,11 @@ QString AiPlugin::renderedSystemPrompt(const AiTask& task, const AiAgent& agent,
     const QSet<ModelTrait> traits = provider == nullptr ? QSet<ModelTrait>{} : modelTraits(*provider, connection.modelId);
     const ModelDescriptor* model = provider == nullptr ? nullptr : findModel(*provider, connection.modelId);
     QStringList traitNames;
+
     for (const auto trait : traits) {
         traitNames.append(modelTraitIdentifier(trait));
     }
+
     traitNames.sort();
     values.insert(QStringLiteral("MODEL"), connectionKey(connection));
     values.insert(QStringLiteral("MODEL_TRAITS"), traitNames.join(QStringLiteral(", ")));
@@ -2035,9 +2161,11 @@ QJsonArray AiPlugin::projectConversation(const QJsonObject& instructions, const 
     QJsonArray messages{instructions};
     QVector<ToolResult> pendingResults;
     qint64 summarized = 0;
+
     for (const auto& message : conversation) {
         summarized = std::max(summarized, message.summarizedUntil);
     }
+
     if (sequences != nullptr) {
         sequences->append(0);
     }
@@ -2092,6 +2220,7 @@ QJsonArray AiPlugin::projectConversation(const QJsonObject& instructions, const 
 
     const qint64 newest = conversation.isEmpty() ? 0 : conversation.last().sequence;
     flushResults();
+
     if (sequences != nullptr) {
         while (sequences->size() < messages.size()) {
             sequences->append(newest);
@@ -2113,6 +2242,7 @@ QStringList AiPlugin::readContextFiles(const QString& workdir) const {
     }
 
     QStringList collected;
+
     for (const auto& name : {QStringLiteral("AGENTS.md"), QStringLiteral("AGENT.md"), QStringLiteral("CLAUDE.md")}) {
         QFile file(QDir(workdir).filePath(name));
         if (!file.open(QIODevice::ReadOnly)) {
@@ -2123,6 +2253,7 @@ QStringList AiPlugin::readContextFiles(const QString& workdir) const {
             collected.append(m_host->translate(QStringLiteral("ai.agent.context-file")).arg(name, content));
         }
     }
+
     return collected;
 }
 
@@ -2134,6 +2265,7 @@ const ModelDescriptor* AiPlugin::findModelDescriptor(const ModelConnection& conn
 
 void AiPlugin::completeExecution(const QString& taskId, ExecutionStatus status, const QString& errorMessage, AgentStopReason stopReason) {
     const std::shared_ptr<ActiveExecution> position = m_active.value(taskId);
+
     if (position == nullptr || m_repository == nullptr) {
         return;
     }
@@ -2142,6 +2274,7 @@ void AiPlugin::completeExecution(const QString& taskId, ExecutionStatus status, 
     TaskExecution record = position->record;
     m_phases.remove(taskId);
     m_phasesBeforeThrottle.remove(taskId);
+
     if (cancelled) {
         appendLog(record.id, ExecutionLogLevel::Warning, ExecutionLogKind::Cancelled);
     } else if (status == ExecutionStatus::Succeeded) {
@@ -2149,6 +2282,7 @@ void AiPlugin::completeExecution(const QString& taskId, ExecutionStatus status, 
     }
     // A deadline outlives the run it was watching, so every one of them is released with the execution it belonged to.
     QStringList unfinishedCalls;
+
     for (const auto& pending : position->toolCalls) {
         if (pending.deadline != nullptr) {
             pending.deadline->stop();
@@ -2176,18 +2310,21 @@ void AiPlugin::completeExecution(const QString& taskId, ExecutionStatus status, 
         client->disconnect(this);
         client->deleteLater();
     }
+
     // A summary still in flight belongs to the run that asked for it, so stopping the run stops it too.
     if (summaryClient != nullptr) {
         summaryClient->disconnect(this);
         summaryClient->cancel();
         summaryClient->deleteLater();
     }
+
     // A command still running belongs to the run as well, and it is stopped once the run is no longer active so its answer reaches nothing.
     for (const auto& callId : unfinishedCalls) {
         if (m_tools != nullptr) {
             m_tools->cancel(callId);
         }
     }
+
     if (runner != nullptr) {
         runner->disconnect(this);
         runner->deleteLater();
@@ -2256,6 +2393,7 @@ void AiPlugin::reportFailure(const utils::Error& error, const QString& message) 
     if (m_host == nullptr) {
         return;
     }
+
     m_host->log(LogLevel::Error, QStringLiteral("ai.tasks"), error.message, {{QStringLiteral("code"), error.code}, {QStringLiteral("detail"), error.detail}});
     m_host->notify(m_host->translate(QStringLiteral("ai.error.title")), message, AlertSeverity::Error);
 }
@@ -2268,6 +2406,7 @@ void AiPlugin::processSchedules() {
 
     const QDateTime now = QDateTime::currentDateTimeUtc();
     QStringList due;
+
     for (const auto& candidate : m_tasks) {
         if (candidate.schedule.has_value() && candidate.schedule->enabled && candidate.schedule->nextRunAtUtc <= now && runState(candidate.id) == TaskRunState::Idle) {
             due.append(candidate.id);
@@ -2327,6 +2466,7 @@ void AiPlugin::armScheduleTimer() {
     m_scheduleTimer.stop();
     const QDateTime now = QDateTime::currentDateTimeUtc();
     std::chrono::milliseconds wakeup = std::chrono::milliseconds{aiLimits().scheduleWakeupMs};
+
     for (const auto& candidate : m_tasks) {
         if (!candidate.schedule.has_value() || !candidate.schedule->enabled) {
             continue;
@@ -2334,6 +2474,7 @@ void AiPlugin::armScheduleTimer() {
         const qint64 remaining = std::max<qint64>(0, now.msecsTo(candidate.schedule->nextRunAtUtc));
         wakeup = std::min(wakeup, std::chrono::milliseconds(remaining));
     }
+
     m_scheduleTimer.setInterval(wakeup);
     m_scheduleTimer.start();
 }

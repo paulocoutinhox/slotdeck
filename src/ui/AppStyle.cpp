@@ -127,6 +127,7 @@ int AppStyle::styleHint(StyleHint hint, const QStyleOption* option, const QWidge
     if (hint == SH_ComboBox_Popup) {
         return 0;
     }
+
     return QProxyStyle::styleHint(hint, option, widget, returnData);
 }
 
@@ -234,9 +235,11 @@ void AppStyle::drawSpinSign(const QStyleOption* option, QPainter* painter, bool 
     painter->setRenderHint(QPainter::Antialiasing, true);
     painter->setPen(QPen(color(option->state.testFlag(State_Enabled) ? Color::Text : Color::TextMuted), 1.6, Qt::SolidLine, Qt::RoundCap));
     painter->drawLine(QPointF(center.x() - arm, center.y()), QPointF(center.x() + arm, center.y()));
+
     if (plus) {
         painter->drawLine(QPointF(center.x(), center.y() - arm), QPointF(center.x(), center.y() + arm));
     }
+
     painter->restore();
 }
 
@@ -251,6 +254,7 @@ void AppStyle::drawControl(ControlElement element, const QStyleOption* option, Q
     }
 
     const auto* tab = qstyleoption_cast<const QStyleOptionTab*>(option);
+
     if (tab == nullptr) {
         return;
     }
@@ -264,6 +268,7 @@ void AppStyle::drawControl(ControlElement element, const QStyleOption* option, Q
 
 bool AppStyle::drawToolButtonLabel(const QStyleOption* option, QPainter* painter, const QWidget* widget) const {
     const auto* toolButton = qstyleoption_cast<const QStyleOptionToolButton*>(option);
+
     if (toolButton == nullptr || toolButton->toolButtonStyle != Qt::ToolButtonTextBesideIcon || toolButton->icon.isNull() || toolButton->text.isEmpty()) {
         return false;
     }
@@ -272,6 +277,7 @@ bool AppStyle::drawToolButtonLabel(const QStyleOption* option, QPainter* painter
     const int textWidth = toolButton->fontMetrics.horizontalAdvance(toolButton->text);
     const int contentWidth = toolButton->iconSize.width() + contentSpacing + textWidth;
     QRect contentRect = toolButton->rect;
+
     if (toolButton->state.testFlag(State_Sunken)) {
         contentRect.translate(pixelMetric(PM_ButtonShiftHorizontal, option, widget), pixelMetric(PM_ButtonShiftVertical, option, widget));
     }
@@ -286,9 +292,11 @@ bool AppStyle::drawToolButtonLabel(const QStyleOption* option, QPainter* painter
     toolButton->icon.paint(painter, iconRect, Qt::AlignCenter, iconMode, iconState);
 
     int textFlags = Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine | Qt::TextShowMnemonic;
+
     if (!styleHint(SH_UnderlineShortcut, option, widget)) {
         textFlags |= Qt::TextHideMnemonic;
     }
+
     drawItemText(painter, textRect, textFlags, toolButton->palette, toolButton->state.testFlag(State_Enabled), toolButton->text, QPalette::ButtonText);
     return true;
 }

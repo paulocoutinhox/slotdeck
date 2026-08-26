@@ -13,6 +13,7 @@ QFuture<utils::Result<void>> ConfigurationManager::exportConfiguration(const QSt
     if (m_transferActive) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"configuration_transfer_pending", "A configuration transfer is already running", {}}));
     }
+
     m_transferActive = true;
     emit transferStateChanged(true);
     auto future = m_databaseExecutor.exportConfiguration(destinationPath);
@@ -29,6 +30,7 @@ QFuture<utils::Result<void>> ConfigurationManager::importConfiguration(const QSt
     if (m_transferActive) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"configuration_transfer_pending", "A configuration transfer is already running", {}}));
     }
+
     m_transferActive = true;
     emit transferStateChanged(true);
     auto future = persistence::ConfigurationTransfer::stageImport(sourcePath, m_pendingImportPath, m_pluginSchemaVersions);

@@ -118,12 +118,14 @@ CalendarPopup::CalendarPopup(const Theme& theme, QWidget* parent) : QWidget(pare
     root->addWidget(days);
 
     const QLocale locale = QLocale::system();
+
     for (int column = 0; column < daysInWeek; ++column) {
         auto* name = new QLabel(locale.dayName(column + 1, QLocale::ShortFormat), days);
         name->setObjectName(QStringLiteral("calendarWeekDay"));
         name->setAlignment(Qt::AlignCenter);
         m_grid->addWidget(name, 0, column);
     }
+
     for (int index = 0; index < daysInWeek * calendarWeeks; ++index) {
         auto* cell = new QToolButton(days);
         cell->setObjectName(QStringLiteral("calendarDay"));
@@ -163,6 +165,7 @@ void CalendarPopup::rebuild() {
 
     const int leading = m_month.dayOfWeek() - 1;
     const QDate first = m_month.addDays(-leading);
+
     for (int index = 0; index < m_cells.size(); ++index) {
         const QDate date = first.addDays(index);
         QToolButton* cell = m_cells.at(index);
@@ -273,6 +276,7 @@ void SecretField::toggleReveal() {
         applyReveal(false);
         return;
     }
+
     applyReveal(m_confirmReveal && m_confirmReveal());
 }
 
@@ -310,6 +314,7 @@ QString ComponentsHelper::hardBreaks(const QString& text) {
     const QStringList lines = text.split(QLatin1Char('\n'));
     QStringList written;
     bool fenced = false;
+
     for (const auto& line : lines) {
         const bool fence = line.trimmed().startsWith(QStringLiteral("```"));
         if (fence) {
@@ -435,11 +440,13 @@ BusyIndicator::BusyIndicator(const Theme& theme, QWidget* parent) : QWidget(pare
 
 void BusyIndicator::setRunning(bool running) {
     setVisible(running);
+
     if (running) {
         m_clock.start();
         m_timer->start();
         return;
     }
+
     m_timer->stop();
 }
 
@@ -494,6 +501,7 @@ void StatusIndicator::setColor(const QColor& color) {
     if (color == m_color) {
         return;
     }
+
     m_color = color;
     update();
 }
@@ -502,6 +510,7 @@ void StatusIndicator::setSelectionInk(const QColor& ink) {
     if (ink == m_selectionInk) {
         return;
     }
+
     m_selectionInk = ink;
     update();
 }
@@ -533,6 +542,7 @@ void setItemGlyph(QTreeWidgetItem* item, int column, IconName name, ThemeColor r
 // A selected item is painted in the accent, so the glyph beside its name switches to the ink that reads on it.
 void repaintTreeGlyphs(QTreeWidget* tree, const Theme& theme) {
     QTreeWidgetItemIterator entry(tree);
+
     while (*entry != nullptr) {
         QTreeWidgetItem* item = *entry;
         for (int column = 0; column < tree->columnCount(); ++column) {
@@ -674,6 +684,7 @@ void sortComboBoxItems(QComboBox* box) {
 
     QVector<QPair<QString, QVariant>> items;
     items.reserve(box->count());
+
     for (int index = 0; index < box->count(); ++index) {
         items.append({box->itemText(index), box->itemData(index)});
     }
@@ -688,13 +699,16 @@ void sortComboBoxItems(QComboBox* box) {
 
     const QSignalBlocker blocker(box);
     box->clear();
+
     for (const auto& item : items) {
         box->addItem(item.first, item.second);
     }
+
     if (box->isEditable()) {
         box->setCurrentText(selectedText);
         return;
     }
+
     box->setCurrentIndex(std::max(0, box->findData(selectedData)));
 }
 
@@ -739,6 +753,7 @@ void addSettingsRow(QFormLayout* form, const QString& label, QWidget* field) {
     // A control that carries text grows to the readable width and still shrinks with a narrow window.
     const QSizePolicy::Policy horizontal = field->sizePolicy().horizontalPolicy();
     const bool carriesText = horizontal != QSizePolicy::Fixed && horizontal != QSizePolicy::Minimum;
+
     if (carriesText) {
         field->setMinimumWidth(theme.metric(ThemeMetric::SettingsControlMinimumWidth));
         field->setMaximumWidth(theme.metric(ThemeMetric::SettingsControlMaximumWidth));
@@ -800,6 +815,7 @@ void showDialogWindow(QDialog* dialog, const QString& title) {
 // The minimum size of a dialog carries the message, so the surface grows and the fields above it keep their room.
 void growDialogToContents(QDialog* dialog) {
     QLayout* layout = dialog->layout();
+
     if (layout == nullptr) {
         return;
     }
@@ -846,9 +862,11 @@ QString localTimestamp(const QDateTime& utcTimestamp) {
 
 int longestWordWidth(const QString& text, const QFontMetrics& metrics) {
     int longest = 0;
+
     for (const auto& word : text.split(QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts)) {
         longest = std::max(longest, metrics.horizontalAdvance(word));
     }
+
     return longest;
 }
 

@@ -51,9 +51,11 @@ utils::Result<QJsonObject> AiProviderCatalogHelper::parseDocument(const QByteArr
 
     QJsonParseError parseError;
     const QJsonDocument document = QJsonDocument::fromJson(contents, &parseError);
+
     if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
         return utils::Result<QJsonObject>::failure(invalid(QStringLiteral("The AI catalog file is not a catalog"), parseError.errorString()));
     }
+
     return utils::Result<QJsonObject>::success(document.object());
 }
 
@@ -78,6 +80,7 @@ std::optional<ModelTrait> AiProviderCatalogHelper::traitFromIdentifier(const QSt
     if (identifier == QStringLiteral("system-prompt")) {
         return ModelTrait::SystemPrompt;
     }
+
     return std::nullopt;
 }
 
@@ -94,6 +97,7 @@ QString modelTraitIdentifier(ModelTrait trait) {
     case ModelTrait::SystemPrompt:
         return QStringLiteral("system-prompt");
     }
+
     Q_UNREACHABLE_RETURN(QStringLiteral("sampling"));
 }
 
@@ -104,6 +108,7 @@ std::optional<WireProtocol> AiProviderCatalogHelper::protocolFromIdentifier(cons
     if (identifier == QStringLiteral("openai-compatible")) {
         return WireProtocol::OpenAiCompatible;
     }
+
     return std::nullopt;
 }
 
@@ -117,6 +122,7 @@ std::optional<ParameterType> AiProviderCatalogHelper::parameterTypeFromIdentifie
     if (identifier == QStringLiteral("enumeration")) {
         return ParameterType::Enumeration;
     }
+
     return std::nullopt;
 }
 
@@ -126,6 +132,7 @@ utils::Result<QSet<ModelTrait>> AiProviderCatalogHelper::traitSet(const QJsonVal
     }
 
     QSet<ModelTrait> traits;
+
     for (const auto& declared : value.toArray()) {
         const auto trait = traitFromIdentifier(declared.toString());
         if (!trait.has_value()) {
@@ -137,6 +144,7 @@ utils::Result<QSet<ModelTrait>> AiProviderCatalogHelper::traitSet(const QJsonVal
     if (traits.contains(ModelTrait::Sampling) && traits.contains(ModelTrait::Reasoning)) {
         return utils::Result<QSet<ModelTrait>>::failure(invalid(QStringLiteral("The declared traits combine sampling and reasoning"), detail));
     }
+
     return utils::Result<QSet<ModelTrait>>::success(traits);
 }
 
@@ -146,12 +154,14 @@ utils::Result<QStringList> AiProviderCatalogHelper::stringList(const QJsonValue&
     }
 
     QStringList values;
+
     for (const auto& entry : value.toArray()) {
         if (!entry.isString() || entry.toString().isEmpty() || values.contains(entry.toString())) {
             return utils::Result<QStringList>::failure(invalid(QStringLiteral("The declared list carries an invalid entry"), detail));
         }
         values.append(entry.toString());
     }
+
     return utils::Result<QStringList>::success(values);
 }
 
@@ -162,12 +172,14 @@ utils::Result<QMap<QString, QString>> AiProviderCatalogHelper::stringMap(const Q
 
     QMap<QString, QString> values;
     const QJsonObject document = value.toObject();
+
     for (auto entry = document.constBegin(); entry != document.constEnd(); ++entry) {
         if (entry.key().isEmpty() || !entry.value().isString()) {
             return utils::Result<QMap<QString, QString>>::failure(invalid(QStringLiteral("The declared map carries an invalid entry"), detail));
         }
         values.insert(entry.key(), entry.value().toString());
     }
+
     return utils::Result<QMap<QString, QString>>::success(values);
 }
 
@@ -177,6 +189,7 @@ utils::Result<QVector<ParameterOption>> AiProviderCatalogHelper::parameterOption
     }
 
     QVector<ParameterOption> options;
+
     for (const auto& entry : value.toArray()) {
         const QJsonObject document = entry.toObject();
         ParameterOption option;
@@ -189,6 +202,7 @@ utils::Result<QVector<ParameterOption>> AiProviderCatalogHelper::parameterOption
         }
         options.append(option);
     }
+
     return utils::Result<QVector<ParameterOption>>::success(options);
 }
 
@@ -200,17 +214,20 @@ utils::Result<void> AiProviderCatalogHelper::boundedNumber(const QJsonObject& do
     descriptor.minimum = document.value(QStringLiteral("minimum")).toDouble();
     descriptor.maximum = document.value(QStringLiteral("maximum")).toDouble();
     const double value = descriptor.defaultValue.toDouble(descriptor.minimum - 1.0);
+
     if (descriptor.minimum > descriptor.maximum || !descriptor.defaultValue.isDouble() || value < descriptor.minimum || value > descriptor.maximum) {
         return utils::Result<void>::failure(invalid(QStringLiteral("The numeric parameter default is outside its bounds"), detail));
     }
     if (descriptor.type == ParameterType::Integer && value != static_cast<double>(descriptor.defaultValue.toInteger())) {
         return utils::Result<void>::failure(invalid(QStringLiteral("The integer parameter default is not whole"), detail));
     }
+
     return utils::Result<void>::success();
 }
 
 utils::Result<ParameterDescriptor> AiProviderCatalogHelper::parameter(const QJsonObject& document, const QString& providerId) {
     const QSet<QString> known{QStringLiteral("id"), QStringLiteral("title"), QStringLiteral("type"), QStringLiteral("field"), QStringLiteral("trait"), QStringLiteral("boundByModelOutput"), QStringLiteral("modelMaximumWhenZero"), QStringLiteral("minimum"), QStringLiteral("maximum"), QStringLiteral("default"), QStringLiteral("options")};
+
     if (!hasKnownKeys(document, known)) {
         return utils::Result<ParameterDescriptor>::failure(invalid(QStringLiteral("A declared parameter carries an unknown value"), providerId));
     }
@@ -221,9 +238,11 @@ utils::Result<ParameterDescriptor> AiProviderCatalogHelper::parameter(const QJso
     const bool typed = readSettingsText(document, QStringLiteral("id"), descriptor.id) && readSettingsText(document, QStringLiteral("title"), descriptor.titleKey) && readSettingsText(document, QStringLiteral("field"), descriptor.field) && readSettingsText(document, QStringLiteral("type"), type) && readSettingsText(document, QStringLiteral("trait"), trait) && readSettingsBool(document, QStringLiteral("boundByModelOutput"), descriptor.boundByModelOutput) && readSettingsBool(document, QStringLiteral("modelMaximumWhenZero"), descriptor.modelMaximumWhenZero);
     const auto parsedType = parameterTypeFromIdentifier(type);
     const QString detail = providerId + QLatin1Char('.') + descriptor.id;
+
     if (!typed || descriptor.id.isEmpty() || descriptor.titleKey.isEmpty() || descriptor.field.isEmpty() || !parsedType.has_value() || descriptor.field.split(QLatin1Char('.')).contains(QString{})) {
         return utils::Result<ParameterDescriptor>::failure(invalid(QStringLiteral("A declared parameter is invalid"), detail));
     }
+
     if (document.contains(QStringLiteral("trait"))) {
         const auto parsedTrait = traitFromIdentifier(trait);
         if (!parsedTrait.has_value()) {
@@ -235,28 +254,34 @@ utils::Result<ParameterDescriptor> AiProviderCatalogHelper::parameter(const QJso
     descriptor.type = *parsedType;
     descriptor.defaultValue = document.value(QStringLiteral("default"));
     const bool numeric = descriptor.type == ParameterType::Integer || descriptor.type == ParameterType::Number;
+
     if (!numeric && (document.contains(QStringLiteral("minimum")) || document.contains(QStringLiteral("maximum")))) {
         return utils::Result<ParameterDescriptor>::failure(invalid(QStringLiteral("A parameter that is not numeric declares bounds"), detail));
     }
     if (descriptor.type != ParameterType::Enumeration && document.contains(QStringLiteral("options"))) {
         return utils::Result<ParameterDescriptor>::failure(invalid(QStringLiteral("A parameter that is not an enumeration declares options"), detail));
     }
+
     if (numeric) {
         const auto bounds = boundedNumber(document, descriptor, detail);
         return bounds.hasValue() ? utils::Result<ParameterDescriptor>::success(descriptor) : utils::Result<ParameterDescriptor>::failure(bounds.error());
     }
 
     const auto options = parameterOptions(document.value(QStringLiteral("options")), detail);
+
     if (!options.hasValue()) {
         return utils::Result<ParameterDescriptor>::failure(options.error());
     }
+
     descriptor.options = options.value();
     // clang-format off
     const auto selected = std::find_if(descriptor.options.cbegin(), descriptor.options.cend(), [&descriptor](const ParameterOption& option) { return option.id == descriptor.defaultValue.toString(); });
     // clang-format on
+
     if (selected == descriptor.options.cend()) {
         return utils::Result<ParameterDescriptor>::failure(invalid(QStringLiteral("The enumeration default is not one of its options"), detail));
     }
+
     return utils::Result<ParameterDescriptor>::success(descriptor);
 }
 
@@ -267,6 +292,7 @@ utils::Result<QVector<ParameterDescriptor>> AiProviderCatalogHelper::parameterSe
     }
 
     QVector<ParameterDescriptor> parameters;
+
     for (const auto& entry : value.toArray()) {
         if (!entry.isObject()) {
             return utils::Result<QVector<ParameterDescriptor>>::failure(invalid(QStringLiteral("A declared parameter is not an object"), providerId));
@@ -285,11 +311,13 @@ utils::Result<QVector<ParameterDescriptor>> AiProviderCatalogHelper::parameterSe
         }
         parameters.append(descriptor.value());
     }
+
     return utils::Result<QVector<ParameterDescriptor>>::success(parameters);
 }
 
 utils::Result<ProviderDescriptor> AiProviderCatalogHelper::provider(const QJsonObject& document) {
     const QSet<QString> known{QStringLiteral("id"), QStringLiteral("title"), QStringLiteral("protocol"), QStringLiteral("baseUrl"), QStringLiteral("addressConfigurable"), QStringLiteral("apiKeyVariable"), QStringLiteral("requiresApiKey"), QStringLiteral("userDefinedTraits"), QStringLiteral("preferredModels"), QStringLiteral("requestMaxRetries"), QStringLiteral("streamIdleTimeoutMs"), QStringLiteral("headers"), QStringLiteral("queryParameters"), QStringLiteral("parameters")};
+
     if (!hasKnownKeys(document, known)) {
         return utils::Result<ProviderDescriptor>::failure(invalid(QStringLiteral("A declared provider carries an unknown value"), {}));
     }
@@ -299,6 +327,7 @@ utils::Result<ProviderDescriptor> AiProviderCatalogHelper::provider(const QJsonO
     const bool typed = readSettingsText(document, QStringLiteral("id"), descriptor.id) && readSettingsText(document, QStringLiteral("title"), descriptor.titleKey) && readSettingsText(document, QStringLiteral("protocol"), protocol) && readSettingsText(document, QStringLiteral("baseUrl"), descriptor.baseUrl) && readSettingsText(document, QStringLiteral("apiKeyVariable"), descriptor.apiKeyVariable) && readSettingsBool(document, QStringLiteral("addressConfigurable"), descriptor.addressConfigurable) && readSettingsBool(document, QStringLiteral("requiresApiKey"), descriptor.requiresApiKey) && readSettingsInteger(document, QStringLiteral("requestMaxRetries"), descriptor.requestMaxRetries) && readSettingsInteger(document, QStringLiteral("streamIdleTimeoutMs"), descriptor.streamIdleTimeoutMs);
     const auto parsedProtocol = protocolFromIdentifier(protocol);
     const QUrl address(descriptor.baseUrl);
+
     if (!typed || descriptor.id.isEmpty() || descriptor.titleKey.isEmpty() || !parsedProtocol.has_value() || !address.isValid() || address.scheme().isEmpty() || descriptor.requestMaxRetries < 0 || descriptor.requestMaxRetries > 10 || descriptor.streamIdleTimeoutMs < 1000 || descriptor.streamIdleTimeoutMs > 600000) {
         return utils::Result<ProviderDescriptor>::failure(invalid(QStringLiteral("A declared provider is invalid"), descriptor.id));
     }
@@ -309,18 +338,21 @@ utils::Result<ProviderDescriptor> AiProviderCatalogHelper::provider(const QJsonO
 
     descriptor.protocol = *parsedProtocol;
     const auto traits = traitSet(document.value(QStringLiteral("userDefinedTraits")), descriptor.id);
+
     if (!traits.hasValue()) {
         return utils::Result<ProviderDescriptor>::failure(traits.error());
     }
     if (!traits.value().contains(ModelTrait::FunctionCalling)) {
         return utils::Result<ProviderDescriptor>::failure(invalid(QStringLiteral("A provider declares a user-defined model that calls no tool"), descriptor.id));
     }
+
     descriptor.userDefinedModelTraits = traits.value();
 
     const auto preferred = stringList(document.value(QStringLiteral("preferredModels")), descriptor.id);
     const auto headers = stringMap(document.value(QStringLiteral("headers")), descriptor.id);
     const auto queries = stringMap(document.value(QStringLiteral("queryParameters")), descriptor.id);
     const auto parameters = parameterSet(document.value(QStringLiteral("parameters")), descriptor.id);
+
     if (!preferred.hasValue() || !headers.hasValue() || !queries.hasValue() || !parameters.hasValue()) {
         return utils::Result<ProviderDescriptor>::failure(!preferred.hasValue() ? preferred.error() : (!headers.hasValue() ? headers.error() : (!queries.hasValue() ? queries.error() : parameters.error())));
     }
@@ -334,6 +366,7 @@ utils::Result<ProviderDescriptor> AiProviderCatalogHelper::provider(const QJsonO
 
 utils::Result<AiLimits> AiProviderCatalogHelper::limits(const QJsonObject& document) {
     const QSet<QString> known{QStringLiteral("repeatedToolCallLimit"), QStringLiteral("summaryMaximumTokens"), QStringLiteral("toolDeadlineMs"), QStringLiteral("requestTimeoutMs"), QStringLiteral("discoveryTimeoutMs"), QStringLiteral("serverStartTimeoutMs"), QStringLiteral("scheduleWakeupMs"), QStringLiteral("maximumAgentIterations"), QStringLiteral("maximumCommandTimeoutSeconds"), QStringLiteral("maximumParallelExecutions"), QStringLiteral("maximumSamplingTokens"), QStringLiteral("maximumRequestDelayMs"), QStringLiteral("maximumRequestsPerMinute"), QStringLiteral("maximumConcurrentRequests"), QStringLiteral("retryBackoffMs"), QStringLiteral("maximumRetryBackoffMs")};
+
     if (!hasExactKeys(document, known)) {
         return utils::Result<AiLimits>::failure(invalid(QStringLiteral("The AI catalog limits are incomplete"), {}));
     }
@@ -367,15 +400,18 @@ utils::Result<AiLimits> AiProviderCatalogHelper::limits(const QJsonObject& docum
     values.maximumConcurrentRequests = read(QStringLiteral("maximumConcurrentRequests"), 1, 1024);
     values.retryBackoffMs = read(QStringLiteral("retryBackoffMs"), 100, 60000);
     values.maximumRetryBackoffMs = read(QStringLiteral("maximumRetryBackoffMs"), 1000, 600000);
+
     if (!valid) {
         return utils::Result<AiLimits>::failure(invalid(QStringLiteral("The AI catalog limits are invalid"), {}));
     }
+
     return utils::Result<AiLimits>::success(values);
 }
 
 // The model list is data, so a model is added by one line in the catalog file and never by interface code.
 utils::Result<QVector<ModelDescriptor>> AiProviderCatalogHelper::importedModels(const QJsonArray& entries, const QString& providerId) {
     QVector<ModelDescriptor> models;
+
     for (const auto& value : entries) {
         const QJsonObject entry = value.toObject();
         if (!hasKnownKeys(entry, {QStringLiteral("id"), QStringLiteral("name"), QStringLiteral("context"), QStringLiteral("output"), QStringLiteral("traits")})) {
@@ -400,11 +436,13 @@ utils::Result<QVector<ModelDescriptor>> AiProviderCatalogHelper::importedModels(
         }
         models.append(model);
     }
+
     return utils::Result<QVector<ModelDescriptor>>::success(models);
 }
 
 utils::Result<void> AiProviderCatalogHelper::mergeImportedModels(QVector<ProviderDescriptor>& providers, const QByteArray& modelsDocument) {
     const auto document = parseDocument(modelsDocument);
+
     if (!document.hasValue()) {
         return utils::Result<void>::failure(document.error());
     }
@@ -413,6 +451,7 @@ utils::Result<void> AiProviderCatalogHelper::mergeImportedModels(QVector<Provide
     }
 
     const QJsonObject declared = document.value().value(QStringLiteral("providers")).toObject();
+
     for (auto entry = declared.constBegin(); entry != declared.constEnd(); ++entry) {
         // clang-format off
         const auto position = std::find_if(providers.begin(), providers.end(), [&entry](const ProviderDescriptor& provider) { return provider.id == entry.key(); });
@@ -446,11 +485,13 @@ utils::Result<void> AiProviderCatalogHelper::mergeImportedModels(QVector<Provide
             }
         }
     }
+
     return utils::Result<void>::success();
 }
 
 utils::Result<AiCatalog> loadAiCatalog(const QByteArray& providersDocument, const QByteArray& modelsDocument) {
     const auto document = AiProviderCatalogHelper::parseDocument(providersDocument);
+
     if (!document.hasValue()) {
         return utils::Result<AiCatalog>::failure(document.error());
     }
@@ -459,12 +500,14 @@ utils::Result<AiCatalog> loadAiCatalog(const QByteArray& providersDocument, cons
     }
 
     const auto declaredLimits = AiProviderCatalogHelper::limits(document.value().value(QStringLiteral("limits")).toObject());
+
     if (!declaredLimits.hasValue()) {
         return utils::Result<AiCatalog>::failure(declaredLimits.error());
     }
 
     AiCatalog catalog;
     catalog.limits = declaredLimits.value();
+
     for (const auto& entry : document.value().value(QStringLiteral("providers")).toArray()) {
         if (!entry.isObject()) {
             return utils::Result<AiCatalog>::failure(AiProviderCatalogHelper::invalid(QStringLiteral("A declared provider is not an object"), {}));
@@ -492,9 +535,11 @@ utils::Result<AiCatalog> loadAiCatalog(const QByteArray& providersDocument, cons
 
 LoadedAiCatalog AiProviderCatalogHelper::load() {
     const auto loaded = loadAiCatalog(resourceContents(QStringLiteral(":/slotdeck/ai/assets/providers.json")), resourceContents(QStringLiteral(":/slotdeck/ai/assets/models.json")));
+
     if (!loaded.hasValue()) {
         return {{}, utils::Result<void>::failure(loaded.error())};
     }
+
     return {loaded.value(), utils::Result<void>::success()};
 }
 
@@ -522,6 +567,7 @@ const ProviderDescriptor* findProvider(const QString& providerId) {
             return &provider;
         }
     }
+
     return nullptr;
 }
 
@@ -531,6 +577,7 @@ const ModelDescriptor* findModel(const ProviderDescriptor& provider, const QStri
             return &model;
         }
     }
+
     return nullptr;
 }
 
@@ -545,6 +592,7 @@ QVector<ParameterDescriptor> applicableParameters(const ProviderDescriptor& prov
     const QSet<ModelTrait> traits = modelTraits(provider, modelId);
     const ModelDescriptor* model = findModel(provider, modelId);
     QVector<ParameterDescriptor> applicable;
+
     for (const auto& parameter : provider.parameters) {
         if (parameter.requiredTrait.has_value() && !traits.contains(parameter.requiredTrait.value())) {
             continue;
@@ -558,14 +606,17 @@ QVector<ParameterDescriptor> applicableParameters(const ProviderDescriptor& prov
         }
         applicable.append(descriptor);
     }
+
     return applicable;
 }
 
 QJsonObject defaultParameters(const ProviderDescriptor& provider, const QString& modelId) {
     QJsonObject defaults;
+
     for (const auto& parameter : applicableParameters(provider, modelId)) {
         defaults.insert(parameter.id, parameter.defaultValue);
     }
+
     return defaults;
 }
 
@@ -576,6 +627,7 @@ std::optional<ParameterDescriptor> outputBudgetParameter(const ProviderDescripto
             return parameter;
         }
     }
+
     return std::nullopt;
 }
 

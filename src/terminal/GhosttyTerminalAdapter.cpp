@@ -112,14 +112,17 @@ bool GhosttyTerminalAdapterHelper::unsupportedKeyText(std::uint32_t codepoint) {
 
 QByteArray GhosttyTerminalAdapterHelper::normalizedKeyText(const QKeyEvent& event) {
     const auto codepoints = event.text().toUcs4();
+
     if (std::ranges::any_of(codepoints, unsupportedKeyText)) {
         return {};
     }
+
     return event.text().toUtf8();
 }
 
 std::uint32_t GhosttyTerminalAdapterHelper::unshiftedCodepoint(const QKeyEvent& event, const QByteArray& normalizedText) {
     const std::uint32_t mapped = unshiftedCodepointForKey(event.key());
+
     if (mapped != 0) {
         return mapped;
     }
@@ -127,6 +130,7 @@ std::uint32_t GhosttyTerminalAdapterHelper::unshiftedCodepoint(const QKeyEvent& 
     if (normalizedText.isEmpty()) {
         return 0;
     }
+
     const auto codepoints = QString::fromUtf8(normalizedText).toUcs4();
     return codepoints.size() == 1 ? codepoints.first() : 0;
 }
@@ -148,6 +152,7 @@ bool GhosttyTerminalAdapterHelper::standsAlone(const QString& text, qsizetype fr
 
 QString GhosttyTerminalAdapterHelper::acceptedAddress(const QString& word) {
     QString address = word.trimmed();
+
     while (!address.isEmpty() && addressTrailing.contains(address.back().toLatin1())) {
         address.chop(1);
     }
@@ -185,53 +190,73 @@ utils::Result<void> GhosttyTerminalAdapter::initialize(int columns, int rows, in
     if (!validTerminalGrid(columns, rows) || !validTerminalCellSize(cellWidth, cellHeight)) {
         return utils::Result<void>::failure({"ghostty_size_invalid", "The terminal dimensions are invalid", QStringLiteral("%1x%2 at %3x%4").arg(columns).arg(rows).arg(cellWidth).arg(cellHeight)});
     }
+
     release();
 
     GhosttyResult result = ghostty_terminal_new(nullptr, &m_terminal, static_cast<std::uint16_t>(columns), static_cast<std::uint16_t>(rows));
+
     if (result != GHOSTTY_SUCCESS) {
         return GhosttyTerminalAdapterHelper::ghosttyFailure(QStringLiteral("Terminal initialization failed"), result);
     }
+
     result = ghostty_render_state_new(nullptr, &m_renderState);
+
     if (result != GHOSTTY_SUCCESS) {
         release();
         return GhosttyTerminalAdapterHelper::ghosttyFailure(QStringLiteral("Render state initialization failed"), result);
     }
+
     result = ghostty_render_state_row_iterator_new(nullptr, &m_rowIterator);
+
     if (result != GHOSTTY_SUCCESS) {
         release();
         return GhosttyTerminalAdapterHelper::ghosttyFailure(QStringLiteral("Row iterator initialization failed"), result);
     }
+
     result = ghostty_render_state_row_cells_new(nullptr, &m_rowCells);
+
     if (result != GHOSTTY_SUCCESS) {
         release();
         return GhosttyTerminalAdapterHelper::ghosttyFailure(QStringLiteral("Cell iterator initialization failed"), result);
     }
+
     result = ghostty_key_encoder_new(nullptr, &m_keyEncoder);
+
     if (result != GHOSTTY_SUCCESS) {
         release();
         return GhosttyTerminalAdapterHelper::ghosttyFailure(QStringLiteral("Key encoder initialization failed"), result);
     }
+
     result = ghostty_key_event_new(nullptr, &m_keyEvent);
+
     if (result != GHOSTTY_SUCCESS) {
         release();
         return GhosttyTerminalAdapterHelper::ghosttyFailure(QStringLiteral("Key event initialization failed"), result);
     }
+
     result = ghostty_mouse_encoder_new(nullptr, &m_mouseEncoder);
+
     if (result != GHOSTTY_SUCCESS) {
         release();
         return GhosttyTerminalAdapterHelper::ghosttyFailure(QStringLiteral("Mouse encoder initialization failed"), result);
     }
+
     result = ghostty_mouse_event_new(nullptr, &m_mouseEvent);
+
     if (result != GHOSTTY_SUCCESS) {
         release();
         return GhosttyTerminalAdapterHelper::ghosttyFailure(QStringLiteral("Mouse event initialization failed"), result);
     }
+
     result = ghostty_selection_gesture_new(nullptr, &m_gesture);
+
     if (result != GHOSTTY_SUCCESS) {
         release();
         return GhosttyTerminalAdapterHelper::ghosttyFailure(QStringLiteral("Selection gesture initialization failed"), result);
     }
+
     const auto gestureEvents = std::array<std::pair<GhosttySelectionGestureEvent*, GhosttySelectionGestureEventType>, 4>{{{&m_pressEvent, GHOSTTY_SELECTION_GESTURE_EVENT_TYPE_PRESS}, {&m_dragEvent, GHOSTTY_SELECTION_GESTURE_EVENT_TYPE_DRAG}, {&m_releaseEvent, GHOSTTY_SELECTION_GESTURE_EVENT_TYPE_RELEASE}, {&m_autoscrollEvent, GHOSTTY_SELECTION_GESTURE_EVENT_TYPE_AUTOSCROLL_TICK}}};
+
     for (const auto& gestureEvent : gestureEvents) {
         result = ghostty_selection_gesture_event_new(nullptr, gestureEvent.first, gestureEvent.second);
         if (result != GHOSTTY_SUCCESS) {
@@ -253,26 +278,33 @@ utils::Result<void> GhosttyTerminalAdapter::initialize(int columns, int rows, in
     ghostty_terminal_set(m_terminal, GHOSTTY_TERMINAL_OPT_DESKTOP_NOTIFICATION, reinterpret_cast<const void*>(desktopNotificationCallback));
 
     result = ghostty_terminal_set(m_terminal, GHOSTTY_TERMINAL_OPT_SCROLLBACK_MAX_BYTES, &scrollbackMaximumBytes);
+
     if (result != GHOSTTY_SUCCESS) {
         release();
         return GhosttyTerminalAdapterHelper::ghosttyFailure(QStringLiteral("Scrollback byte limit configuration failed"), result);
     }
+
     result = ghostty_terminal_set(m_terminal, GHOSTTY_TERMINAL_OPT_SCROLLBACK_MAX_LINES, &scrollbackMaximumLines);
+
     if (result != GHOSTTY_SUCCESS) {
         release();
         return GhosttyTerminalAdapterHelper::ghosttyFailure(QStringLiteral("Scrollback line limit configuration failed"), result);
     }
+
     result = ghostty_terminal_resize(m_terminal, static_cast<std::uint16_t>(columns), static_cast<std::uint16_t>(rows), static_cast<std::uint32_t>(cellWidth), static_cast<std::uint32_t>(cellHeight));
+
     if (result != GHOSTTY_SUCCESS) {
         release();
         return GhosttyTerminalAdapterHelper::ghosttyFailure(QStringLiteral("Terminal cell geometry configuration failed"), result);
     }
 
     const auto themeResult = applyTheme(theme);
+
     if (!themeResult.hasValue()) {
         release();
         return themeResult;
     }
+
     ghostty_render_state_update(m_renderState, m_terminal);
     return utils::Result<void>::success();
 }
@@ -283,9 +315,11 @@ utils::Result<void> GhosttyTerminalAdapter::setTheme(const domain::TerminalTheme
     }
 
     const auto result = applyTheme(theme);
+
     if (result.hasValue()) {
         ghostty_render_state_update(m_renderState, m_terminal);
     }
+
     return result;
 }
 
@@ -293,6 +327,7 @@ void GhosttyTerminalAdapter::write(const QByteArray& bytes) {
     if (m_terminal == nullptr || bytes.isEmpty()) {
         return;
     }
+
     ghostty_terminal_vt_write(m_terminal, reinterpret_cast<const std::uint8_t*>(bytes.constData()), static_cast<std::size_t>(bytes.size()));
     ghostty_render_state_update(m_renderState, m_terminal);
 }
@@ -306,6 +341,7 @@ utils::Result<void> GhosttyTerminalAdapter::resize(int columns, int rows, int ce
     }
 
     const auto result = ghostty_terminal_resize(m_terminal, static_cast<std::uint16_t>(columns), static_cast<std::uint16_t>(rows), static_cast<std::uint32_t>(cellWidth), static_cast<std::uint32_t>(cellHeight));
+
     if (result != GHOSTTY_SUCCESS) {
         return GhosttyTerminalAdapterHelper::ghosttyFailure(QStringLiteral("Terminal resize failed"), result);
     }
@@ -333,6 +369,7 @@ utils::Result<QByteArray> GhosttyTerminalAdapter::encodeKey(const QKeyEvent& eve
     std::array<char, 128> stackBuffer{};
     std::size_t outputSize = 0;
     GhosttyResult result = ghostty_key_encoder_encode(m_keyEncoder, m_keyEvent, stackBuffer.data(), stackBuffer.size(), &outputSize);
+
     if (result == GHOSTTY_SUCCESS) {
         return utils::Result<QByteArray>::success(QByteArray(stackBuffer.data(), static_cast<qsizetype>(outputSize)));
     }
@@ -342,9 +379,11 @@ utils::Result<QByteArray> GhosttyTerminalAdapter::encodeKey(const QKeyEvent& eve
 
     QByteArray output(static_cast<qsizetype>(outputSize), Qt::Uninitialized);
     result = ghostty_key_encoder_encode(m_keyEncoder, m_keyEvent, output.data(), static_cast<std::size_t>(output.size()), &outputSize);
+
     if (result != GHOSTTY_SUCCESS) {
         return utils::Result<QByteArray>::failure({"ghostty_key_encoding_failed", "The key event could not be encoded", QString::number(static_cast<int>(result))});
     }
+
     output.resize(static_cast<qsizetype>(outputSize));
     return utils::Result<QByteArray>::success(std::move(output));
 }
@@ -353,6 +392,7 @@ void GhosttyTerminalAdapter::scrollViewport(qint64 rows) {
     if (m_terminal == nullptr || rows == 0) {
         return;
     }
+
     GhosttyTerminalScrollViewport behavior{};
     behavior.tag = GHOSTTY_SCROLL_VIEWPORT_DELTA;
     behavior.value.delta = static_cast<intptr_t>(rows);
@@ -364,6 +404,7 @@ void GhosttyTerminalAdapter::scrollToRow(quint64 row) {
     if (m_terminal == nullptr) {
         return;
     }
+
     GhosttyTerminalScrollViewport behavior{};
     behavior.tag = GHOSTTY_SCROLL_VIEWPORT_ROW;
     behavior.value.row = static_cast<std::size_t>(row);
@@ -375,6 +416,7 @@ void GhosttyTerminalAdapter::scrollToTop() {
     if (m_terminal == nullptr) {
         return;
     }
+
     GhosttyTerminalScrollViewport behavior{};
     behavior.tag = GHOSTTY_SCROLL_VIEWPORT_TOP;
     ghostty_terminal_scroll_viewport(m_terminal, behavior);
@@ -385,6 +427,7 @@ void GhosttyTerminalAdapter::scrollToBottom() {
     if (m_terminal == nullptr) {
         return;
     }
+
     GhosttyTerminalScrollViewport behavior{};
     behavior.tag = GHOSTTY_SCROLL_VIEWPORT_BOTTOM;
     ghostty_terminal_scroll_viewport(m_terminal, behavior);
@@ -393,6 +436,7 @@ void GhosttyTerminalAdapter::scrollToBottom() {
 
 TerminalRenderSnapshot GhosttyTerminalAdapter::snapshot() {
     TerminalRenderSnapshot output;
+
     if (m_renderState == nullptr) {
         return output;
     }
@@ -405,6 +449,7 @@ TerminalRenderSnapshot GhosttyTerminalAdapter::snapshot() {
     output.rows = rows;
 
     GhosttyTerminalScrollbar scrollbar{};
+
     if (m_terminal != nullptr && ghostty_terminal_get(m_terminal, GHOSTTY_TERMINAL_DATA_SCROLLBAR, &scrollbar) == GHOSTTY_SUCCESS) {
         output.scrollTotal = scrollbar.total;
         output.scrollOffset = scrollbar.offset;
@@ -413,6 +458,7 @@ TerminalRenderSnapshot GhosttyTerminalAdapter::snapshot() {
 
     GhosttyRenderStateColors colors{};
     colors.size = sizeof(GhosttyRenderStateColors);
+
     if (ghostty_render_state_colors_get(m_renderState, &colors) == GHOSTTY_SUCCESS) {
         output.foreground = GhosttyTerminalAdapterHelper::toColor(colors.foreground);
         output.background = GhosttyTerminalAdapterHelper::toColor(colors.background);
@@ -423,6 +469,7 @@ TerminalRenderSnapshot GhosttyTerminalAdapter::snapshot() {
     ghostty_render_state_get(m_renderState, GHOSTTY_RENDER_STATE_DATA_CURSOR_VISIBLE, &output.cursorVisible);
     ghostty_render_state_get(m_renderState, GHOSTTY_RENDER_STATE_DATA_CURSOR_BLINKING, &output.cursorBlinking);
     ghostty_render_state_get(m_renderState, GHOSTTY_RENDER_STATE_DATA_CURSOR_VIEWPORT_HAS_VALUE, &cursorInViewport);
+
     if (cursorInViewport) {
         std::uint16_t cursorColumn = 0;
         std::uint16_t cursorRow = 0;
@@ -443,6 +490,7 @@ TerminalRenderSnapshot GhosttyTerminalAdapter::snapshot() {
 
     int row = 0;
     output.cells.reserve(output.columns * output.rows);
+
     while (ghostty_render_state_row_iterator_next(m_rowIterator)) {
         if (ghostty_render_state_row_get(m_rowIterator, GHOSTTY_RENDER_STATE_ROW_DATA_CELLS, &m_rowCells) != GHOSTTY_SUCCESS) {
             ++row;
@@ -511,10 +559,13 @@ QString GhosttyTerminalAdapter::title() const {
     if (m_terminal == nullptr) {
         return {};
     }
+
     GhosttyString value{};
+
     if (ghostty_terminal_get(m_terminal, GHOSTTY_TERMINAL_DATA_TITLE, &value) != GHOSTTY_SUCCESS) {
         return {};
     }
+
     return QString::fromUtf8(reinterpret_cast<const char*>(value.ptr), static_cast<qsizetype>(value.len));
 }
 
@@ -522,10 +573,13 @@ QString GhosttyTerminalAdapter::workingDirectory() const {
     if (m_terminal == nullptr) {
         return {};
     }
+
     GhosttyString value{};
+
     if (ghostty_terminal_get(m_terminal, GHOSTTY_TERMINAL_DATA_PWD, &value) != GHOSTTY_SUCCESS) {
         return {};
     }
+
     return QString::fromUtf8(reinterpret_cast<const char*>(value.ptr), static_cast<qsizetype>(value.len));
 }
 
@@ -551,6 +605,7 @@ bool GhosttyTerminalAdapter::sizeCallback(GhosttyTerminal terminal, void*, Ghost
     std::uint16_t rows = 0;
     std::uint32_t widthPixels = 0;
     std::uint32_t heightPixels = 0;
+
     if (size == nullptr || ghostty_terminal_get(terminal, GHOSTTY_TERMINAL_DATA_COLS, &columns) != GHOSTTY_SUCCESS || ghostty_terminal_get(terminal, GHOSTTY_TERMINAL_DATA_ROWS, &rows) != GHOSTTY_SUCCESS) {
         return false;
     }
@@ -568,6 +623,7 @@ bool GhosttyTerminalAdapter::sizeCallback(GhosttyTerminal terminal, void*, Ghost
 // A program that adapts its colours to the terminal is told which side the background is on.
 bool GhosttyTerminalAdapter::colorSchemeCallback(GhosttyTerminal terminal, void*, GhosttyColorScheme* scheme) {
     GhosttyColorRgb background{};
+
     if (scheme == nullptr || ghostty_terminal_get(terminal, GHOSTTY_TERMINAL_DATA_COLOR_BACKGROUND, &background) != GHOSTTY_SUCCESS) {
         return false;
     }
@@ -602,12 +658,14 @@ void GhosttyTerminalAdapter::bellCallback(GhosttyTerminal, void* userData) {
 // The clipboard belongs to the user, so a program only reaches it while the user allows it and only with text.
 GhosttyClipboardWriteResult GhosttyTerminalAdapter::clipboardWriteCallback(GhosttyTerminal, void* userData, const GhosttyClipboardWrite* write) {
     auto* adapter = static_cast<GhosttyTerminalAdapter*>(userData);
+
     if (!adapter->m_clipboardWriteAllowed) {
         return GHOSTTY_CLIPBOARD_WRITE_RESULT_DENIED;
     }
     if (write == nullptr || write->location != GHOSTTY_CLIPBOARD_LOCATION_STANDARD) {
         return GHOSTTY_CLIPBOARD_WRITE_RESULT_UNSUPPORTED;
     }
+
     if (write->contents_len == 0) {
         emit adapter->clipboardWriteRequested(QString());
         return GHOSTTY_CLIPBOARD_WRITE_RESULT_SUCCESS;
@@ -644,6 +702,7 @@ void GhosttyTerminalAdapter::setClipboardWriteAllowed(bool allowed) {
 
 GhosttyKey GhosttyTerminalAdapter::mapKey(const QKeyEvent& event) {
     const int key = event.key();
+
     if (event.modifiers().testFlag(Qt::KeypadModifier)) {
         if (key >= Qt::Key_0 && key <= Qt::Key_9) {
             return static_cast<GhosttyKey>(GHOSTTY_KEY_NUMPAD_0 + (key - Qt::Key_0));
@@ -881,6 +940,7 @@ utils::Result<QByteArray> GhosttyTerminalAdapter::encodePaste(const QByteArray& 
     }
 
     GhosttyTerminalModeConfig bracketed{GHOSTTY_MODE_BRACKETED_PASTE, false};
+
     if (ghostty_terminal_get(m_terminal, GHOSTTY_TERMINAL_DATA_MODE, &bracketed) != GHOSTTY_SUCCESS) {
         return utils::Result<QByteArray>::failure({"ghostty_mode_unavailable", "The terminal paste mode could not be read", {}});
     }
@@ -889,6 +949,7 @@ utils::Result<QByteArray> GhosttyTerminalAdapter::encodePaste(const QByteArray& 
     std::size_t written = 0;
     QByteArray encoded(payload.size() + pasteMarkerReserve, '\0');
     const GhosttyResult result = ghostty_paste_encode(payload.data(), static_cast<std::size_t>(payload.size()), bracketed.value, encoded.data(), static_cast<std::size_t>(encoded.size()), &written);
+
     if (result != GHOSTTY_SUCCESS) {
         return utils::Result<QByteArray>::failure(GhosttyTerminalAdapterHelper::ghosttyFailure(QStringLiteral("encode paste"), result).error());
     }
@@ -909,6 +970,7 @@ bool GhosttyTerminalAdapter::modeEnabled(GhosttyMode mode) const {
     }
 
     GhosttyTerminalModeConfig config{mode, false};
+
     if (ghostty_terminal_get(m_terminal, GHOSTTY_TERMINAL_DATA_MODE, &config) != GHOSTTY_SUCCESS) {
         return false;
     }
@@ -922,6 +984,7 @@ bool GhosttyTerminalAdapter::programWantsMouse() const {
     }
 
     bool tracking = false;
+
     if (ghostty_terminal_get(m_terminal, GHOSTTY_TERMINAL_DATA_MOUSE_TRACKING, &tracking) != GHOSTTY_SUCCESS) {
         return false;
     }
@@ -940,6 +1003,7 @@ bool GhosttyTerminalAdapter::gridReferenceAt(const QPointF& position, GhosttyGri
     std::uint16_t rows = 0;
     std::uint32_t widthPixels = 0;
     std::uint32_t heightPixels = 0;
+
     if (m_terminal == nullptr || ghostty_terminal_get(m_terminal, GHOSTTY_TERMINAL_DATA_COLS, &columns) != GHOSTTY_SUCCESS || ghostty_terminal_get(m_terminal, GHOSTTY_TERMINAL_DATA_ROWS, &rows) != GHOSTTY_SUCCESS) {
         return false;
     }
@@ -962,6 +1026,7 @@ bool GhosttyTerminalAdapter::gestureGeometry(GhosttySelectionGestureGeometry& ge
     std::uint16_t columns = 0;
     std::uint32_t widthPixels = 0;
     std::uint32_t heightPixels = 0;
+
     if (m_terminal == nullptr || ghostty_terminal_get(m_terminal, GHOSTTY_TERMINAL_DATA_COLS, &columns) != GHOSTTY_SUCCESS || ghostty_terminal_get(m_terminal, GHOSTTY_TERMINAL_DATA_WIDTH_PX, &widthPixels) != GHOSTTY_SUCCESS) {
         return false;
     }
@@ -983,6 +1048,7 @@ void GhosttyTerminalAdapter::installSelection(const GhosttySelection* selection)
     }
 
     ghostty_terminal_set(m_terminal, GHOSTTY_TERMINAL_OPT_SELECTION, selection);
+
     if (m_renderState != nullptr) {
         ghostty_render_state_update(m_renderState, m_terminal);
     }
@@ -992,10 +1058,12 @@ utils::Result<void> GhosttyTerminalAdapter::applyGesture(GhosttySelectionGesture
     GhosttySelection selection{};
     selection.size = sizeof(GhosttySelection);
     const GhosttyResult result = ghostty_selection_gesture_event(m_gesture, m_terminal, event, &selection);
+
     if (result == GHOSTTY_SUCCESS) {
         installSelection(&selection);
         return utils::Result<void>::success();
     }
+
     if (result == GHOSTTY_NO_VALUE) {
         return utils::Result<void>::success();
     }
@@ -1009,6 +1077,7 @@ utils::Result<void> GhosttyTerminalAdapter::beginSelection(const QPointF& positi
     }
 
     GhosttyGridRef reference{};
+
     if (!gridReferenceAt(position, reference)) {
         return utils::Result<void>::failure({"ghostty_position_invalid", "The pointer is outside the terminal grid", {}});
     }
@@ -1033,6 +1102,7 @@ utils::Result<void> GhosttyTerminalAdapter::extendSelection(const QPointF& posit
 
     GhosttyGridRef reference{};
     GhosttySelectionGestureGeometry geometry{};
+
     if (!gridReferenceAt(position, reference) || !gestureGeometry(geometry)) {
         return utils::Result<void>::failure({"ghostty_position_invalid", "The pointer is outside the terminal grid", {}});
     }
@@ -1062,6 +1132,7 @@ SelectionAutoscroll GhosttyTerminalAdapter::selectionAutoscroll() const {
     }
 
     GhosttySelectionGestureAutoscroll autoscroll = GHOSTTY_SELECTION_GESTURE_AUTOSCROLL_NONE;
+
     if (ghostty_selection_gesture_get(m_gesture, m_terminal, GHOSTTY_SELECTION_GESTURE_DATA_AUTOSCROLL, &autoscroll) != GHOSTTY_SUCCESS) {
         return SelectionAutoscroll::None;
     }
@@ -1078,6 +1149,7 @@ SelectionAutoscroll GhosttyTerminalAdapter::selectionAutoscroll() const {
 
 utils::Result<void> GhosttyTerminalAdapter::advanceSelectionAutoscroll(const QPointF& position, bool rectangle) {
     const SelectionAutoscroll direction = selectionAutoscroll();
+
     if (direction == SelectionAutoscroll::None) {
         return utils::Result<void>::success();
     }
@@ -1085,6 +1157,7 @@ utils::Result<void> GhosttyTerminalAdapter::advanceSelectionAutoscroll(const QPo
     scrollViewport(direction == SelectionAutoscroll::Up ? -1 : 1);
 
     GhosttySelectionGestureGeometry geometry{};
+
     if (!gestureGeometry(geometry)) {
         return utils::Result<void>::failure({"ghostty_geometry_unavailable", "The terminal geometry could not be read", {}});
     }
@@ -1093,6 +1166,7 @@ utils::Result<void> GhosttyTerminalAdapter::advanceSelectionAutoscroll(const QPo
     std::uint16_t rows = 0;
     ghostty_terminal_get(m_terminal, GHOSTTY_TERMINAL_DATA_COLS, &columns);
     ghostty_terminal_get(m_terminal, GHOSTTY_TERMINAL_DATA_ROWS, &rows);
+
     if (columns == 0 || rows == 0) {
         return utils::Result<void>::failure({"ghostty_geometry_unavailable", "The terminal geometry could not be read", {}});
     }
@@ -1117,6 +1191,7 @@ QString GhosttyTerminalAdapter::screenText() const {
 
     GhosttySelection selection{};
     selection.size = sizeof(GhosttySelection);
+
     if (ghostty_terminal_select_all(m_terminal, &selection) != GHOSTTY_SUCCESS) {
         return {};
     }
@@ -1126,12 +1201,14 @@ QString GhosttyTerminalAdapter::screenText() const {
 
 QList<SearchMatch> GhosttyTerminalAdapter::search(const QString& query, bool caseSensitive, bool wholeWord, int maximum) const {
     QList<SearchMatch> matches;
+
     if (query.isEmpty() || maximum <= 0) {
         return matches;
     }
 
     const Qt::CaseSensitivity sensitivity = caseSensitive ? Qt::CaseSensitive : Qt::CaseInsensitive;
     const QStringList rows = screenText().split(QLatin1Char('\n'));
+
     for (qsizetype row = 0; row < rows.size() && matches.size() < maximum; ++row) {
         const QString& text = rows.at(row);
         qsizetype from = text.indexOf(query, 0, sensitivity);
@@ -1154,6 +1231,7 @@ bool GhosttyTerminalAdapter::revealMatch(const SearchMatch& match) {
 
     GhosttyGridRef start{};
     GhosttyGridRef end{};
+
     if (!screenReference(match.row, match.column, start) || !screenReference(match.row, match.column + match.length - 1, end)) {
         return false;
     }
@@ -1166,6 +1244,7 @@ bool GhosttyTerminalAdapter::revealMatch(const SearchMatch& match) {
     installSelection(&selection);
 
     GhosttyTerminalScrollbar scrollbar{};
+
     if (ghostty_terminal_get(m_terminal, GHOSTTY_TERMINAL_DATA_SCROLLBAR, &scrollbar) != GHOSTTY_SUCCESS || scrollbar.len == 0) {
         return true;
     }
@@ -1192,6 +1271,7 @@ void GhosttyTerminalAdapter::selectAll() {
 
     GhosttySelection selection{};
     selection.size = sizeof(GhosttySelection);
+
     if (ghostty_terminal_select_all(m_terminal, &selection) != GHOSTTY_SUCCESS) {
         return;
     }
@@ -1201,12 +1281,14 @@ void GhosttyTerminalAdapter::selectAll() {
 
 QString GhosttyTerminalAdapter::addressAt(const QPointF& position) const {
     GhosttyGridRef reference{};
+
     if (!gridReferenceAt(position, reference)) {
         return {};
     }
 
     std::array<std::uint8_t, hyperlinkMaximumBytes> buffer{};
     std::size_t written = 0;
+
     if (ghostty_grid_ref_hyperlink_uri(&reference, buffer.data(), buffer.size(), &written) == GHOSTTY_SUCCESS && written > 0) {
         return QString::fromUtf8(reinterpret_cast<const char*>(buffer.data()), static_cast<qsizetype>(written));
     }
@@ -1226,6 +1308,7 @@ QString GhosttyTerminalAdapter::wordAt(const GhosttyGridRef& reference) const {
 
     GhosttySelection selection{};
     selection.size = sizeof(GhosttySelection);
+
     if (ghostty_terminal_select_word(m_terminal, &options, &selection) != GHOSTTY_SUCCESS) {
         return {};
     }
@@ -1281,6 +1364,7 @@ QString GhosttyTerminalAdapter::formatSelection(const GhosttySelection* selectio
 
     std::uint8_t* buffer = nullptr;
     std::size_t length = 0;
+
     if (ghostty_terminal_selection_format_alloc(m_terminal, nullptr, options, &buffer, &length) != GHOSTTY_SUCCESS) {
         return {};
     }
@@ -1341,6 +1425,7 @@ utils::Result<QByteArray> GhosttyTerminalAdapter::encodeMouse(const MouseReport&
     std::uint32_t widthPixels = 0;
     std::uint32_t heightPixels = 0;
     const bool geometryRead = ghostty_terminal_get(m_terminal, GHOSTTY_TERMINAL_DATA_COLS, &columns) == GHOSTTY_SUCCESS && ghostty_terminal_get(m_terminal, GHOSTTY_TERMINAL_DATA_ROWS, &rows) == GHOSTTY_SUCCESS && ghostty_terminal_get(m_terminal, GHOSTTY_TERMINAL_DATA_WIDTH_PX, &widthPixels) == GHOSTTY_SUCCESS && ghostty_terminal_get(m_terminal, GHOSTTY_TERMINAL_DATA_HEIGHT_PX, &heightPixels) == GHOSTTY_SUCCESS;
+
     if (!geometryRead || columns == 0 || rows == 0) {
         return utils::Result<QByteArray>::failure({"ghostty_geometry_unavailable", "The terminal geometry could not be read", {}});
     }
@@ -1359,11 +1444,13 @@ utils::Result<QByteArray> GhosttyTerminalAdapter::encodeMouse(const MouseReport&
     ghostty_mouse_encoder_setopt(m_mouseEncoder, GHOSTTY_MOUSE_ENCODER_OPT_TRACK_LAST_CELL, &trackLastCell);
 
     ghostty_mouse_event_set_action(m_mouseEvent, mapMouseAction(report.action));
+
     if (report.button == MouseButton::None) {
         ghostty_mouse_event_clear_button(m_mouseEvent);
     } else {
         ghostty_mouse_event_set_button(m_mouseEvent, mapMouseButton(report.button));
     }
+
     ghostty_mouse_event_set_mods(m_mouseEvent, mapModifiers(report.modifiers));
     const GhosttyMousePosition position{static_cast<float>(report.position.x()), static_cast<float>(report.position.y())};
     ghostty_mouse_event_set_position(m_mouseEvent, position);
@@ -1371,6 +1458,7 @@ utils::Result<QByteArray> GhosttyTerminalAdapter::encodeMouse(const MouseReport&
     std::array<char, 64> stackBuffer{};
     std::size_t written = 0;
     GhosttyResult result = ghostty_mouse_encoder_encode(m_mouseEncoder, m_mouseEvent, stackBuffer.data(), stackBuffer.size(), &written);
+
     if (result == GHOSTTY_SUCCESS) {
         return utils::Result<QByteArray>::success(QByteArray(stackBuffer.data(), static_cast<qsizetype>(written)));
     }
@@ -1380,6 +1468,7 @@ utils::Result<QByteArray> GhosttyTerminalAdapter::encodeMouse(const MouseReport&
 
     QByteArray output(static_cast<qsizetype>(written), Qt::Uninitialized);
     result = ghostty_mouse_encoder_encode(m_mouseEncoder, m_mouseEvent, output.data(), static_cast<std::size_t>(output.size()), &written);
+
     if (result != GHOSTTY_SUCCESS) {
         return utils::Result<QByteArray>::failure({"ghostty_mouse_encoding_failed", "The mouse event could not be encoded", QString::number(static_cast<int>(result))});
     }
@@ -1392,6 +1481,7 @@ utils::Result<QByteArray> GhosttyTerminalAdapter::encodeFocus(bool gained) const
     std::array<char, 16> buffer{};
     std::size_t written = 0;
     const GhosttyResult result = ghostty_focus_encode(gained ? GHOSTTY_FOCUS_GAINED : GHOSTTY_FOCUS_LOST, buffer.data(), buffer.size(), &written);
+
     if (result != GHOSTTY_SUCCESS) {
         return utils::Result<QByteArray>::failure({"ghostty_focus_encoding_failed", "The focus event could not be encoded", QString::number(static_cast<int>(result))});
     }
@@ -1401,27 +1491,35 @@ utils::Result<QByteArray> GhosttyTerminalAdapter::encodeFocus(bool gained) const
 
 GhosttyMods GhosttyTerminalAdapter::mapModifiers(Qt::KeyboardModifiers modifiers) {
     GhosttyMods output = 0;
+
     if (modifiers.testFlag(Qt::ShiftModifier)) {
         output |= GHOSTTY_MODS_SHIFT;
     }
+
     if (modifiers.testFlag(Qt::AltModifier)) {
         output |= GHOSTTY_MODS_ALT;
     }
 
 #ifdef Q_OS_MACOS
+
     if (modifiers.testFlag(Qt::MetaModifier)) {
         output |= GHOSTTY_MODS_CTRL;
     }
+
     if (modifiers.testFlag(Qt::ControlModifier)) {
         output |= GHOSTTY_MODS_SUPER;
     }
+
 #else
+
     if (modifiers.testFlag(Qt::ControlModifier)) {
         output |= GHOSTTY_MODS_CTRL;
     }
+
     if (modifiers.testFlag(Qt::MetaModifier)) {
         output |= GHOSTTY_MODS_SUPER;
     }
+
 #endif
     return output;
 }
@@ -1433,18 +1531,22 @@ utils::Result<void> GhosttyTerminalAdapter::applyTheme(const domain::TerminalThe
 
     std::array<GhosttyColorRgb, 256> palette{};
     ghostty_color_palette_default(palette.data());
+
     for (std::size_t index = 0; index < theme.ansiPalette.size(); ++index) {
         palette[index] = GhosttyTerminalAdapterHelper::toGhosttyColor(theme.ansiPalette[index]);
     }
+
     ghostty_color_palette_generate(palette.data(), nullptr, &background, &foreground, true, palette.data());
 
     const std::array<std::pair<GhosttyTerminalOption, const void*>, 4> options = {std::pair{GHOSTTY_TERMINAL_OPT_COLOR_FOREGROUND, static_cast<const void*>(&foreground)}, std::pair{GHOSTTY_TERMINAL_OPT_COLOR_BACKGROUND, static_cast<const void*>(&background)}, std::pair{GHOSTTY_TERMINAL_OPT_COLOR_CURSOR, static_cast<const void*>(&cursor)}, std::pair{GHOSTTY_TERMINAL_OPT_COLOR_PALETTE, static_cast<const void*>(palette.data())}};
+
     for (const auto& [option, value] : options) {
         const auto result = ghostty_terminal_set(m_terminal, option, value);
         if (result != GHOSTTY_SUCCESS) {
             return GhosttyTerminalAdapterHelper::ghosttyFailure(QStringLiteral("Terminal theme update failed"), result);
         }
     }
+
     return utils::Result<void>::success();
 }
 
@@ -1455,38 +1557,47 @@ void GhosttyTerminalAdapter::release() {
             *gestureEvent = nullptr;
         }
     }
+
     if (m_gesture != nullptr) {
         ghostty_selection_gesture_free(m_gesture, m_terminal);
         m_gesture = nullptr;
     }
+
     if (m_mouseEvent != nullptr) {
         ghostty_mouse_event_free(m_mouseEvent);
         m_mouseEvent = nullptr;
     }
+
     if (m_mouseEncoder != nullptr) {
         ghostty_mouse_encoder_free(m_mouseEncoder);
         m_mouseEncoder = nullptr;
     }
+
     if (m_keyEvent != nullptr) {
         ghostty_key_event_free(m_keyEvent);
         m_keyEvent = nullptr;
     }
+
     if (m_keyEncoder != nullptr) {
         ghostty_key_encoder_free(m_keyEncoder);
         m_keyEncoder = nullptr;
     }
+
     if (m_rowCells != nullptr) {
         ghostty_render_state_row_cells_free(m_rowCells);
         m_rowCells = nullptr;
     }
+
     if (m_rowIterator != nullptr) {
         ghostty_render_state_row_iterator_free(m_rowIterator);
         m_rowIterator = nullptr;
     }
+
     if (m_renderState != nullptr) {
         ghostty_render_state_free(m_renderState);
         m_renderState = nullptr;
     }
+
     if (m_terminal != nullptr) {
         ghostty_terminal_free(m_terminal);
         m_terminal = nullptr;

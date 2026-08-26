@@ -47,21 +47,26 @@ class AiTaskRepositoryHelper final {
 
 bool AiTaskRepositoryHelper::readPosition(const QVariant& value, int& output) {
     qint64 position = -1;
+
     if (!persistence::readStoredInteger(value, position) || position < 0 || position > std::numeric_limits<int>::max()) {
         return false;
     }
+
     output = static_cast<int>(position);
     return true;
 }
 
 utils::Result<std::optional<TaskSchedule>> AiTaskRepositoryHelper::parseSchedule(const QVariantMap& row) {
     const QString kindName = row.value(QStringLiteral("schedule_kind")).toString();
+
     if (kindName.isEmpty()) {
         return utils::Result<std::optional<TaskSchedule>>::success(std::nullopt);
     }
+
     const auto kind = AiTaskRepository::parseScheduleKind(kindName);
     qint64 enabled = -1;
     qint64 intervalSeconds = 0;
+
     if (!kind.hasValue() || !persistence::readStoredInteger(row.value(QStringLiteral("schedule_enabled")), enabled) || (enabled != 0 && enabled != 1) || (!row.value(QStringLiteral("interval_seconds")).isNull() && !persistence::readStoredInteger(row.value(QStringLiteral("interval_seconds")), intervalSeconds))) {
         return utils::Result<std::optional<TaskSchedule>>::failure(!kind.hasValue() ? kind.error() : utils::Error{"ai_tasks_schedule_invalid", "A stored AI task schedule is invalid", kindName});
     }
@@ -89,36 +94,44 @@ std::optional<McpTransport> AiTaskRepositoryHelper::mcpTransportFromIdentifier(c
     if (value == QStringLiteral("stdio")) {
         return McpTransport::Stdio;
     }
+
     return std::nullopt;
 }
 
 utils::Result<McpServerDescriptor> AiTaskRepositoryHelper::validateMcpServer(const McpServerDescriptor& server) {
     const bool stdio = server.transport == McpTransport::Stdio;
+
     if (server.id.trimmed().isEmpty() || server.samplingMaximumTokens < 0 || (stdio ? server.command.trimmed().isEmpty() : server.url.trimmed().isEmpty())) {
         return utils::Result<McpServerDescriptor>::failure({"ai_mcp_server_invalid", "The MCP server is invalid", server.id});
     }
+
     return utils::Result<McpServerDescriptor>::success(server);
 }
 
 utils::Result<ExecutionSettings> AiTaskRepositoryHelper::executionFromDocument(const QJsonObject& document, const ExecutionSettings& declared) {
     ExecutionSettings settings = declared;
+
     if (!hasKnownKeys(document, {QStringLiteral("maximumIterations"), QStringLiteral("commandTimeoutSeconds"), QStringLiteral("parallelExecutions"), QStringLiteral("chatFontSize")}) || !readSettingsInteger(document, QStringLiteral("maximumIterations"), settings.maximumIterations) || !readSettingsInteger(document, QStringLiteral("commandTimeoutSeconds"), settings.commandTimeoutSeconds) || !readSettingsInteger(document, QStringLiteral("parallelExecutions"), settings.parallelExecutions) || !readSettingsInteger(document, QStringLiteral("chatFontSize"), settings.chatFontSize) || !ui::validContentFontSize(settings.chatFontSize) || settings.maximumIterations < 0 || settings.commandTimeoutSeconds < 0 || settings.parallelExecutions < 0) {
         return utils::Result<ExecutionSettings>::failure({"ai_tasks_settings_invalid", "The AI execution settings are invalid", {}});
     }
+
     return utils::Result<ExecutionSettings>::success(settings);
 }
 
 utils::Result<SearchSettings> AiTaskRepositoryHelper::searchFromDocument(const QJsonObject& document, const SearchSettings& declared) {
     SearchSettings settings = declared;
     QString provider = searchProviderIdentifier(settings.provider);
+
     if (!hasKnownKeys(document, {QStringLiteral("provider"), QStringLiteral("instanceUrl"), QStringLiteral("apiKey")}) || !readSettingsText(document, QStringLiteral("provider"), provider) || !readSettingsText(document, QStringLiteral("instanceUrl"), settings.instanceUrl) || !readSettingsText(document, QStringLiteral("apiKey"), settings.apiKey)) {
         return utils::Result<SearchSettings>::failure({"ai_tasks_settings_invalid", "The AI search settings are invalid", {}});
     }
 
     const auto parsed = searchProviderFromIdentifier(provider);
+
     if (!parsed.has_value()) {
         return utils::Result<SearchSettings>::failure({"ai_tasks_settings_invalid", "The AI search service is unknown", provider});
     }
+
     settings.provider = *parsed;
     return utils::Result<SearchSettings>::success(settings);
 }
@@ -126,14 +139,17 @@ utils::Result<SearchSettings> AiTaskRepositoryHelper::searchFromDocument(const Q
 utils::Result<SpeechSettings> AiTaskRepositoryHelper::speechFromDocument(const QJsonObject& document, const SpeechSettings& declared) {
     SpeechSettings settings = declared;
     QString provider = speechProviderIdentifier(settings.provider);
+
     if (!hasKnownKeys(document, {QStringLiteral("provider"), QStringLiteral("voiceId"), QStringLiteral("apiKey")}) || !readSettingsText(document, QStringLiteral("provider"), provider) || !readSettingsText(document, QStringLiteral("voiceId"), settings.voiceId) || !readSettingsText(document, QStringLiteral("apiKey"), settings.apiKey)) {
         return utils::Result<SpeechSettings>::failure({"ai_tasks_settings_invalid", "The AI speech settings are invalid", {}});
     }
 
     const auto parsed = speechProviderFromIdentifier(provider);
+
     if (!parsed.has_value()) {
         return utils::Result<SpeechSettings>::failure({"ai_tasks_settings_invalid", "The AI speech service is unknown", provider});
     }
+
     settings.provider = *parsed;
     return utils::Result<SpeechSettings>::success(settings);
 }
@@ -164,6 +180,7 @@ utils::Result<AiAgent> validateAgent(const AiAgent& agent) {
     }
 
     const QStringList unknown = unknownPromptTags(validated.systemPrompt);
+
     if (!unknown.isEmpty()) {
         return utils::Result<AiAgent>::failure({"ai_agent_tag_unknown", "The system prompt carries a tag nobody declares", unknown.join(QStringLiteral(", "))});
     }
@@ -174,6 +191,7 @@ utils::Result<AiAgent> validateAgent(const AiAgent& agent) {
 // An agent names a connection, so a set that names one nobody configured is refused where it is read.
 utils::Result<void> validateAgentSet(const QVector<AiAgent>& agents, const QVector<ModelConnection>& connections) {
     QSet<QString> identifiers;
+
     for (const auto& agent : agents) {
         const auto validated = validateAgent(agent);
         if (!validated.hasValue()) {
@@ -198,6 +216,7 @@ QJsonObject AiTaskRepositoryHelper::agentDocument(const AiAgent& agent) {
 utils::Result<AiAgent> AiTaskRepositoryHelper::agentFromDocument(const QJsonObject& document) {
     AiAgent agent;
     const bool typed = hasKnownKeys(document, {QStringLiteral("id"), QStringLiteral("name"), QStringLiteral("description"), QStringLiteral("systemPrompt"), QStringLiteral("connectionKey"), QStringLiteral("maximumIterations")}) && readSettingsText(document, QStringLiteral("id"), agent.id) && readSettingsText(document, QStringLiteral("name"), agent.name) && readSettingsText(document, QStringLiteral("description"), agent.description) && readSettingsText(document, QStringLiteral("systemPrompt"), agent.systemPrompt) && readSettingsText(document, QStringLiteral("connectionKey"), agent.connectionKey) && readSettingsInteger(document, QStringLiteral("maximumIterations"), agent.maximumIterations);
+
     if (!typed) {
         return utils::Result<AiAgent>::failure({"ai_agent_invalid", "The stored AI agent is invalid", agent.id});
     }
@@ -213,6 +232,7 @@ QJsonObject AiTaskRepositoryHelper::rateLimitDocument(const ProviderRateLimit& l
 utils::Result<ProviderRateLimit> AiTaskRepositoryHelper::rateLimitFromDocument(const QJsonObject& document) {
     ProviderRateLimit limit;
     const bool typed = hasKnownKeys(document, {QStringLiteral("providerId"), QStringLiteral("minimumIntervalMs"), QStringLiteral("maximumRequestsPerMinute"), QStringLiteral("maximumConcurrentRequests")}) && readSettingsText(document, QStringLiteral("providerId"), limit.providerId) && readSettingsInteger(document, QStringLiteral("minimumIntervalMs"), limit.minimumIntervalMs) && readSettingsInteger(document, QStringLiteral("maximumRequestsPerMinute"), limit.maximumRequestsPerMinute) && readSettingsInteger(document, QStringLiteral("maximumConcurrentRequests"), limit.maximumConcurrentRequests);
+
     if (!typed || findProvider(limit.providerId) == nullptr) {
         return utils::Result<ProviderRateLimit>::failure({"ai_rate_limit_invalid", "The stored provider rate limit is invalid", limit.providerId});
     }
@@ -234,9 +254,11 @@ utils::Result<ModelConnection> AiTaskRepositoryHelper::connectionFromDocument(co
 
     ModelConnection connection;
     const bool typed = readSettingsText(document, QStringLiteral("providerId"), connection.providerId) && readSettingsText(document, QStringLiteral("modelId"), connection.modelId) && readSettingsText(document, QStringLiteral("displayName"), connection.displayName) && readSettingsText(document, QStringLiteral("apiKey"), connection.apiKey) && readSettingsText(document, QStringLiteral("address"), connection.address) && readSettingsObject(document, QStringLiteral("parameters"), connection.parameters) && readSettingsObject(document, QStringLiteral("extraParameters"), connection.extraParameters);
+
     if (!typed) {
         return utils::Result<ModelConnection>::failure({"ai_tasks_settings_invalid", "A stored AI connection is invalid", connection.providerId});
     }
+
     return validateConnection(connection);
 }
 
@@ -249,6 +271,7 @@ utils::Result<McpServerDescriptor> AiTaskRepositoryHelper::mcpServerFromDocument
     QString transport = AiTaskRepositoryHelper::mcpTransportIdentifier(server.transport);
     const bool typed = readSettingsText(document, QStringLiteral("id"), server.id) && readSettingsText(document, QStringLiteral("transport"), transport) && readSettingsText(document, QStringLiteral("command"), server.command) && readSettingsText(document, QStringLiteral("workdir"), server.workdir) && readSettingsText(document, QStringLiteral("url"), server.url) && readSettingsText(document, QStringLiteral("apiKey"), server.apiKey) && readSettingsBool(document, QStringLiteral("samplingEnabled"), server.samplingEnabled) && readSettingsInteger(document, QStringLiteral("samplingMaximumTokens"), server.samplingMaximumTokens) && readSettingsTextList(document, QStringLiteral("arguments"), server.arguments) && readSettingsTextList(document, QStringLiteral("roots"), server.roots);
     const auto parsedTransport = AiTaskRepositoryHelper::mcpTransportFromIdentifier(transport);
+
     if (!typed || !parsedTransport.has_value()) {
         return utils::Result<McpServerDescriptor>::failure({"ai_tasks_settings_invalid", "A stored MCP server is invalid", server.id});
     }
@@ -288,6 +311,7 @@ AiSettings AiTaskRepositoryHelper::settingsFromDocument(const QJsonObject& docum
             settings.connections.append(connection.value());
         }
     }
+
     if (findConnection(settings.connections, settings.defaultConnectionKey) == nullptr) {
         settings.defaultConnectionKey.clear();
     }
@@ -319,29 +343,39 @@ AiSettings AiTaskRepositoryHelper::settingsFromDocument(const QJsonObject& docum
     if (const auto execution = AiTaskRepositoryHelper::executionFromDocument(executionDocument, settings.execution); execution.hasValue()) {
         settings.execution = execution.value();
     }
+
     if (const auto search = AiTaskRepositoryHelper::searchFromDocument(searchDocument, settings.search); search.hasValue()) {
         settings.search = search.value();
     }
+
     if (const auto speech = AiTaskRepositoryHelper::speechFromDocument(speechDocument, settings.speech); speech.hasValue()) {
         settings.speech = speech.value();
     }
+
     return settings;
 }
 
 QJsonObject AiTaskRepositoryHelper::settingsDocument(const AiSettings& settings) {
     QJsonArray connections;
+
     for (const auto& connection : settings.connections) {
         connections.append(AiTaskRepositoryHelper::connectionDocument(connection));
     }
+
     QJsonArray servers;
+
     for (const auto& server : settings.mcpServers) {
         servers.append(AiTaskRepositoryHelper::mcpServerDocument(server));
     }
+
     QJsonArray rateLimits;
+
     for (const auto& limit : settings.rateLimits) {
         rateLimits.append(AiTaskRepositoryHelper::rateLimitDocument(limit));
     }
+
     QJsonArray agents;
+
     for (const auto& agent : settings.agents) {
         agents.append(AiTaskRepositoryHelper::agentDocument(agent));
     }
@@ -362,6 +396,7 @@ QFuture<utils::Result<void>> AiTaskRepository::saveSettings(const AiSettings& se
 
 utils::Result<QVector<AiWorkspace>> AiTaskRepository::workspaces() const {
     const auto rows = m_host.queryBootstrapDatabase(QStringLiteral("SELECT id, name, position, active, created_at_utc, updated_at_utc FROM ai_tasks_workspaces ORDER BY position"));
+
     if (!rows.hasValue()) {
         return utils::Result<QVector<AiWorkspace>>::failure(rows.error());
     }
@@ -369,6 +404,7 @@ utils::Result<QVector<AiWorkspace>> AiTaskRepository::workspaces() const {
     QVector<AiWorkspace> values;
     QSet<QString> identifiers;
     int activeWorkspaces = 0;
+
     for (const auto& row : rows.value()) {
         AiWorkspace workspace;
         workspace.id = row.value(QStringLiteral("id")).toString();
@@ -383,20 +419,24 @@ utils::Result<QVector<AiWorkspace>> AiTaskRepository::workspaces() const {
         activeWorkspaces += workspace.active ? 1 : 0;
         values.append(std::move(workspace));
     }
+
     if (!values.isEmpty() && activeWorkspaces != 1) {
         return utils::Result<QVector<AiWorkspace>>::failure({"ai_tasks_workspace_invalid", "The stored AI workspace selection is invalid", {}});
     }
+
     return utils::Result<QVector<AiWorkspace>>::success(std::move(values));
 }
 
 utils::Result<QVector<AiTask>> AiTaskRepository::tasks() const {
     const auto rows = m_host.queryBootstrapDatabase(QStringLiteral("SELECT ai_tasks_tasks.id, ai_tasks_tasks.workspace_id, ai_tasks_tasks.title, ai_tasks_tasks.description, ai_tasks_tasks.prompt, ai_tasks_tasks.issue_url, ai_tasks_tasks.agent_id, ai_tasks_tasks.execution_kind, ai_tasks_tasks.workdir, ai_tasks_tasks.command, ai_tasks_tasks.command_timeout_seconds, ai_tasks_tasks.column_name, ai_tasks_tasks.position, ai_tasks_tasks.created_at_utc, ai_tasks_tasks.updated_at_utc, ai_tasks_schedules.schedule_kind, ai_tasks_schedules.enabled AS schedule_enabled, ai_tasks_schedules.once_at_utc, ai_tasks_schedules.interval_seconds, ai_tasks_schedules.cron_expression, ai_tasks_schedules.time_zone_id, ai_tasks_schedules.next_run_at_utc, ai_tasks_schedules.last_triggered_at_utc FROM ai_tasks_tasks LEFT JOIN ai_tasks_schedules ON ai_tasks_schedules.task_id = ai_tasks_tasks.id ORDER BY ai_tasks_tasks.workspace_id, ai_tasks_tasks.column_name, ai_tasks_tasks.position, ai_tasks_tasks.id"));
+
     if (!rows.hasValue()) {
         return utils::Result<QVector<AiTask>>::failure(rows.error());
     }
 
     QVector<AiTask> values;
     QSet<QString> identifiers;
+
     for (const auto& row : rows.value()) {
         const auto column = parseColumn(row.value(QStringLiteral("column_name")).toString());
         if (!column.hasValue()) {
@@ -432,16 +472,19 @@ utils::Result<QVector<AiTask>> AiTaskRepository::tasks() const {
         identifiers.insert(task.id);
         values.append(std::move(task));
     }
+
     return utils::Result<QVector<AiTask>>::success(std::move(values));
 }
 
 utils::Result<QStringList> AiTaskRepository::queuedTaskIds() const {
     const auto rows = m_host.queryBootstrapDatabase(QStringLiteral("SELECT task_id, queued_at_utc FROM ai_tasks_queue ORDER BY queued_at_utc, task_id"));
+
     if (!rows.hasValue()) {
         return utils::Result<QStringList>::failure(rows.error());
     }
 
     QStringList identifiers;
+
     for (const auto& row : rows.value()) {
         const QString taskId = row.value(QStringLiteral("task_id")).toString();
         if (taskId.isEmpty() || identifiers.contains(taskId) || !persistence::validStoredTimestamp(persistence::parseStoredTimestamp(row.value(QStringLiteral("queued_at_utc"))))) {
@@ -449,6 +492,7 @@ utils::Result<QStringList> AiTaskRepository::queuedTaskIds() const {
         }
         identifiers.append(taskId);
     }
+
     return utils::Result<QStringList>::success(std::move(identifiers));
 }
 
@@ -456,11 +500,13 @@ utils::Result<QStringList> AiTaskRepository::queuedTaskIds() const {
 // SQLite answers a bare column of a query carrying one maximum from the row that holds it, which is what names the newest run of each task.
 utils::Result<QHash<QString, TaskOutcome>> AiTaskRepository::lastOutcomes() const {
     const auto rows = m_host.queryBootstrapDatabase(QStringLiteral("SELECT task_id, status, error_message, stop_reason, MAX(started_at_utc) FROM ai_tasks_executions GROUP BY task_id"));
+
     if (!rows.hasValue()) {
         return utils::Result<QHash<QString, TaskOutcome>>::failure(rows.error());
     }
 
     QHash<QString, TaskOutcome> outcomes;
+
     for (const auto& row : rows.value()) {
         const QString taskId = row.value(QStringLiteral("task_id")).toString();
         const auto status = parseExecutionStatus(row.value(QStringLiteral("status")).toString());
@@ -470,6 +516,7 @@ utils::Result<QHash<QString, TaskOutcome>> AiTaskRepository::lastOutcomes() cons
         }
         outcomes.insert(taskId, {status.value(), row.value(QStringLiteral("error_message")).toString(), stopReason.value()});
     }
+
     return utils::Result<QHash<QString, TaskOutcome>>::success(std::move(outcomes));
 }
 
@@ -480,6 +527,7 @@ QString searchProviderIdentifier(SearchProvider provider) {
     if (provider == SearchProvider::SearxNg) {
         return QStringLiteral("searxng");
     }
+
     return QStringLiteral("brave");
 }
 
@@ -493,6 +541,7 @@ std::optional<SearchProvider> searchProviderFromIdentifier(const QString& identi
     if (identifier == QStringLiteral("searxng")) {
         return SearchProvider::SearxNg;
     }
+
     return std::nullopt;
 }
 
@@ -504,6 +553,7 @@ QString searchAddress(const SearchSettings& settings) {
     if (settings.provider == SearchProvider::SearxNg) {
         return settings.instanceUrl;
     }
+
     return QStringLiteral("https://api.search.brave.com");
 }
 
@@ -514,6 +564,7 @@ QString searchProviderKeyVariable(SearchProvider provider) {
     if (provider == SearchProvider::SearxNg) {
         return QString{};
     }
+
     return QStringLiteral("BRAVE_API_KEY");
 }
 
@@ -537,6 +588,7 @@ std::optional<SpeechProvider> speechProviderFromIdentifier(const QString& identi
     if (identifier == QStringLiteral("openai")) {
         return SpeechProvider::OpenAi;
     }
+
     return std::nullopt;
 }
 
@@ -557,11 +609,13 @@ QStringList speechProviderDeclaredVoices(SpeechProvider provider) {
     if (provider != SpeechProvider::OpenAi) {
         return {};
     }
+
     return {QStringLiteral("alloy"), QStringLiteral("ash"), QStringLiteral("ballad"), QStringLiteral("coral"), QStringLiteral("echo"), QStringLiteral("fable"), QStringLiteral("nova"), QStringLiteral("onyx"), QStringLiteral("sage"), QStringLiteral("shimmer")};
 }
 
 utils::Result<QVector<TaskExecution>> AiTaskRepositoryHelper::parseExecutions(const persistence::DatabaseRows& rows) {
     QVector<TaskExecution> values;
+
     for (const auto& row : rows) {
         const auto status = AiTaskRepository::parseExecutionStatus(row.value(QStringLiteral("status")).toString());
         if (!status.hasValue()) {
@@ -590,11 +644,13 @@ utils::Result<QVector<TaskExecution>> AiTaskRepositoryHelper::parseExecutions(co
         }
         values.append(std::move(execution));
     }
+
     return utils::Result<QVector<TaskExecution>>::success(std::move(values));
 }
 
 utils::Result<QVector<ExecutionLogEntry>> AiTaskRepositoryHelper::parseExecutionLogs(const persistence::DatabaseRows& rows) {
     QVector<ExecutionLogEntry> values;
+
     for (const auto& row : rows) {
         const auto level = AiTaskRepository::parseExecutionLogLevel(row.value(QStringLiteral("level")).toString());
         if (!level.hasValue()) {
@@ -617,6 +673,7 @@ utils::Result<QVector<ExecutionLogEntry>> AiTaskRepositoryHelper::parseExecution
         }
         values.append(std::move(entry));
     }
+
     return utils::Result<QVector<ExecutionLogEntry>>::success(std::move(values));
 }
 
@@ -640,6 +697,7 @@ QString AiTaskRepository::conversationRoleName(ConversationRole role) {
     case ConversationRole::Tool:
         return QStringLiteral("tool");
     }
+
     Q_UNREACHABLE_RETURN(QStringLiteral("user"));
 }
 
@@ -652,6 +710,7 @@ utils::Result<ConversationRole> AiTaskRepository::parseConversationRole(const QS
 utils::Result<QVector<ConversationMessage>> AiTaskRepositoryHelper::parseConversation(const persistence::DatabaseRows& rows) {
     QVector<ConversationMessage> messages;
     messages.reserve(rows.size());
+
     for (const auto& row : rows) {
         ConversationMessage message;
         message.id = row.value(QStringLiteral("id")).toString();
@@ -692,6 +751,7 @@ QFuture<utils::Result<QVector<ConversationMessage>>> AiTaskRepository::conversat
 
     const QString statement = beforeSequence == 0 ? QStringLiteral("SELECT id, task_id, sequence, role, content, tool_calls, tool_call_id, summarized_until, created_at_utc, image_data, image_media_type FROM ai_tasks_messages WHERE task_id = ? ORDER BY sequence DESC LIMIT %1").arg(maximumMessages) : QStringLiteral("SELECT id, task_id, sequence, role, content, tool_calls, tool_call_id, summarized_until, created_at_utc, image_data, image_media_type FROM ai_tasks_messages WHERE task_id = ? AND sequence < ? ORDER BY sequence DESC LIMIT %1").arg(maximumMessages);
     QVariantList bindings{taskId};
+
     if (beforeSequence > 0) {
         bindings.append(beforeSequence);
     }
@@ -704,11 +764,13 @@ QFuture<utils::Result<QVector<ConversationMessage>>> AiTaskRepository::conversat
 
 utils::Result<QHash<QString, qint64>> AiTaskRepository::conversationSequences() const {
     const auto rows = m_host.queryBootstrapDatabase(QStringLiteral("SELECT task_id, MAX(sequence) AS last_sequence FROM ai_tasks_messages GROUP BY task_id"));
+
     if (!rows.hasValue()) {
         return utils::Result<QHash<QString, qint64>>::failure(rows.error());
     }
 
     QHash<QString, qint64> sequences;
+
     for (const auto& row : rows.value()) {
         qint64 sequence = 0;
         const QString taskId = row.value(QStringLiteral("task_id")).toString();
@@ -724,6 +786,7 @@ utils::Result<QHash<QString, qint64>> AiTaskRepository::conversationSequences() 
 QFuture<utils::Result<void>> AiTaskRepository::appendConversation(const QVector<ConversationMessage>& messages) {
     QVector<persistence::DatabaseStatement> statements;
     statements.reserve(messages.size());
+
     for (const auto& message : messages) {
         if (message.id.isEmpty() || message.taskId.isEmpty() || message.sequence < 0 || message.summarizedUntil < 0 || !persistence::validStoredTimestamp(message.createdAtUtc)) {
             return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_conversation_invalid", "The conversation message is invalid", message.id}));
@@ -762,9 +825,11 @@ QFuture<utils::Result<void>> AiTaskRepository::createWorkspace(const AiWorkspace
     }
 
     QVector<persistence::DatabaseStatement> statements;
+
     if (workspace.active) {
         statements.append({QStringLiteral("UPDATE ai_tasks_workspaces SET active = ?"), {0}});
     }
+
     statements.append({QStringLiteral("INSERT INTO ai_tasks_workspaces(id, name, position, active, created_at_utc, updated_at_utc) VALUES(?, ?, ?, ?, ?, ?)"), {workspace.id, workspace.name, workspace.position, workspace.active ? 1 : 0, persistence::storedTimestamp(workspace.createdAtUtc), persistence::storedTimestamp(workspace.updatedAtUtc)}});
     return m_host.executeDatabaseTransaction(statements);
 }
@@ -773,6 +838,7 @@ QFuture<utils::Result<void>> AiTaskRepository::renameWorkspace(const QString& wo
     if (workspaceId.isEmpty() || name.trimmed().isEmpty() || name != name.trimmed() || !persistence::validStoredTimestamp(updatedAtUtc)) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_tasks_workspace_invalid", "The AI workspace name is invalid", workspaceId}));
     }
+
     return m_host.executeDatabaseTransaction({{QStringLiteral("UPDATE ai_tasks_workspaces SET name = ?, updated_at_utc = ? WHERE id = ?"), {name, persistence::storedTimestamp(updatedAtUtc), workspaceId}}});
 }
 
@@ -782,6 +848,7 @@ QFuture<utils::Result<void>> AiTaskRepository::removeWorkspace(const QString& wo
     }
 
     int activeWorkspaces = 0;
+
     for (int index = 0; index < remaining.size(); ++index) {
         const auto& workspace = remaining.at(index);
         if (workspace.id.isEmpty() || workspace.id == workspaceId || workspace.position != index) {
@@ -789,14 +856,17 @@ QFuture<utils::Result<void>> AiTaskRepository::removeWorkspace(const QString& wo
         }
         activeWorkspaces += workspace.active ? 1 : 0;
     }
+
     if (!remaining.isEmpty() && activeWorkspaces != 1) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_tasks_workspace_invalid", "Exactly one AI workspace must remain active", workspaceId}));
     }
 
     QVector<persistence::DatabaseStatement> statements{{QStringLiteral("DELETE FROM ai_tasks_workspaces WHERE id = ?"), {workspaceId}}};
+
     for (const auto& workspace : remaining) {
         statements.append({QStringLiteral("UPDATE ai_tasks_workspaces SET position = ?, active = ? WHERE id = ?"), {workspace.position, workspace.active ? 1 : 0, workspace.id}});
     }
+
     return m_host.executeDatabaseTransaction(statements);
 }
 
@@ -804,12 +874,14 @@ QFuture<utils::Result<void>> AiTaskRepository::activateWorkspace(const QString& 
     if (workspaceId.isEmpty()) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_tasks_workspace_invalid", "The AI workspace identifier is invalid", workspaceId}));
     }
+
     return m_host.executeDatabaseTransaction({{QStringLiteral("UPDATE ai_tasks_workspaces SET active = ?"), {0}}, {QStringLiteral("UPDATE ai_tasks_workspaces SET active = ? WHERE id = ?"), {1, workspaceId}}});
 }
 
 // One contract decides what a task must carry, because a reader stricter than its writer refuses to load what it stored.
 bool AiTaskRepository::validTask(const AiTask& task) {
     const QUrl issue(task.issueUrl);
+
     if (!task.issueUrl.isEmpty() && (!issue.isValid() || issue.host().isEmpty() || (issue.scheme() != QStringLiteral("http") && issue.scheme() != QStringLiteral("https")))) {
         return false;
     }
@@ -827,6 +899,7 @@ QFuture<utils::Result<void>> AiTaskRepository::saveTask(const AiTask& task) {
     if (!validTask(task) || task.commandTimeoutSeconds < 0 || task.position < 0 || !persistence::validStoredTimestamp(task.createdAtUtc) || !persistence::validStoredTimestamp(task.updatedAtUtc) || task.updatedAtUtc < task.createdAtUtc) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_tasks_task_invalid", "The AI task is invalid", task.id}));
     }
+
     if (task.schedule.has_value()) {
         const auto validation = validateSchedule(task.schedule.value());
         if (!validation.hasValue()) {
@@ -843,6 +916,7 @@ QFuture<utils::Result<void>> AiTaskRepository::removeTask(const QString& taskId)
     if (taskId.isEmpty()) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_tasks_task_invalid", "The AI task identifier is invalid", taskId}));
     }
+
     return m_host.executeDatabaseTransaction({{QStringLiteral("DELETE FROM ai_tasks_tasks WHERE id = ?"), {taskId}}});
 }
 
@@ -850,6 +924,7 @@ QFuture<utils::Result<void>> AiTaskRepository::moveTask(const QString& taskId, T
     if (taskId.isEmpty() || position < 0 || !persistence::validStoredTimestamp(updatedAtUtc)) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_tasks_task_invalid", "The AI task move is invalid", taskId}));
     }
+
     return m_host.executeDatabaseTransaction({{QStringLiteral("UPDATE ai_tasks_tasks SET column_name = ?, position = ?, updated_at_utc = ? WHERE id = ?"), {columnName(column), position, persistence::storedTimestamp(updatedAtUtc), taskId}}});
 }
 
@@ -857,6 +932,7 @@ QFuture<utils::Result<void>> AiTaskRepository::enqueueTask(const QString& taskId
     if (taskId.isEmpty() || !persistence::validStoredTimestamp(queuedAtUtc)) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_tasks_queue_invalid", "The AI task queue entry is invalid", taskId}));
     }
+
     if (updatedSchedule.has_value()) {
         const auto validation = validateSchedule(updatedSchedule.value());
         if (!validation.hasValue()) {
@@ -865,10 +941,12 @@ QFuture<utils::Result<void>> AiTaskRepository::enqueueTask(const QString& taskId
     }
 
     QVector<persistence::DatabaseStatement> statements{{QStringLiteral("INSERT INTO ai_tasks_queue(task_id, queued_at_utc) VALUES(?, ?)"), {taskId, persistence::storedTimestamp(queuedAtUtc)}}, {QStringLiteral("UPDATE ai_tasks_tasks SET column_name = ?, updated_at_utc = ? WHERE id = ?"), {columnName(TaskColumn::Doing), persistence::storedTimestamp(queuedAtUtc), taskId}}};
+
     if (updatedSchedule.has_value()) {
         const auto& schedule = updatedSchedule.value();
         statements.append({QStringLiteral("UPDATE ai_tasks_schedules SET enabled = ?, next_run_at_utc = ?, last_triggered_at_utc = ? WHERE task_id = ?"), {schedule.enabled ? 1 : 0, schedule.nextRunAtUtc.isValid() ? persistence::storedTimestamp(schedule.nextRunAtUtc) : QVariant{}, schedule.lastTriggeredAtUtc.isValid() ? persistence::storedTimestamp(schedule.lastTriggeredAtUtc) : QVariant{}, taskId}});
     }
+
     return m_host.executeDatabaseTransaction(statements);
 }
 
@@ -876,6 +954,7 @@ QFuture<utils::Result<void>> AiTaskRepository::cancelTask(const QString& taskId,
     if (taskId.isEmpty() || !persistence::validStoredTimestamp(cancelledAtUtc)) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_tasks_queue_invalid", "The AI task cancellation is invalid", taskId}));
     }
+
     return m_host.executeDatabaseTransaction({{QStringLiteral("DELETE FROM ai_tasks_queue WHERE task_id = ?"), {taskId}}, {QStringLiteral("UPDATE ai_tasks_tasks SET column_name = ?, updated_at_utc = ? WHERE id = ?"), {columnName(TaskColumn::Todo), persistence::storedTimestamp(cancelledAtUtc), taskId}}});
 }
 
@@ -883,6 +962,7 @@ QFuture<utils::Result<void>> AiTaskRepository::completeTask(const QString& taskI
     if (taskId.isEmpty() || !persistence::validStoredTimestamp(finishedAtUtc)) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_tasks_task_invalid", "The AI task completion is invalid", taskId}));
     }
+
     return m_host.executeDatabaseTransaction({{QStringLiteral("DELETE FROM ai_tasks_queue WHERE task_id = ?"), {taskId}}, {QStringLiteral("UPDATE ai_tasks_tasks SET column_name = ?, updated_at_utc = ? WHERE id = ?"), {columnName(column), persistence::storedTimestamp(finishedAtUtc), taskId}}});
 }
 
@@ -890,6 +970,7 @@ QFuture<utils::Result<void>> AiTaskRepository::startExecution(const TaskExecutio
     if (execution.id.isEmpty() || execution.taskId.isEmpty() || !persistence::validStoredTimestamp(execution.startedAtUtc)) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_tasks_execution_invalid", "The AI execution is invalid", execution.id}));
     }
+
     return m_host.executeDatabase(QStringLiteral("INSERT INTO ai_tasks_executions(id, task_id, status, started_at_utc, finished_at_utc, input_tokens, output_tokens, finish_reason, error_message, content, stop_reason) VALUES(?, ?, ?, ?, NULL, 0, 0, '', '', '', 'answered')"), {execution.id, execution.taskId, executionStatusName(ExecutionStatus::Running), persistence::storedTimestamp(execution.startedAtUtc)});
 }
 
@@ -897,6 +978,7 @@ QFuture<utils::Result<void>> AiTaskRepository::finishExecution(const TaskExecuti
     if (execution.id.isEmpty() || execution.status == ExecutionStatus::Running || !persistence::validStoredTimestamp(execution.startedAtUtc) || !persistence::validStoredTimestamp(execution.finishedAtUtc) || execution.finishedAtUtc < execution.startedAtUtc || execution.inputTokens < 0 || execution.outputTokens < 0) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_tasks_execution_invalid", "The AI execution is invalid", execution.id}));
     }
+
     return m_host.executeDatabase(QStringLiteral("UPDATE ai_tasks_executions SET status = ?, finished_at_utc = ?, input_tokens = ?, output_tokens = ?, finish_reason = ?, error_message = ?, content = ?, stop_reason = ? WHERE id = ?"), {executionStatusName(execution.status), persistence::storedTimestamp(execution.finishedAtUtc), execution.inputTokens, execution.outputTokens, persistence::storedText(execution.finishReason), persistence::storedText(execution.errorMessage), persistence::storedText(execution.content), agentStopReasonName(execution.stopReason), execution.id});
 }
 
@@ -904,6 +986,7 @@ QFuture<utils::Result<void>> AiTaskRepository::appendExecutionLog(const Executio
     if (entry.id.isEmpty() || entry.executionId.isEmpty() || entry.sequence < 0 || !persistence::validStoredTimestamp(entry.timestampUtc)) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"ai_tasks_execution_invalid", "The AI execution log entry is invalid", entry.id}));
     }
+
     return m_host.executeDatabase(QStringLiteral("INSERT INTO ai_tasks_logs(id, execution_id, sequence, timestamp_utc, level, kind, detail) VALUES(?, ?, ?, ?, ?, ?, ?)"), {entry.id, entry.executionId, entry.sequence, persistence::storedTimestamp(entry.timestampUtc), executionLogLevelName(entry.level), executionLogKindName(entry.kind), persistence::storedText(entry.detail)});
 }
 
@@ -918,6 +1001,7 @@ utils::Result<TaskExecutionKind> AiTaskRepository::parseTaskExecutionKind(const 
     if (value == QStringLiteral("command")) {
         return utils::Result<TaskExecutionKind>::success(TaskExecutionKind::Command);
     }
+
     return utils::Result<TaskExecutionKind>::failure({"ai_tasks_task_invalid", "A stored AI task execution kind is invalid", value});
 }
 
@@ -932,6 +1016,7 @@ QString AiTaskRepository::executionStatusName(ExecutionStatus status) {
     case ExecutionStatus::Cancelled:
         return QStringLiteral("cancelled");
     }
+
     Q_UNREACHABLE_RETURN(QStringLiteral("running"));
 }
 
@@ -950,6 +1035,7 @@ QString AiTaskRepository::agentStopReasonName(AgentStopReason reason) {
     case AgentStopReason::Failed:
         return QStringLiteral("failed");
     }
+
     Q_UNREACHABLE_RETURN(QStringLiteral("answered"));
 }
 
@@ -972,6 +1058,7 @@ utils::Result<ExecutionStatus> AiTaskRepository::parseExecutionStatus(const QStr
     if (value == QStringLiteral("cancelled")) {
         return utils::Result<ExecutionStatus>::success(ExecutionStatus::Cancelled);
     }
+
     return utils::Result<ExecutionStatus>::failure({"ai_tasks_execution_invalid", "A stored AI execution status is invalid", value});
 }
 
@@ -986,6 +1073,7 @@ QString AiTaskRepository::executionLogLevelName(ExecutionLogLevel level) {
     case ExecutionLogLevel::Error:
         return QStringLiteral("error");
     }
+
     Q_UNREACHABLE_RETURN(QStringLiteral("info"));
 }
 
@@ -1008,6 +1096,7 @@ bool AiTaskRepository::carriesExchangedPayload(ExecutionLogKind kind) {
     case ExecutionLogKind::Cancelled:
         return false;
     }
+
     Q_UNREACHABLE_RETURN(false);
 }
 
@@ -1040,6 +1129,7 @@ QString AiTaskRepository::executionLogKindName(ExecutionLogKind kind) {
     case ExecutionLogKind::Cancelled:
         return QStringLiteral("cancelled");
     }
+
     Q_UNREACHABLE_RETURN(QStringLiteral("started"));
 }
 
@@ -1062,11 +1152,13 @@ utils::Result<ExecutionLogLevel> AiTaskRepository::parseExecutionLogLevel(const 
     if (value == QStringLiteral("error")) {
         return utils::Result<ExecutionLogLevel>::success(ExecutionLogLevel::Error);
     }
+
     return utils::Result<ExecutionLogLevel>::failure({"ai_tasks_execution_invalid", "A stored AI execution log level is invalid", value});
 }
 
 QVector<persistence::DatabaseStatement> AiTaskRepository::scheduleStatements(const AiTask& task) const {
     QVector<persistence::DatabaseStatement> statements{{QStringLiteral("DELETE FROM ai_tasks_schedules WHERE task_id = ?"), {task.id}}};
+
     if (!task.schedule.has_value()) {
         return statements;
     }
@@ -1094,6 +1186,7 @@ QString AiTaskRepository::columnName(TaskColumn column) {
     case TaskColumn::Done:
         return QStringLiteral("done");
     }
+
     Q_UNREACHABLE_RETURN({});
 }
 
@@ -1103,6 +1196,7 @@ utils::Result<TaskColumn> AiTaskRepository::parseColumn(const QString& value) {
             return utils::Result<TaskColumn>::success(column);
         }
     }
+
     return utils::Result<TaskColumn>::failure({"ai_tasks_column_invalid", "The AI task column is invalid", value});
 }
 
@@ -1115,6 +1209,7 @@ QString AiTaskRepository::scheduleKindName(ScheduleKind kind) {
     case ScheduleKind::Cron:
         return QStringLiteral("cron");
     }
+
     Q_UNREACHABLE_RETURN({});
 }
 
@@ -1128,18 +1223,22 @@ utils::Result<ScheduleKind> AiTaskRepository::parseScheduleKind(const QString& v
     if (value == QStringLiteral("cron")) {
         return utils::Result<ScheduleKind>::success(ScheduleKind::Cron);
     }
+
     return utils::Result<ScheduleKind>::failure({"ai_tasks_schedule_kind_invalid", "The AI task schedule kind is invalid", value});
 }
 
 utils::Result<void> AiTaskRepository::validateSchedule(const TaskSchedule& schedule) {
     const bool nextValid = schedule.nextRunAtUtc.isValid();
+
     if (schedule.timeZoneId.isEmpty() || !QTimeZone(schedule.timeZoneId).isValid() || (schedule.lastTriggeredAtUtc.isValid() && !persistence::validStoredTimestamp(schedule.lastTriggeredAtUtc)) || (nextValid && !persistence::validStoredTimestamp(schedule.nextRunAtUtc)) || (schedule.enabled != nextValid)) {
         return utils::Result<void>::failure({"ai_tasks_schedule_invalid", "The AI task schedule is invalid", {}});
     }
+
     if (schedule.kind == ScheduleKind::Once) {
         const bool valid = persistence::validStoredTimestamp(schedule.onceAtUtc) && schedule.intervalSeconds == 0 && schedule.cronExpression.isEmpty() && (!schedule.enabled || schedule.nextRunAtUtc == schedule.onceAtUtc);
         return valid ? utils::Result<void>::success() : utils::Result<void>::failure({"ai_tasks_schedule_invalid", "The one-time AI task schedule is invalid", {}});
     }
+
     if (schedule.kind == ScheduleKind::Interval) {
         const bool valid = !schedule.onceAtUtc.isValid() && schedule.intervalSeconds >= 60 && schedule.cronExpression.isEmpty();
         return valid ? utils::Result<void>::success() : utils::Result<void>::failure({"ai_tasks_schedule_invalid", "The interval AI task schedule is invalid", {}});

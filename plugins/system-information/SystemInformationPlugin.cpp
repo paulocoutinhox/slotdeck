@@ -81,11 +81,13 @@ void SystemInformationPlugin::handleEvent(const QString&, const QString&, const 
 void SystemInformationPlugin::shutdown() {
     m_asyncContext.reset();
     ++m_collectionGeneration;
+
     if (m_collection.has_value()) {
         m_collection->cancelled->store(true, std::memory_order_relaxed);
         m_collection->future.waitForFinished();
         m_collection.reset();
     }
+
     m_snapshot.reset();
     m_refreshing = false;
     m_host = nullptr;

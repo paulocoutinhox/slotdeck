@@ -28,11 +28,13 @@ bool WebServerInstance::start(const QString& root, const QString& host, quint16 
 
     m_resolver.emplace(root);
     QHostAddress address;
+
     if (!m_resolver->valid() || !address.setAddress(host) || !m_server->listen(address, requestedPort)) {
         m_server.reset();
         m_resolver.reset();
         return false;
     }
+
     m_port.store(m_server->serverPort(), std::memory_order_release);
     m_running.store(true, std::memory_order_release);
     return true;
@@ -41,14 +43,17 @@ bool WebServerInstance::start(const QString& root, const QString& host, quint16 
 void WebServerInstance::stop() {
     m_running.store(false, std::memory_order_release);
     m_port.store(0, std::memory_order_release);
+
     if (m_server != nullptr) {
         m_server->close();
     }
+
     for (auto* socket : std::as_const(m_sockets)) {
         socket->disconnect(this);
         socket->abort();
         socket->deleteLater();
     }
+
     m_fileTransfers.clear();
     m_sockets.clear();
     m_server.reset();
@@ -99,9 +104,11 @@ void WebServerInstance::acceptConnection() {
 
 void WebServerInstance::releaseSocket() {
     auto* socket = qobject_cast<QTcpSocket*>(sender());
+
     if (socket == nullptr) {
         return;
     }
+
     m_sockets.remove(socket);
     m_fileTransfers.remove(socket);
     socket->deleteLater();
@@ -109,26 +116,31 @@ void WebServerInstance::releaseSocket() {
 
 void WebServerInstance::readRequest() {
     auto* socket = qobject_cast<QTcpSocket*>(sender());
+
     if (socket == nullptr) {
         return;
     }
 
     QByteArray request = socket->property("requestBuffer").toByteArray();
     request.append(socket->readAll());
+
     if (request.size() > maximumRequestBytes) {
         respond(*socket, {});
         return;
     }
+
     if (!request.contains("\r\n\r\n")) {
         socket->setProperty("requestBuffer", request);
         return;
     }
+
     respond(*socket, request);
 }
 
 void WebServerInstance::expireConnection() {
     const auto* deadline = qobject_cast<QTimer*>(sender());
     auto* socket = deadline == nullptr ? nullptr : qobject_cast<QTcpSocket*>(deadline->parent());
+
     if (socket != nullptr) {
         socket->abort();
     }
@@ -148,6 +160,7 @@ void WebServerInstance::respond(QTcpSocket& socket, const QByteArray& request) {
     std::shared_ptr<QFile> source;
     QByteArray fileMimeType;
     qint64 fileSize = 0;
+
     if (file.has_value()) {
         source = std::make_shared<QFile>(file->canonicalPath);
         if (!source->open(QIODevice::ReadOnly) || source->size() != file->size) {
@@ -156,6 +169,7 @@ void WebServerInstance::respond(QTcpSocket& socket, const QByteArray& request) {
         fileMimeType = file->mimeType;
         fileSize = file->size;
     }
+
     const bool fileAvailable = source != nullptr;
     const int status = fileAvailable ? 200 : validRequest ? 404 : 400;
     const QByteArray statusText = status == 200 ? QByteArrayLiteral("OK") : status == 404 ? QByteArrayLiteral("Not Found") : QByteArrayLiteral("Bad Request");
@@ -168,13 +182,16 @@ void WebServerInstance::respond(QTcpSocket& socket, const QByteArray& request) {
     response += "Cache-Control: no-store\r\nConnection: close\r\n\r\n";
     response += body;
     disconnect(&socket, &QTcpSocket::readyRead, this, &WebServerInstance::readRequest);
+
     if (auto* deadline = socket.findChild<QTimer*>(QStringLiteral("requestDeadline")); deadline != nullptr) {
         deadline->stop();
     }
+
     if (socket.write(response) < 0) {
         socket.abort();
         return;
     }
+
     if (fileAvailable) {
         m_fileTransfers.insert(&socket, {std::move(source), contentLength});
         connect(&socket, &QTcpSocket::bytesWritten, this, &WebServerInstance::continueFileTransfer);
@@ -188,6 +205,7 @@ void WebServerInstance::respond(QTcpSocket& socket, const QByteArray& request) {
 
 void WebServerInstance::continueFileTransfer() {
     auto* socket = qobject_cast<QTcpSocket*>(sender());
+
     if (socket != nullptr) {
         writeFileChunks(*socket);
     }
@@ -195,10 +213,13 @@ void WebServerInstance::continueFileTransfer() {
 
 void WebServerInstance::writeFileChunks(QTcpSocket& socket) {
     auto transfer = m_fileTransfers.find(&socket);
+
     if (transfer == m_fileTransfers.end()) {
         return;
     }
+
     auto& state = transfer.value();
+
     while (socket.bytesToWrite() < maximumBufferedFileBytes && state.remainingBytes > 0) {
         const QByteArray chunk = state.source->read(std::min(fileChunkSize, state.remainingBytes));
         if (chunk.isEmpty()) {
@@ -213,6 +234,7 @@ void WebServerInstance::writeFileChunks(QTcpSocket& socket) {
         }
         state.remainingBytes -= chunk.size();
     }
+
     if (state.remainingBytes == 0 && socket.bytesToWrite() == 0) {
         m_fileTransfers.remove(&socket);
         socket.disconnectFromHost();

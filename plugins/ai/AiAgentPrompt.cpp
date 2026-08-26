@@ -14,6 +14,7 @@ const QVector<PromptTagDescriptor>& promptTags() {
 // A tag nobody declares is refused where the prompt is written, so no run ever meets one it cannot answer.
 QStringList unknownPromptTags(const QString& prompt) {
     QStringList declared;
+
     for (const auto& tag : promptTags()) {
         declared.append(tag.name);
     }
@@ -21,6 +22,7 @@ QStringList unknownPromptTags(const QString& prompt) {
     QStringList unknown;
     const QRegularExpression pattern{promptTagPattern};
     QRegularExpressionMatchIterator matches = pattern.globalMatch(prompt);
+
     while (matches.hasNext()) {
         const QString name = matches.next().captured(1);
         if (!declared.contains(name) && !unknown.contains(name)) {
@@ -33,6 +35,7 @@ QStringList unknownPromptTags(const QString& prompt) {
 
 QString renderPrompt(const QString& prompt, const QHash<QString, QString>& values) {
     QString rendered = prompt;
+
     for (const auto& tag : promptTags()) {
         rendered.replace(QStringLiteral("{{%1}}").arg(tag.name), values.value(tag.name));
     }

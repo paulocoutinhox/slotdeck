@@ -43,6 +43,7 @@ const QRegularExpression& AiAgentSettingsViewHelper::identifierPattern() {
 // The identifier is spelled from the name, so the writer names the agent and receives an identifier that already obeys the rule.
 QString AiAgentSettingsViewHelper::identifierFromName(const QString& name) {
     QString spelled;
+
     for (const QChar character : name.toLower()) {
         const bool accepted = (character >= QLatin1Char('a') && character <= QLatin1Char('z')) || (character >= QLatin1Char('0') && character <= QLatin1Char('9'));
         if (accepted) {
@@ -53,9 +54,11 @@ QString AiAgentSettingsViewHelper::identifierFromName(const QString& name) {
             spelled.append(QLatin1Char('-'));
         }
     }
+
     while (!spelled.isEmpty() && !(spelled.front() >= QLatin1Char('a') && spelled.front() <= QLatin1Char('z'))) {
         spelled.remove(0, 1);
     }
+
     while (spelled.endsWith(QLatin1Char('-'))) {
         spelled.chop(1);
     }
@@ -86,9 +89,11 @@ AiAgentDialog::AiAgentDialog(PluginHost& host, AiAgent agent, QStringList takenI
 
     m_connection = new ui::ComboBox(m_host.theme(), this);
     m_connection->setObjectName(QStringLiteral("aiAgentConnection"));
+
     for (const auto& connection : connections) {
         m_connection->addItem(connectionLabel(connection), connectionKey(connection));
     }
+
     ui::sortComboBoxItems(m_connection);
     m_connection->setCurrentIndex(std::max(0, m_connection->findData(agent.connectionKey)));
 
@@ -173,9 +178,11 @@ void AiAgentDialog::showTags() {
     layout->setSpacing(12);
 
     QStringList rows;
+
     for (const auto& tag : promptTags()) {
         rows.append(QStringLiteral("`{{%1}}` — %2").arg(tag.name, m_host.translate(tag.descriptionKey)));
     }
+
     auto* content = new QTextBrowser(dialog);
     content->setObjectName(QStringLiteral("aiAgentTagsContent"));
     content->setMarkdown(rows.join(QStringLiteral("\n\n")));
@@ -267,6 +274,7 @@ int AiAgentSettingsView::selectedRow() const {
 
 void AiAgentSettingsView::rebuild() {
     m_grid->setRowCount(static_cast<int>(m_agents.size()));
+
     for (int row = 0; row < static_cast<int>(m_agents.size()); ++row) {
         const AiAgent& agent = m_agents.at(row);
         m_grid->setItem(row, 0, new QTableWidgetItem(agent.id));
@@ -281,11 +289,13 @@ void AiAgentSettingsView::rebuild() {
 
 void AiAgentSettingsView::addAgent() {
     QStringList taken;
+
     for (const auto& agent : m_agents) {
         taken.append(agent.id);
     }
 
     AiAgentDialog dialog(m_host, {}, taken, m_plugin.connections(), this);
+
     if (dialog.exec() != QDialog::Accepted) {
         return;
     }
@@ -297,11 +307,13 @@ void AiAgentSettingsView::addAgent() {
 
 void AiAgentSettingsView::editAgent() {
     const int row = selectedRow();
+
     if (row < 0 || row >= static_cast<int>(m_agents.size())) {
         return;
     }
 
     QStringList taken;
+
     for (int index = 0; index < static_cast<int>(m_agents.size()); ++index) {
         if (index != row) {
             taken.append(m_agents.at(index).id);
@@ -309,6 +321,7 @@ void AiAgentSettingsView::editAgent() {
     }
 
     AiAgentDialog dialog(m_host, m_agents.at(row), taken, m_plugin.connections(), this);
+
     if (dialog.exec() != QDialog::Accepted) {
         return;
     }
@@ -321,12 +334,14 @@ void AiAgentSettingsView::editAgent() {
 // Removing an agent stops the tasks it was handed, so the confirmation says how many it takes with it.
 void AiAgentSettingsView::removeAgent() {
     const int row = selectedRow();
+
     if (row < 0 || row >= static_cast<int>(m_agents.size())) {
         return;
     }
 
     const QString agentId = m_agents.at(row).id;
     int assigned = 0;
+
     for (const auto& task : m_plugin.tasks()) {
         if (task.agentId == agentId) {
             ++assigned;
@@ -334,6 +349,7 @@ void AiAgentSettingsView::removeAgent() {
     }
 
     const QString detail = assigned == 0 ? m_agents.at(row).name : m_host.translate(QStringLiteral("ai.agent.remove-detail")).arg(QString::number(assigned));
+
     if (!m_host.confirm(this, m_host.translate(QStringLiteral("ai.agent.remove-title")), m_host.translate(QStringLiteral("ai.agent.remove-message")), detail, m_host.translate(QStringLiteral("ai.agent.remove")), true)) {
         return;
     }

@@ -58,6 +58,7 @@ QColor ThemeHelper::themeColor(ThemeColor role, const QColor& accent, const QCol
     case ThemeColor::Terminal:
         return QColor(24, 24, 24);
     }
+
     Q_UNREACHABLE_RETURN({});
 }
 
@@ -128,26 +129,32 @@ int ThemeHelper::themeMetric(ThemeMetric role) {
     case ThemeMetric::RoundButtonSize:
         return 36;
     }
+
     Q_UNREACHABLE_RETURN(0);
 }
 
 QFont ThemeHelper::themeFont(ThemeFont role) {
     QFont font = QApplication::font();
+
     if (role == ThemeFont::Caption) {
         font.setPointSizeF(std::max(8.0, font.pointSizeF() - 2.0));
     }
+
     if (role == ThemeFont::Navigation) {
         font.setPointSizeF(std::max(8.0, font.pointSizeF() - 2.0));
         font.setWeight(QFont::DemiBold);
     }
+
     if (role == ThemeFont::PageTitle || role == ThemeFont::SectionTitle) {
         font.setPointSizeF(font.pointSizeF() + 1.0);
         font.setWeight(QFont::DemiBold);
     }
+
     if (role == ThemeFont::Monospace) {
         font.setStyleHint(QFont::Monospace);
         font.setFixedPitch(true);
     }
+
     return font;
 }
 
@@ -236,9 +243,11 @@ QString applyThemeTokens(QString styleSheet, const Theme& theme) {
     const QVector<QPair<QString, QString>> tokens{
         {QStringLiteral("@borderStrong"), theme.color(ThemeColor::BorderStrong).name()}, {QStringLiteral("@border"), theme.color(ThemeColor::Border).name()}, {QStringLiteral("@dangerBackground"), theme.color(ThemeColor::DangerBackground).name()}, {QStringLiteral("@dangerText"), theme.color(ThemeColor::DangerText).name()}, {QStringLiteral("@dangerHover"), theme.color(ThemeColor::Danger).lighter(112).name()}, {QStringLiteral("@danger"), theme.color(ThemeColor::Danger).name()}, {QStringLiteral("@accentStrong"), theme.color(ThemeColor::AccentStrong).name()}, {QStringLiteral("@accentHover"), theme.color(ThemeColor::AccentHover).name()}, {QStringLiteral("@accent"), theme.color(ThemeColor::Accent).name()}, {QStringLiteral("@onAccent"), theme.color(ThemeColor::OnAccent).name()}, {QStringLiteral("@onDanger"), theme.color(ThemeColor::OnDanger).name()}, {QStringLiteral("@textMuted"), theme.color(ThemeColor::TextMuted).name()}, {QStringLiteral("@text"), theme.color(ThemeColor::Text).name()}, {QStringLiteral("@window"), theme.color(ThemeColor::Window).name()}, {QStringLiteral("@panel"), theme.color(ThemeColor::Panel).name()}, {QStringLiteral("@raised"), theme.color(ThemeColor::Raised).name()}, {QStringLiteral("@hover"), theme.color(ThemeColor::Hover).name()}, {QStringLiteral("@success"), theme.color(ThemeColor::Success).name()}, {QStringLiteral("@warning"), theme.color(ThemeColor::Warning).name()}, {QStringLiteral("@information"), theme.color(ThemeColor::Information).name()}, {QStringLiteral("@terminal"), theme.color(ThemeColor::Terminal).name()}, {QStringLiteral("@interfaceFontSize"), QString::number(theme.font(ThemeFont::Interface).pointSize())}, {QStringLiteral("@pageTitleFontSize"), QString::number(theme.font(ThemeFont::PageTitle).pointSize())}, {QStringLiteral("@sectionTitleFontSize"), QString::number(theme.font(ThemeFont::SectionTitle).pointSize())}, {QStringLiteral("@captionFontSize"), QString::number(theme.font(ThemeFont::Caption).pointSize())}, {QStringLiteral("@monospaceFamily"), theme.font(ThemeFont::Monospace).family()}, {QStringLiteral("@roundButtonRadius"), QString::number(theme.metric(ThemeMetric::RoundButtonSize) / 2)}, {QStringLiteral("@roundButtonSize"), QString::number(theme.metric(ThemeMetric::RoundButtonSize))}, {QStringLiteral("@controlHorizontalPadding"), QString::number(theme.metric(ThemeMetric::ControlHorizontalPadding))}, {QStringLiteral("@controlVerticalPadding"), QString::number(theme.metric(ThemeMetric::ControlVerticalPadding))}, {QStringLiteral("@controlRadius"), QString::number(theme.metric(ThemeMetric::ControlRadius))}, {QStringLiteral("@comboIndicatorWidth"), QString::number(theme.metric(ThemeMetric::ComboIndicatorWidth))}, {QStringLiteral("@badgeRadius"), QString::number(theme.metric(ThemeMetric::BadgeRadius))}, {QStringLiteral("@badgeHorizontalPadding"), QString::number(theme.metric(ThemeMetric::BadgeHorizontalPadding))}, {QStringLiteral("@badgeVerticalPadding"), QString::number(theme.metric(ThemeMetric::BadgeVerticalPadding))}, {QStringLiteral("@scrollBarExtent"), QString::number(theme.metric(ThemeMetric::ScrollBarExtent))},
     };
+
     for (const auto& token : tokens) {
         styleSheet.replace(token.first, token.second);
     }
+
     return styleSheet;
 }
 
@@ -258,6 +267,7 @@ const Theme* ThemeCatalog::find(const QString& themeId) const {
             return theme.get();
         }
     }
+
     return nullptr;
 }
 
@@ -290,9 +300,11 @@ void ThemeManager::loadTheme(const QString& storedThemeId) {
 
 utils::Result<void> ThemeManager::selectTheme(const QString& themeId) {
     const Theme* selected = m_catalog.find(themeId);
+
     if (selected == nullptr) {
         return utils::Result<void>::failure({"application_theme_invalid", "The application theme is unsupported", themeId});
     }
+
     m_theme = selected;
     return utils::Result<void>::success();
 }

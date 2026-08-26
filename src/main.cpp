@@ -22,11 +22,14 @@ int main(int argc, char* argv[]) {
     QApplication::setPalette(slotdeck::ui::AppStyle::applicationPalette());
     slotdeck::app::Application slotDeckApplication;
     const auto initialization = slotDeckApplication.initialize();
+
     if (!initialization.hasValue()) {
         qCritical().noquote() << initialization.error().message << initialization.error().detail;
         return 1;
     }
+
     const auto interfaceResult = slotDeckApplication.loadInterface();
+
     if (!interfaceResult.hasValue()) {
         qCritical().noquote() << interfaceResult.error().message << interfaceResult.error().detail;
         return 1;

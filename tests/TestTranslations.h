@@ -14,6 +14,7 @@ namespace slotdeck::test {
 // A catalog is complete when every language the selector offers spells every key, so no reader ever falls back to another language.
 inline void expectCompleteCatalog(const QString& owner, const plugins::TranslationCatalog& catalog) {
     const QStringList languages{QStringLiteral("en"), QStringLiteral("pt")};
+
     for (const auto& language : languages) {
         ASSERT_TRUE(catalog.contains(language)) << owner.toStdString() << " declares no " << language.toStdString();
     }

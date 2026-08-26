@@ -26,6 +26,7 @@ bool CodeEditorRepositoryHelper::validWorkspace(const CodeWorkspaceState& worksp
 
     QSet<QString> paths;
     int activeDocuments = 0;
+
     for (int index = 0; index < workspace.documents.size(); ++index) {
         const auto& document = workspace.documents.at(index);
         if (!QDir::isAbsolutePath(document.path) || !document.path.startsWith(workspace.rootPath + QLatin1Char('/')) || document.position != index || document.cursorPosition < 0 || paths.contains(document.path)) {
@@ -34,6 +35,7 @@ bool CodeEditorRepositoryHelper::validWorkspace(const CodeWorkspaceState& worksp
         paths.insert(document.path);
         activeDocuments += document.active ? 1 : 0;
     }
+
     return activeDocuments <= 1 && (workspace.documents.isEmpty() || activeDocuments == 1);
 }
 
@@ -41,6 +43,7 @@ utils::Result<void> CodeEditorRepositoryHelper::validateState(const QVector<Code
     QSet<QString> ids;
     QSet<QString> roots;
     int activeWorkspaces = 0;
+
     for (int index = 0; index < workspaces.size(); ++index) {
         const auto& workspace = workspaces.at(index);
         if (!validWorkspace(workspace, index) || ids.contains(workspace.id) || roots.contains(workspace.rootPath)) {
@@ -50,9 +53,11 @@ utils::Result<void> CodeEditorRepositoryHelper::validateState(const QVector<Code
         roots.insert(workspace.rootPath);
         activeWorkspaces += workspace.active ? 1 : 0;
     }
+
     if (activeWorkspaces > 1 || (!workspaces.isEmpty() && activeWorkspaces != 1)) {
         return utils::Result<void>::failure({"code_editor_state_invalid", "The code editor active workspace is invalid", {}});
     }
+
     return utils::Result<void>::success();
 }
 
@@ -68,16 +73,20 @@ utils::Result<void> CodeEditorRepository::initialize() {
 
 utils::Result<QVector<CodeWorkspaceState>> CodeEditorRepository::load() const {
     const auto workspaceRows = m_host.queryBootstrapDatabase(QStringLiteral("SELECT id, root_path, position, active, created_at_utc, updated_at_utc FROM code_editor_workspaces ORDER BY position"));
+
     if (!workspaceRows.hasValue()) {
         return utils::Result<QVector<CodeWorkspaceState>>::failure(workspaceRows.error());
     }
+
     const auto documentRows = m_host.queryBootstrapDatabase(QStringLiteral("SELECT workspace_id, path, position, cursor_position, active FROM code_editor_documents ORDER BY workspace_id, position"));
+
     if (!documentRows.hasValue()) {
         return utils::Result<QVector<CodeWorkspaceState>>::failure(documentRows.error());
     }
 
     QVector<CodeWorkspaceState> workspaces;
     QHash<QString, int> indexes;
+
     for (const auto& row : workspaceRows.value()) {
         CodeWorkspaceState workspace;
         workspace.id = row.value(QStringLiteral("id")).toString();
@@ -95,6 +104,7 @@ utils::Result<QVector<CodeWorkspaceState>> CodeEditorRepository::load() const {
         indexes.insert(workspace.id, static_cast<int>(workspaces.size()));
         workspaces.append(std::move(workspace));
     }
+
     for (const auto& row : documentRows.value()) {
         const QString workspaceId = row.value(QStringLiteral("workspace_id")).toString();
         if (!indexes.contains(workspaceId)) {
@@ -120,9 +130,11 @@ CodeEditorSettings CodeEditorRepositoryHelper::settingsFromDocument(const QJsonO
     reader.readText(QStringLiteral("defaultCharset"), charsetName);
 
     settings.defaultCharset = parseTextCharset(charsetName).value_or(declared.defaultCharset);
+
     if (!settings.fontFamily.isEmpty() && !ui::monospacedFontFamilies().contains(settings.fontFamily)) {
         settings.fontFamily = declared.fontFamily;
     }
+
     if (!ui::validContentFontSize(settings.fontSize)) {
         settings.fontSize = declared.fontSize;
     }
@@ -144,17 +156,20 @@ QFuture<utils::Result<void>> CodeEditorRepository::saveSettings(const CodeEditor
 
 QFuture<utils::Result<void>> CodeEditorRepository::save(const QVector<CodeWorkspaceState>& workspaces) {
     const auto validation = CodeEditorRepositoryHelper::validateState(workspaces);
+
     if (!validation.hasValue()) {
         return QtFuture::makeReadyValueFuture(validation);
     }
 
     QVector<persistence::DatabaseStatement> statements = {{QStringLiteral("DELETE FROM code_editor_documents"), {}}, {QStringLiteral("DELETE FROM code_editor_workspaces"), {}}};
+
     for (const auto& workspace : workspaces) {
         statements.append({QStringLiteral("INSERT INTO code_editor_workspaces(id, root_path, position, active, created_at_utc, updated_at_utc) VALUES(?, ?, ?, ?, ?, ?)"), {workspace.id, workspace.rootPath, workspace.position, workspace.active ? 1 : 0, persistence::storedTimestamp(workspace.createdAtUtc), persistence::storedTimestamp(workspace.updatedAtUtc)}});
         for (const auto& document : workspace.documents) {
             statements.append({QStringLiteral("INSERT INTO code_editor_documents(workspace_id, path, position, cursor_position, active) VALUES(?, ?, ?, ?, ?)"), {workspace.id, document.path, document.position, document.cursorPosition, document.active ? 1 : 0}});
         }
     }
+
     return m_host.executeDatabaseTransaction(statements);
 }
 

@@ -20,12 +20,14 @@ class AiModelDiscoveryHelper final {
 
 QStringList AiModelDiscoveryHelper::parseModels(const QJsonObject& payload) {
     QStringList models;
+
     for (const auto& value : payload.value(QStringLiteral("data")).toArray()) {
         const QString id = value.toObject().value(QStringLiteral("id")).toString();
         if (!id.isEmpty() && !models.contains(id)) {
             models.append(id);
         }
     }
+
     models.sort();
     return models;
 }
@@ -42,12 +44,14 @@ void AiModelDiscovery::discover(const QString& providerId, const QString& apiKey
     }
 
     const ProviderDescriptor* provider = findProvider(providerId);
+
     if (provider == nullptr) {
         emit failed({"ai_provider_unknown", "The provider is unknown", providerId});
         return;
     }
 
     const auto credential = resolveSecret(apiKey);
+
     if (!credential.hasValue()) {
         emit failed(credential.error());
         return;
@@ -55,6 +59,7 @@ void AiModelDiscovery::discover(const QString& providerId, const QString& apiKey
 
     QUrl endpoint(address);
     endpoint.setPath(endpoint.path() + (provider->protocol == WireProtocol::Anthropic ? QStringLiteral("/v1/models") : QStringLiteral("/models")));
+
     if (!endpoint.isValid() || endpoint.host().isEmpty()) {
         emit failed({"ai_provider_base_url_invalid", "The provider address is invalid", address});
         return;
@@ -63,9 +68,11 @@ void AiModelDiscovery::discover(const QString& providerId, const QString& apiKey
     QNetworkRequest request(endpoint);
     request.setTransferTimeout(aiLimits().discoveryTimeoutMs);
     request.setRawHeader(QByteArrayLiteral("accept"), QByteArrayLiteral("application/json"));
+
     for (auto header = provider->httpHeaders.constBegin(); header != provider->httpHeaders.constEnd(); ++header) {
         request.setRawHeader(header.key().toUtf8(), header.value().toUtf8());
     }
+
     if (provider->protocol == WireProtocol::Anthropic) {
         request.setRawHeader(QByteArrayLiteral("x-api-key"), credential.value().toUtf8());
     } else if (!credential.value().isEmpty()) {

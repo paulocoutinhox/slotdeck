@@ -46,13 +46,16 @@ QString LanguageServerClientHelper::hoverText(const QJsonValue& contents) {
     if (contents.isObject()) {
         return contents.toObject().value(QStringLiteral("value")).toString();
     }
+
     QStringList parts;
+
     for (const auto& entry : contents.toArray()) {
         const QString part = entry.isString() ? entry.toString() : entry.toObject().value(QStringLiteral("value")).toString();
         if (!part.isEmpty()) {
             parts.append(part);
         }
     }
+
     return parts.join(QStringLiteral("\n"));
 }
 
@@ -69,6 +72,7 @@ QString LanguageServerClientHelper::symbolQueryMethod(SymbolQueryKind kind) {
     case SymbolQueryKind::References:
         return QStringLiteral("textDocument/references");
     }
+
     return {};
 }
 
@@ -77,11 +81,13 @@ SourceLocation LanguageServerClientHelper::locationOf(const QJsonObject& entry) 
     const QJsonObject location = entry.value(QStringLiteral("location")).toObject();
     const QString uri = targetUri.isEmpty() ? location.value(QStringLiteral("uri")).toString() : targetUri;
     QJsonObject range = entry.value(QStringLiteral("range")).toObject();
+
     if (entry.contains(QStringLiteral("targetSelectionRange"))) {
         range = entry.value(QStringLiteral("targetSelectionRange")).toObject();
     } else if (!location.isEmpty()) {
         range = location.value(QStringLiteral("range")).toObject();
     }
+
     const QJsonObject start = range.value(QStringLiteral("start")).toObject();
     const QJsonObject end = range.value(QStringLiteral("end")).toObject();
     return {QUrl(uri).toLocalFile(), start.value(QStringLiteral("line")).toInt(), start.value(QStringLiteral("character")).toInt(), end.value(QStringLiteral("line")).toInt(), end.value(QStringLiteral("character")).toInt()};
@@ -89,22 +95,26 @@ SourceLocation LanguageServerClientHelper::locationOf(const QJsonObject& entry) 
 
 QVector<SourceLocation> LanguageServerClientHelper::locationsOf(const QJsonValue& result) {
     QVector<SourceLocation> locations;
+
     if (result.isObject()) {
         locations.append(locationOf(result.toObject()));
         return locations;
     }
+
     for (const auto& entry : result.toArray()) {
         const SourceLocation location = locationOf(entry.toObject());
         if (!location.path.isEmpty()) {
             locations.append(location);
         }
     }
+
     return locations;
 }
 
 // A server answers either the nested document symbols or the flat symbol information, and both describe the same outline.
 QVector<DocumentSymbolNode> LanguageServerClientHelper::symbolNodes(const QJsonArray& items) {
     QVector<DocumentSymbolNode> nodes;
+
     for (const auto& entry : items) {
         const QJsonObject item = entry.toObject();
         const QString name = item.value(QStringLiteral("name")).toString();
@@ -114,11 +124,13 @@ QVector<DocumentSymbolNode> LanguageServerClientHelper::symbolNodes(const QJsonA
         const SourceLocation location = locationOf(item.contains(QStringLiteral("selectionRange")) ? QJsonObject{{QStringLiteral("range"), item.value(QStringLiteral("selectionRange"))}} : item);
         nodes.append({name, item.value(QStringLiteral("detail")).toString(), item.value(QStringLiteral("kind")).toInt(), location.line, location.character, symbolNodes(item.value(QStringLiteral("children")).toArray())});
     }
+
     return nodes;
 }
 
 QVector<LanguageDiagnostic> LanguageServerClientHelper::diagnosticsOf(const QString& path, const QJsonArray& items) {
     QVector<LanguageDiagnostic> diagnostics;
+
     for (const auto& value : items) {
         const QJsonObject object = value.toObject();
         const QJsonObject range = object.value(QStringLiteral("range")).toObject();
@@ -126,6 +138,7 @@ QVector<LanguageDiagnostic> LanguageServerClientHelper::diagnosticsOf(const QStr
         const QJsonObject end = range.value(QStringLiteral("end")).toObject();
         diagnostics.append({path, start.value(QStringLiteral("line")).toInt(), start.value(QStringLiteral("character")).toInt(), end.value(QStringLiteral("line")).toInt(), end.value(QStringLiteral("character")).toInt(), object.value(QStringLiteral("severity")).toInt(1), object.value(QStringLiteral("message")).toString()});
     }
+
     return diagnostics;
 }
 
@@ -196,6 +209,7 @@ void LanguageServerClient::openDocument(const QString& path, const QString& text
     Document& document = m_documents[path];
     document.text = text;
     document.languageId = languageId;
+
     if (m_ready && !document.opened) {
         sendOpen(path, document);
     }
@@ -204,12 +218,14 @@ void LanguageServerClient::openDocument(const QString& path, const QString& text
 // A reload replaces everything the server holds, and a change without a range is the full content in both synchronization modes.
 void LanguageServerClient::replaceDocument(const QString& path, const QString& text) {
     auto document = m_documents.find(path);
+
     if (document == m_documents.end()) {
         return;
     }
     if (document->text == text) {
         return;
     }
+
     document->text = text;
     sendChange(path, *document, QJsonArray{QJsonObject{{QStringLiteral("text"), text}}});
 }
@@ -217,6 +233,7 @@ void LanguageServerClient::replaceDocument(const QString& path, const QString& t
 // An edit that does not fit the copy the server has means the two drifted apart, and only a complete replacement can bring them back together.
 bool LanguageServerClient::editDocument(const QString& path, const QVector<DocumentEdit>& edits) {
     auto document = m_documents.find(path);
+
     if (document == m_documents.end()) {
         return false;
     }
@@ -225,6 +242,7 @@ bool LanguageServerClient::editDocument(const QString& path, const QVector<Docum
     }
 
     QJsonArray contentChanges;
+
     for (const auto& edit : edits) {
         if (edit.offset < 0 || edit.removedLength < 0 || edit.offset + edit.removedLength > document->text.size()) {
             return false;
@@ -240,35 +258,44 @@ bool LanguageServerClient::editDocument(const QString& path, const QVector<Docum
     if (m_capabilities.sync == DocumentSyncKind::Full) {
         contentChanges.append(QJsonObject{{QStringLiteral("text"), document->text}});
     }
+
     sendChange(path, *document, contentChanges);
     return true;
 }
 
 void LanguageServerClient::saveDocument(const QString& path, const QString& text) {
     auto document = m_documents.find(path);
+
     if (document == m_documents.end()) {
         return;
     }
+
     document->text = text;
+
     if (!m_ready || !document->opened || !m_capabilities.save) {
         return;
     }
 
     QJsonObject parameters{{QStringLiteral("textDocument"), LanguageServerClientHelper::textDocument(uri(path))}};
+
     if (m_capabilities.saveIncludesText) {
         parameters.insert(QStringLiteral("text"), text);
     }
+
     sendNotification(QStringLiteral("textDocument/didSave"), parameters);
 }
 
 void LanguageServerClient::closeDocument(const QString& path) {
     auto document = m_documents.find(path);
+
     if (document == m_documents.end()) {
         return;
     }
+
     if (m_ready && document->opened && m_capabilities.openClose) {
         sendNotification(QStringLiteral("textDocument/didClose"), {{QStringLiteral("textDocument"), LanguageServerClientHelper::textDocument(uri(path))}});
     }
+
     m_documents.erase(document);
 }
 
@@ -277,6 +304,7 @@ void LanguageServerClient::requestCompletion(const QString& path, int line, int 
     if (!m_ready || !m_capabilities.completion || !m_documents.contains(path)) {
         return;
     }
+
     trackedRequest(QStringLiteral("textDocument/completion"), documentPosition(path, line, character), m_completionRequests, path);
 }
 
@@ -285,6 +313,7 @@ void LanguageServerClient::requestCompletionDocumentation(const QString& path, i
     if (!m_ready || !m_capabilities.completionResolve || item.isEmpty()) {
         return;
     }
+
     for (auto request = m_completionResolveRequests.begin(); request != m_completionResolveRequests.end();) {
         if (request.value().first != path) {
             ++request;
@@ -293,6 +322,7 @@ void LanguageServerClient::requestCompletionDocumentation(const QString& path, i
         cancelRequest(request.key());
         request = m_completionResolveRequests.erase(request);
     }
+
     m_completionResolveRequests.insert(sendRequest(QStringLiteral("completionItem/resolve"), item), {path, row});
 }
 
@@ -300,10 +330,13 @@ void LanguageServerClient::requestSymbolQuery(const QString& path, int line, int
     if (!m_ready || !supports(kind) || !m_documents.contains(path)) {
         return;
     }
+
     QJsonObject parameters = documentPosition(path, line, character);
+
     if (kind == SymbolQueryKind::References) {
         parameters.insert(QStringLiteral("context"), QJsonObject{{QStringLiteral("includeDeclaration"), true}});
     }
+
     m_symbolQueryRequests.insert(sendRequest(LanguageServerClientHelper::symbolQueryMethod(kind), parameters), {path, kind});
 }
 
@@ -311,6 +344,7 @@ void LanguageServerClient::requestHover(const QString& path, int line, int chara
     if (!m_ready || !m_capabilities.hover || !m_documents.contains(path)) {
         return;
     }
+
     trackedRequest(QStringLiteral("textDocument/hover"), documentPosition(path, line, character), m_hoverRequests, path);
 }
 
@@ -318,6 +352,7 @@ void LanguageServerClient::requestSignatureHelp(const QString& path, int line, i
     if (!m_ready || !m_capabilities.signatureHelp || !m_documents.contains(path)) {
         return;
     }
+
     trackedRequest(QStringLiteral("textDocument/signatureHelp"), documentPosition(path, line, character), m_signatureHelpRequests, path);
 }
 
@@ -325,6 +360,7 @@ void LanguageServerClient::requestDocumentHighlights(const QString& path, int li
     if (!m_ready || !m_capabilities.documentHighlights || !m_documents.contains(path)) {
         return;
     }
+
     trackedRequest(QStringLiteral("textDocument/documentHighlight"), documentPosition(path, line, character), m_highlightRequests, path);
 }
 
@@ -332,6 +368,7 @@ void LanguageServerClient::requestDocumentSymbols(const QString& path) {
     if (!m_ready || !m_capabilities.documentSymbols || !m_documents.contains(path)) {
         return;
     }
+
     trackedRequest(QStringLiteral("textDocument/documentSymbol"), {{QStringLiteral("textDocument"), LanguageServerClientHelper::textDocument(uri(path))}}, m_documentSymbolRequests, path);
 }
 
@@ -339,9 +376,11 @@ void LanguageServerClient::requestWorkspaceSymbols(const QString& query) {
     if (!m_ready || !m_capabilities.workspaceSymbols) {
         return;
     }
+
     for (const int requestId : m_workspaceSymbolRequests) {
         cancelRequest(requestId);
     }
+
     m_workspaceSymbolRequests.clear();
     m_workspaceSymbolRequests.insert(sendRequest(QStringLiteral("workspace/symbol"), {{QStringLiteral("query"), query}}));
 }
@@ -350,6 +389,7 @@ void LanguageServerClient::requestSemanticTokens(const QString& path) {
     if (!m_ready || !m_capabilities.semanticTokens || !m_documents.contains(path)) {
         return;
     }
+
     trackedRequest(QStringLiteral("textDocument/semanticTokens/full"), {{QStringLiteral("textDocument"), LanguageServerClientHelper::textDocument(uri(path))}}, m_semanticTokenRequests, path);
 }
 
@@ -358,6 +398,7 @@ void LanguageServerClient::requestDiagnostics(const QString& path) {
     if (!m_ready || !m_capabilities.pullDiagnostics || !m_documents.contains(path)) {
         return;
     }
+
     trackedRequest(QStringLiteral("textDocument/diagnostic"), {{QStringLiteral("textDocument"), LanguageServerClientHelper::textDocument(uri(path))}}, m_diagnosticRequests, path);
 }
 
@@ -368,9 +409,11 @@ void LanguageServerClient::notifyWatchedFilesChanged(const QStringList& paths, i
     }
 
     QJsonArray changes;
+
     for (const auto& path : paths) {
         changes.append(QJsonObject{{QStringLiteral("uri"), uri(path)}, {QStringLiteral("type"), changeType}});
     }
+
     sendNotification(QStringLiteral("workspace/didChangeWatchedFiles"), {{QStringLiteral("changes"), changes}});
 }
 
@@ -399,6 +442,7 @@ bool LanguageServerClient::supports(SymbolQueryKind kind) const {
     case SymbolQueryKind::References:
         return m_capabilities.references;
     }
+
     return false;
 }
 
@@ -410,18 +454,22 @@ void LanguageServerClient::stop() {
     if (m_stopping) {
         return;
     }
+
     m_stopping = true;
     m_initializeTimer.stop();
+
     if (!m_running) {
         emit stopped();
         return;
     }
 
     m_stopTimer.start();
+
     if (!m_ready) {
         QMetaObject::invokeMethod(m_transport, "requestTermination", Qt::QueuedConnection);
         return;
     }
+
     m_shutdownRequestId = sendRequest(QStringLiteral("shutdown"), {});
 }
 
@@ -458,6 +506,7 @@ void LanguageServerClient::processFinished(int exitCode) {
     m_workspaceSymbolRequests.clear();
     m_initializeRequestId = -1;
     m_shutdownRequestId = -1;
+
     for (auto document = m_documents.begin(); document != m_documents.end(); ++document) {
         document->opened = false;
     }
@@ -466,10 +515,12 @@ void LanguageServerClient::processFinished(int exitCode) {
         emit stopped();
         return;
     }
+
     if (!m_restartWindow.isValid() || m_restartWindow.elapsed() > LanguageRegistry::limits().restartWindowMs) {
         m_restartWindow.start();
         m_restartsUsed = 0;
     }
+
     if (m_restartsUsed >= LanguageRegistry::limits().maximumRestarts) {
         emit serverError(QStringLiteral("The language server exited with code %1 and reached its restart limit").arg(exitCode));
         emit stopped();
@@ -484,6 +535,7 @@ void LanguageServerClient::processFinished(int exitCode) {
 // A message carrying a method is what the server is asking of us, and only a message without one answers what we asked.
 void LanguageServerClient::handleMessage(const QJsonObject& message) {
     const QString method = message.value(QStringLiteral("method")).toString();
+
     if (!method.isEmpty()) {
         if (message.contains(QStringLiteral("id"))) {
             handleServerRequest(message.value(QStringLiteral("id")), method, message.value(QStringLiteral("params")).toObject());
@@ -492,9 +544,11 @@ void LanguageServerClient::handleMessage(const QJsonObject& message) {
         handleServerNotification(method, message.value(QStringLiteral("params")).toObject());
         return;
     }
+
     if (!message.contains(QStringLiteral("id"))) {
         return;
     }
+
     handleResponse(message.value(QStringLiteral("id")).toInt(-1), message);
 }
 
@@ -508,14 +562,17 @@ void LanguageServerClient::handleServerRequest(const QJsonValue& id, const QStri
         sendResponse(id, configuration);
         return;
     }
+
     if (method == QStringLiteral("client/registerCapability") || method == QStringLiteral("client/unregisterCapability") || method == QStringLiteral("window/workDoneProgress/create")) {
         sendResponse(id, QJsonValue::Null);
         return;
     }
+
     if (method == QStringLiteral("workspace/workspaceFolders")) {
         sendResponse(id, QJsonArray{QJsonObject{{QStringLiteral("uri"), uri(m_rootPath)}, {QStringLiteral("name"), QFileInfo(m_rootPath).fileName()}}});
         return;
     }
+
     sendErrorResponse(id, -32601, QStringLiteral("Method not found"));
 }
 
@@ -525,6 +582,7 @@ void LanguageServerClient::handleServerNotification(const QString& method, const
         emit diagnosticsPublished(path, LanguageServerClientHelper::diagnosticsOf(path, parameters.value(QStringLiteral("diagnostics")).toArray()));
         return;
     }
+
     if (method == QStringLiteral("$/progress")) {
         const QJsonObject value = parameters.value(QStringLiteral("value")).toObject();
         const QString kind = value.value(QStringLiteral("kind")).toString();
@@ -533,10 +591,12 @@ void LanguageServerClient::handleServerNotification(const QString& method, const
         emit progressChanged(detail.isEmpty() ? title : title + QStringLiteral(" ") + detail, kind != QStringLiteral("end"));
         return;
     }
+
     if (method == QStringLiteral("window/logMessage")) {
         emit serverLog(parameters.value(QStringLiteral("message")).toString());
         return;
     }
+
     if (method == QStringLiteral("window/showMessage")) {
         const QString message = parameters.value(QStringLiteral("message")).toString();
         if (parameters.value(QStringLiteral("type")).toInt() == 1) {
@@ -552,46 +612,57 @@ void LanguageServerClient::handleResponse(int requestId, const QJsonObject& mess
         handleShutdownResponse(message);
         return;
     }
+
     if (requestId == m_initializeRequestId) {
         handleInitializeResponse(message);
         return;
     }
+
     if (m_completionRequests.contains(requestId)) {
         handleCompletionResponse(requestId, message);
         return;
     }
+
     if (m_completionResolveRequests.contains(requestId)) {
         handleCompletionDocumentationResponse(requestId, message);
         return;
     }
+
     if (m_symbolQueryRequests.contains(requestId)) {
         handleSymbolQueryResponse(requestId, message);
         return;
     }
+
     if (m_hoverRequests.contains(requestId)) {
         handleHoverResponse(requestId, message);
         return;
     }
+
     if (m_signatureHelpRequests.contains(requestId)) {
         handleSignatureHelpResponse(requestId, message);
         return;
     }
+
     if (m_highlightRequests.contains(requestId)) {
         handleHighlightResponse(requestId, message);
         return;
     }
+
     if (m_documentSymbolRequests.contains(requestId)) {
         handleDocumentSymbolResponse(requestId, message);
         return;
     }
+
     if (m_workspaceSymbolRequests.contains(requestId)) {
         handleWorkspaceSymbolResponse(requestId, message);
         return;
     }
+
     if (m_semanticTokenRequests.contains(requestId)) {
         handleSemanticTokenResponse(requestId, message);
         return;
     }
+
     if (m_diagnosticRequests.contains(requestId)) {
         handleDiagnosticResponse(requestId, message);
         return;
@@ -600,11 +671,13 @@ void LanguageServerClient::handleResponse(int requestId, const QJsonObject& mess
 
 void LanguageServerClient::handleShutdownResponse(const QJsonObject& message) {
     m_shutdownRequestId = -1;
+
     if (message.contains(QStringLiteral("result"))) {
         sendNotification(QStringLiteral("exit"), {});
         QMetaObject::invokeMethod(m_transport, "requestTermination", Qt::QueuedConnection);
         return;
     }
+
     emit serverLog(message.value(QStringLiteral("error")).toObject().value(QStringLiteral("message")).toString(QStringLiteral("The language server rejected shutdown")));
     QMetaObject::invokeMethod(m_transport, "requestTermination", Qt::QueuedConnection);
 }
@@ -612,31 +685,38 @@ void LanguageServerClient::handleShutdownResponse(const QJsonObject& message) {
 void LanguageServerClient::handleInitializeResponse(const QJsonObject& message) {
     m_initializeRequestId = -1;
     m_initializeTimer.stop();
+
     if (!message.contains(QStringLiteral("result"))) {
         emit serverError(message.value(QStringLiteral("error")).toObject().value(QStringLiteral("message")).toString(QStringLiteral("The language server rejected initialization")));
         return;
     }
+
     applyCapabilities(message.value(QStringLiteral("result")).toObject().value(QStringLiteral("capabilities")).toObject());
     m_ready = true;
     sendNotification(QStringLiteral("initialized"), {});
+
     if (m_capabilities.openClose) {
         for (auto document = m_documents.begin(); document != m_documents.end(); ++document) {
             sendOpen(document.key(), document.value());
         }
     }
+
     emit initialized();
     return;
 }
 
 void LanguageServerClient::handleCompletionResponse(int requestId, const QJsonObject& message) {
     const QString path = m_completionRequests.take(requestId);
+
     if (message.contains(QStringLiteral("error"))) {
         emit serverLog(message.value(QStringLiteral("error")).toObject().value(QStringLiteral("message")).toString(QStringLiteral("The language server rejected completion")));
         return;
     }
+
     const QJsonValue result = message.value(QStringLiteral("result"));
     const QJsonArray items = result.isArray() ? result.toArray() : result.toObject().value(QStringLiteral("items")).toArray();
     QVector<CompletionProposal> proposals;
+
     for (const auto& value : items) {
         const QJsonObject item = value.toObject();
         const QString label = item.value(QStringLiteral("label")).toString().trimmed();
@@ -689,20 +769,24 @@ void LanguageServerClient::handleSignatureHelpResponse(int requestId, const QJso
     const QString path = m_signatureHelpRequests.take(requestId);
     const QJsonObject result = message.value(QStringLiteral("result")).toObject();
     SignatureHelpInfo help{{}, result.value(QStringLiteral("activeSignature")).toInt(0), result.value(QStringLiteral("activeParameter")).toInt(-1)};
+
     for (const auto& signature : result.value(QStringLiteral("signatures")).toArray()) {
         help.signatures.append(signature.toObject().value(QStringLiteral("label")).toString());
     }
+
     emit signatureHelpReady(path, help);
 }
 
 void LanguageServerClient::handleHighlightResponse(int requestId, const QJsonObject& message) {
     const QString path = m_highlightRequests.take(requestId);
     QVector<SourceLocation> highlights;
+
     for (const auto& entry : message.value(QStringLiteral("result")).toArray()) {
         SourceLocation highlight = LanguageServerClientHelper::locationOf(entry.toObject());
         highlight.path = path;
         highlights.append(highlight);
     }
+
     emit documentHighlightsReady(path, highlights);
 }
 
@@ -714,6 +798,7 @@ void LanguageServerClient::handleDocumentSymbolResponse(int requestId, const QJs
 void LanguageServerClient::handleWorkspaceSymbolResponse(int requestId, const QJsonObject& message) {
     m_workspaceSymbolRequests.remove(requestId);
     QVector<WorkspaceSymbolEntry> symbols;
+
     for (const auto& entry : message.value(QStringLiteral("result")).toArray()) {
         const QJsonObject item = entry.toObject();
         const SourceLocation location = LanguageServerClientHelper::locationOf(item);
@@ -721,6 +806,7 @@ void LanguageServerClient::handleWorkspaceSymbolResponse(int requestId, const QJ
             symbols.append({item.value(QStringLiteral("name")).toString(), item.value(QStringLiteral("containerName")).toString(), item.value(QStringLiteral("kind")).toInt(), location});
         }
     }
+
     emit workspaceSymbolsReady(symbols);
 }
 
@@ -730,6 +816,7 @@ void LanguageServerClient::handleSemanticTokenResponse(int requestId, const QJso
     QVector<SemanticToken> tokens;
     int line = 0;
     int start = 0;
+
     for (qsizetype index = 0; index + 4 < data.size(); index += 5) {
         const int deltaLine = data.at(index).toInt();
         const int deltaStart = data.at(index + 1).toInt();
@@ -740,12 +827,14 @@ void LanguageServerClient::handleSemanticTokenResponse(int requestId, const QJso
             tokens.append({line, start, data.at(index + 2).toInt(), m_capabilities.semanticTokenTypes.at(type)});
         }
     }
+
     emit semanticTokensReady(path, tokens);
 }
 
 void LanguageServerClient::handleDiagnosticResponse(int requestId, const QJsonObject& message) {
     const QString path = m_diagnosticRequests.take(requestId);
     const QJsonObject report = message.value(QStringLiteral("result")).toObject();
+
     if (report.value(QStringLiteral("kind")).toString() == QStringLiteral("full")) {
         emit diagnosticsPublished(path, LanguageServerClientHelper::diagnosticsOf(path, report.value(QStringLiteral("items")).toArray()));
     }
@@ -757,6 +846,7 @@ void LanguageServerClient::applyCapabilities(const QJsonObject& capabilities) {
     const QJsonValue synchronization = capabilities.value(QStringLiteral("textDocumentSync"));
     const int kind = synchronization.isObject() ? synchronization.toObject().value(QStringLiteral("change")).toInt(1) : synchronization.toInt(1);
     m_capabilities.sync = kind == 2 ? DocumentSyncKind::Incremental : (kind == 1 ? DocumentSyncKind::Full : DocumentSyncKind::None);
+
     if (synchronization.isObject()) {
         const QJsonObject object = synchronization.toObject();
         const QJsonValue save = object.value(QStringLiteral("save"));
@@ -768,11 +858,13 @@ void LanguageServerClient::applyCapabilities(const QJsonObject& capabilities) {
     const QJsonValue completion = capabilities.value(QStringLiteral("completionProvider"));
     m_capabilities.completion = LanguageServerClientHelper::declaredProvider(completion);
     m_capabilities.completionResolve = completion.toObject().value(QStringLiteral("resolveProvider")).toBool(false);
+
     for (const auto& character : completion.toObject().value(QStringLiteral("triggerCharacters")).toArray()) {
         if (!character.toString().isEmpty()) {
             m_capabilities.completionTriggerCharacters.append(character.toString());
         }
     }
+
     m_capabilities.definition = LanguageServerClientHelper::declaredProvider(capabilities.value(QStringLiteral("definitionProvider")));
     m_capabilities.declaration = LanguageServerClientHelper::declaredProvider(capabilities.value(QStringLiteral("declarationProvider")));
     m_capabilities.typeDefinition = LanguageServerClientHelper::declaredProvider(capabilities.value(QStringLiteral("typeDefinitionProvider")));
@@ -786,6 +878,7 @@ void LanguageServerClient::applyCapabilities(const QJsonObject& capabilities) {
 
     const QJsonValue signatureHelp = capabilities.value(QStringLiteral("signatureHelpProvider"));
     m_capabilities.signatureHelp = LanguageServerClientHelper::declaredProvider(signatureHelp);
+
     for (const auto& character : signatureHelp.toObject().value(QStringLiteral("triggerCharacters")).toArray()) {
         if (!character.toString().isEmpty()) {
             m_capabilities.signatureHelpTriggerCharacters.append(character.toString());
@@ -793,9 +886,11 @@ void LanguageServerClient::applyCapabilities(const QJsonObject& capabilities) {
     }
 
     const QJsonObject semanticTokens = capabilities.value(QStringLiteral("semanticTokensProvider")).toObject();
+
     for (const auto& type : semanticTokens.value(QStringLiteral("legend")).toObject().value(QStringLiteral("tokenTypes")).toArray()) {
         m_capabilities.semanticTokenTypes.append(type.toString());
     }
+
     m_capabilities.semanticTokens = !m_capabilities.semanticTokenTypes.isEmpty() && LanguageServerClientHelper::declaredProvider(semanticTokens.value(QStringLiteral("full")));
 }
 
@@ -848,14 +943,17 @@ void LanguageServerClient::sendOpen(const QString& path, Document& document) {
 
 void LanguageServerClient::sendChange(const QString& path, Document& document, const QJsonArray& contentChanges) {
     ++document.version;
+
     if (!m_ready || !document.opened || contentChanges.isEmpty()) {
         return;
     }
+
     sendNotification(QStringLiteral("textDocument/didChange"), {{QStringLiteral("textDocument"), QJsonObject{{QStringLiteral("uri"), uri(path)}, {QStringLiteral("version"), document.version}}}, {QStringLiteral("contentChanges"), contentChanges}});
 }
 
 QJsonObject LanguageServerClient::positionOf(const QString& text, int offset) const {
     const qsizetype bounded = std::clamp<qsizetype>(offset, 0, text.size());
+
     if (bounded == 0) {
         return {{QStringLiteral("line"), 0}, {QStringLiteral("character"), 0}};
     }
@@ -868,6 +966,7 @@ QJsonObject LanguageServerClient::positionOf(const QString& text, int offset) co
 // The end of a range is reached by walking the text it covers, because scanning the whole file again for it costs the size of the file on every edit.
 QJsonObject LanguageServerClient::positionAfter(const QJsonObject& start, QStringView covered) const {
     const qsizetype breaks = covered.count(QLatin1Char('\n'));
+
     if (breaks == 0) {
         return {{QStringLiteral("line"), start.value(QStringLiteral("line")).toInt()}, {QStringLiteral("character"), start.value(QStringLiteral("character")).toInt() + static_cast<int>(covered.size())}};
     }
@@ -883,14 +982,17 @@ QJsonObject LanguageServerClient::documentPosition(const QString& path, int line
 // The server answers with the address it built, so the answer is resolved back to the document the workspace really has open.
 QString LanguageServerClient::documentPathOf(const QString& uri) const {
     QString local = QUrl(uri).toLocalFile();
+
     if (m_documents.contains(local)) {
         return local;
     }
+
     for (auto document = m_documents.constBegin(); document != m_documents.constEnd(); ++document) {
         if (samePath(document.key(), local)) {
             return document.key();
         }
     }
+
     return local;
 }
 

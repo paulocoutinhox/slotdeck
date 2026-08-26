@@ -516,6 +516,7 @@ TEST(AiToolRegistryTest, AcceptsAPathInsideTheWorkingDirectoryHoweverItWasWritte
     QTemporaryDir outside;
     ASSERT_TRUE(outside.isValid());
     const QString link = root + QStringLiteral("/escape");
+
     if (!QFile::link(QDir(outside.path()).canonicalPath(), link) || !QFileInfo(link).isSymLink()) {
         GTEST_SKIP() << "The platform did not allow creating a symbolic link";
     }
@@ -1182,9 +1183,11 @@ TEST(AiTaskRepositoryTest, RoundTripsAConversationAndRejectsAStoredMessageNobody
     // The stored rows are read back in the order they were written, whatever order the page returned them in.
     host.queryHandler = [](const QString& statement, const QVariantList&) {
         persistence::DatabaseRows rows;
+
         if (!statement.contains(QStringLiteral("FROM ai_tasks_messages"))) {
             return utils::Result<persistence::DatabaseRows>::success(rows);
         }
+
         rows.append({{QStringLiteral("id"), QStringLiteral("message-2")}, {QStringLiteral("task_id"), QStringLiteral("task-1")}, {QStringLiteral("sequence"), 2}, {QStringLiteral("role"), QStringLiteral("assistant")}, {QStringLiteral("content"), QStringLiteral("Reading it now")}, {QStringLiteral("tool_calls"), QStringLiteral("[]")}, {QStringLiteral("tool_call_id"), QString{}}, {QStringLiteral("summarized_until"), 0}, {QStringLiteral("created_at_utc"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)}});
         rows.append({{QStringLiteral("id"), QStringLiteral("message-1")}, {QStringLiteral("task_id"), QStringLiteral("task-1")}, {QStringLiteral("sequence"), 1}, {QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QStringLiteral("Review the repository")}, {QStringLiteral("tool_calls"), QStringLiteral("[]")}, {QStringLiteral("tool_call_id"), QString{}}, {QStringLiteral("summarized_until"), 0}, {QStringLiteral("created_at_utc"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)}});
         return utils::Result<persistence::DatabaseRows>::success(rows);
@@ -1480,6 +1483,7 @@ TEST(AiTaskRepositoryTest, TakesTheDeclaredDefaultForEveryStoredValueItCannotUse
 
     // A container of the wrong type is the declared default, so it never becomes an empty selection nobody explained.
     const QVector<QPair<QString, QJsonValue>> mistyped{{QStringLiteral("connections"), QStringLiteral("none")}, {QStringLiteral("execution"), 12}, {QStringLiteral("search"), QJsonArray{}}, {QStringLiteral("speech"), true}, {QStringLiteral("mcpServers"), QJsonObject{}}};
+
     for (const auto& [key, value] : mistyped) {
         host.settingsDocument = {{key, value}};
         const AiSettings settings = repository.settings();
@@ -1953,9 +1957,11 @@ TEST(AiToolRegistryTest, DiscoversSkillsInThePublishedLayoutAndDisclosesThemProg
     EXPECT_FALSE(catalog.first().root.isEmpty());
 
     QStringList names;
+
     for (const auto& declared : catalog) {
         names.append(declared.name);
     }
+
     EXPECT_TRUE(names.contains(QStringLiteral("data-export")));
     EXPECT_TRUE(names.contains(QStringLiteral("reporting")));
     // A file that declares nothing about itself is skipped by name and the catalog around it still answers.
@@ -2023,6 +2029,7 @@ TEST(AiToolContractTest, FitsTheConversationToTheModelWindowWithoutBreakingToolT
     const QString filler(4000, QLatin1Char('x'));
 
     QJsonArray conversation{instructions, task};
+
     for (int turn = 0; turn < 6; ++turn) {
         conversation.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("assistant")}, {QStringLiteral("content"), filler}, {QStringLiteral("tool_calls"), QJsonArray{QJsonObject{{QStringLiteral("id"), QStringLiteral("c")}}}}});
         conversation.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("tool")}, {QStringLiteral("tool_call_id"), QStringLiteral("c")}, {QStringLiteral("content"), filler}});
@@ -2054,6 +2061,7 @@ TEST(AiToolContractTest, FitsTheConversationToTheModelWindowWithoutBreakingToolT
     ASSERT_GE(fitted.messages.size(), 2);
     EXPECT_EQ(fitted.messages.first().toObject().value(QStringLiteral("role")).toString(), QStringLiteral("system"));
     EXPECT_EQ(fitted.messages.at(1).toObject().value(QStringLiteral("content")).toString(), QStringLiteral("do the work"));
+
     for (qsizetype index = 2; index < fitted.messages.size(); ++index) {
         if (fitted.messages.at(index).toObject().value(QStringLiteral("role")).toString() == QStringLiteral("tool")) {
             EXPECT_TRUE(fitted.messages.at(index - 1).toObject().contains(QStringLiteral("tool_calls"))) << index;

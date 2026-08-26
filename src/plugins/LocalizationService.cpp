@@ -41,6 +41,7 @@ utils::Result<void> LocalizationService::registerCatalog(const QString& pluginId
     }
 
     const auto& englishEntries = catalog.value(QStringLiteral("en"));
+
     if (englishEntries.isEmpty()) {
         return utils::Result<void>::failure({"plugin_translation_english_missing", "The plugin translation catalog requires English", pluginId});
     }
@@ -69,20 +70,24 @@ void LocalizationService::unregisterCatalog(const QString& pluginId) {
 utils::Result<void> LocalizationService::setLocale(QString localeName) {
     localeName.replace(QLatin1Char('_'), QLatin1Char('-'));
     localeName = localeName.toLower();
+
     if (!LocalizationServiceHelper::localePattern().match(localeName).hasMatch()) {
         return utils::Result<void>::failure({"application_locale_invalid", "The application locale is invalid", localeName});
     }
+
     m_localeName = std::move(localeName);
     return utils::Result<void>::success();
 }
 
 QString LocalizationService::translate(const QString& key) const {
     const qsizetype separator = key.indexOf(QLatin1Char('.'));
+
     if (separator <= 0) {
         return key;
     }
 
     const auto catalog = m_catalogs.constFind(key.first(separator));
+
     if (catalog == m_catalogs.cend()) {
         return key;
     }
@@ -98,6 +103,7 @@ QString LocalizationService::translate(const QString& key) const {
             return translation.value();
         }
     }
+
     return key;
 }
 
@@ -108,19 +114,23 @@ const QString& LocalizationService::localeName() const {
 QStringList LocalizationService::localeCandidates() const {
     QStringList candidates{m_localeName};
     const qsizetype separator = m_localeName.indexOf(QLatin1Char('-'));
+
     if (separator > 0) {
         candidates.append(m_localeName.first(separator));
     }
+
     candidates.append(QStringLiteral("en"));
 
     QSet<QString> seen;
     QStringList unique;
+
     for (const auto& candidate : candidates) {
         if (!seen.contains(candidate)) {
             seen.insert(candidate);
             unique.append(candidate);
         }
     }
+
     return unique;
 }
 

@@ -60,6 +60,7 @@ inline bool isCloseTerminal(const QKeyEvent& event) {
 
 inline bool isCopy(const QKeyEvent& event) {
     const Qt::KeyboardModifiers keyModifiers = modifiers(event);
+
     if (event.key() == Qt::Key_Copy && keyModifiers == Qt::NoModifier) {
         return true;
     }
@@ -76,6 +77,7 @@ inline bool isCopy(const QKeyEvent& event) {
 
 inline bool isPaste(const QKeyEvent& event) {
     const Qt::KeyboardModifiers keyModifiers = modifiers(event);
+
     if (event.key() == Qt::Key_Paste && keyModifiers == Qt::NoModifier) {
         return true;
     }
@@ -105,6 +107,7 @@ inline bool isSelectAll(const QKeyEvent& event) {
 // Clearing the buffer follows the same rule, because Control with K deletes to the end of the line in a shell.
 inline bool isClearBuffer(const QKeyEvent& event) {
     const Qt::KeyboardModifiers keyModifiers = modifiers(event);
+
     if (event.key() != Qt::Key_K) {
         return false;
     }
@@ -150,9 +153,11 @@ inline bool isTerminalOwned(const QKeyEvent& event) {
 
     const Qt::KeyboardModifiers keyModifiers = modifiers(event);
 #ifdef Q_OS_MACOS
+
     if (keyModifiers.testFlag(applicationModifier)) {
         return false;
     }
+
 #endif
     return keyModifiers.testFlag(terminalControlModifier) || keyModifiers.testFlag(Qt::AltModifier);
 }

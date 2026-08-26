@@ -83,9 +83,11 @@ TerminalWidget::TerminalWidget(plugins::PluginHost& host, QWidget* parent) : QWi
     // clang-format on
     connect(m_scrollBar, &QScrollBar::valueChanged, this, scrollToRow);
     const QStringList monospacedFamilies = ui::monospacedFontFamilies();
+
     if (!monospacedFamilies.isEmpty()) {
         m_font.setFamily(monospacedFamilies.first());
     }
+
     m_font.setStyleHint(QFont::Monospace);
     m_font.setFixedPitch(true);
     m_font.setPointSizeF(m_fontSize);
@@ -106,10 +108,12 @@ void TerminalWidget::setSession(terminalcore::TerminalSession* newSession) {
 
     m_resizeTimer.stop();
     m_renderTimer.stop();
+
     if (m_renderConnection) {
         disconnect(m_renderConnection);
         m_renderConnection = {};
     }
+
     if (m_clipboardConnection) {
         disconnect(m_clipboardConnection);
         m_clipboardConnection = {};
@@ -118,6 +122,7 @@ void TerminalWidget::setSession(terminalcore::TerminalSession* newSession) {
     m_session = newSession;
     m_wheelPixelRemainder = 0;
     m_wheelAngleRemainder = 0;
+
     if (m_session != nullptr) {
         m_renderConnection = connect(m_session, &terminalcore::TerminalSession::renderChanged, this, &TerminalWidget::scheduleSnapshotRefresh);
         // clang-format off
@@ -132,6 +137,7 @@ void TerminalWidget::setSession(terminalcore::TerminalSession* newSession) {
         }
         m_scrollBar->hide();
     }
+
     update();
 }
 
@@ -169,6 +175,7 @@ bool TerminalWidget::event(QEvent* event) {
             return true;
         }
     }
+
     return QWidget::event(event);
 }
 
@@ -186,6 +193,7 @@ void TerminalWidget::paintEvent(QPaintEvent*) {
 
     const QFontMetricsF fontMetrics(m_font);
     const qreal baseline = (static_cast<qreal>(m_cellHeight) - fontMetrics.height()) / 2.0 + fontMetrics.ascent();
+
     for (const auto& cell : renderSnapshot.cells) {
         const QRectF cellRect(m_host.theme().metric(ThemeMetric::TerminalHorizontalPadding) + static_cast<qreal>(cell.column * m_cellWidth), m_host.theme().metric(ThemeMetric::TerminalVerticalPadding) + static_cast<qreal>(cell.row * m_cellHeight), m_cellWidth, m_cellHeight);
         QColor foreground = cell.foreground;
@@ -236,6 +244,7 @@ void TerminalWidget::paintMatches(QPainter& painter, const terminalcore::Termina
     QColor marker = m_host.theme().color(ThemeColor::Warning);
     marker.setAlphaF(0.35F);
     const auto& theme = m_host.theme();
+
     for (const auto& match : m_matches) {
         const qint64 row = static_cast<qint64>(match.row) - static_cast<qint64>(renderSnapshot.scrollOffset);
         if (row < 0 || row >= renderSnapshot.rows) {
@@ -276,11 +285,13 @@ void TerminalWidget::paintCursor(QPainter& painter, const terminalcore::Terminal
         painter.drawRect(cell.adjusted(0.5, 0.5, -0.5, -0.5));
         return;
     }
+
     if (renderSnapshot.cursorBlinking && !m_cursorOn) {
         return;
     }
 
     cursorColor.setAlphaF(0.72F);
+
     switch (renderSnapshot.cursorStyle) {
     case terminalcore::CursorStyle::Bar:
         painter.fillRect(QRectF(cell.left(), cell.top(), cursorEdgeThickness, cell.height()), cursorColor);
@@ -304,10 +315,12 @@ void TerminalWidget::resizeEvent(QResizeEvent* event) {
     const int horizontalPadding = m_host.theme().metric(ThemeMetric::TerminalHorizontalPadding);
     m_scrollBar->setGeometry(width() - horizontalPadding, 0, horizontalPadding, height());
     m_scrollBar->raise();
+
     if (m_findBar->isVisible()) {
         layoutFindBar();
         m_findBar->raise();
     }
+
     scheduleTerminalResize();
 }
 
@@ -347,6 +360,7 @@ void TerminalWidget::reportFocus(bool gained) {
     }
 
     const auto result = m_session->sendFocus(gained);
+
     if (!result.hasValue()) {
         emit interactionError(result.error().message);
     }
@@ -377,6 +391,7 @@ void TerminalWidget::dropEvent(QDropEvent* event) {
     }
 
     const QStringList paths = localPathsFromDrop(*event->mimeData());
+
     if (paths.isEmpty()) {
         event->ignore();
         return;
@@ -384,6 +399,7 @@ void TerminalWidget::dropEvent(QDropEvent* event) {
 
     m_session->scrollToBottom();
     const auto result = m_session->writeLocalPaths(paths);
+
     if (!result.hasValue()) {
         emit interactionError(result.error().message);
         event->ignore();
@@ -468,9 +484,11 @@ void TerminalWidget::keyPressEvent(QKeyEvent* event) {
 
     m_session->scrollToBottom();
     const auto result = m_session->sendKey(*event);
+
     if (!result.hasValue()) {
         emit interactionError(result.error().message);
     }
+
     event->accept();
 }
 
@@ -478,6 +496,7 @@ void TerminalWidget::pasteClipboard() {
     const QString text = QApplication::clipboard()->text();
     const QByteArray payload = text.toUtf8();
     const int lineCount = static_cast<int>(text.count(QLatin1Char('\n'))) + (text.endsWith(QLatin1Char('\n')) ? 0 : 1);
+
     if (m_confirmMultilinePaste && m_session->pasteExecutesOnArrival(payload)) {
         const bool confirmed = m_host.confirm(this, m_host.translate(QStringLiteral("terminal.paste.confirm-title")), m_host.translate(QStringLiteral("terminal.paste.confirm-message")).arg(lineCount), m_host.translate(QStringLiteral("terminal.paste.confirm-detail")), m_host.translate(QStringLiteral("terminal.paste.confirm-action")), false);
         if (!confirmed) {
@@ -487,6 +506,7 @@ void TerminalWidget::pasteClipboard() {
 
     m_session->scrollToBottom();
     const auto result = m_session->paste(payload);
+
     if (!result.hasValue()) {
         emit interactionError(result.error().message);
     }
@@ -499,6 +519,7 @@ QStringList TerminalWidget::localPathsFromDrop(const QMimeData& mimeData) {
 
     QStringList paths;
     paths.reserve(mimeData.urls().size());
+
     for (const auto& url : mimeData.urls()) {
         if (!url.isLocalFile()) {
             return {};
@@ -524,6 +545,7 @@ void TerminalWidget::inputMethodEvent(QInputMethodEvent* event) {
     }
 
     m_preedit = event->preeditString();
+
     if (!event->commitString().isEmpty()) {
         m_session->scrollToBottom();
         const auto result = m_session->write(event->commitString().toUtf8());
@@ -540,10 +562,12 @@ QVariant TerminalWidget::inputMethodQuery(Qt::InputMethodQuery query) const {
     if (query == Qt::ImEnabled) {
         return true;
     }
+
     if (query == Qt::ImCursorRectangle) {
         const QMutexLocker locker(&m_snapshotMutex);
         return QRectF(m_host.theme().metric(ThemeMetric::TerminalHorizontalPadding) + static_cast<qreal>(m_snapshot.cursorPosition.x() * m_cellWidth), m_host.theme().metric(ThemeMetric::TerminalVerticalPadding) + static_cast<qreal>(m_snapshot.cursorPosition.y() * m_cellHeight), m_cellWidth, m_cellHeight);
     }
+
     return QWidget::inputMethodQuery(query);
 }
 
@@ -562,6 +586,7 @@ QString TerminalWidget::selectedText() const {
 
 void TerminalWidget::copySelection() {
     const QString text = selectedText();
+
     if (text.isEmpty()) {
         return;
     }
@@ -601,6 +626,7 @@ void TerminalWidget::refreshMatches() {
     const QString query = m_findBar->query();
     m_matches = m_session->search(query, m_findBar->caseSensitive(), m_findBar->wholeWord(), searchMatchMaximum);
     m_currentMatch = m_matches.isEmpty() ? -1 : 0;
+
     if (m_currentMatch >= 0) {
         m_session->revealMatch(m_matches.at(m_currentMatch));
     }
@@ -727,6 +753,7 @@ void TerminalWidget::reportMouse(terminalcore::MouseAction action, terminalcore:
     report.anyButtonPressed = pressedButtons != Qt::NoButton;
 
     const auto result = m_session->sendMouse(report);
+
     if (!result.hasValue()) {
         emit interactionError(result.error().message);
     }
@@ -737,6 +764,7 @@ void TerminalWidget::startSelection(QMouseEvent& event) {
     const quint64 timeNanoseconds = static_cast<quint64>(event.timestamp()) * 1'000'000;
     const quint64 repeatInterval = static_cast<quint64>(QApplication::doubleClickInterval()) * 1'000'000;
     const auto result = m_session->beginSelection(gridPosition(event.position()), timeNanoseconds, repeatInterval, QApplication::startDragDistance(), event.modifiers().testFlag(Qt::AltModifier));
+
     if (!result.hasValue()) {
         emit interactionError(result.error().message);
     }
@@ -756,6 +784,7 @@ void TerminalWidget::mousePressEvent(QMouseEvent* event) {
     }
 
     const terminalcore::MouseButton button = mouseButtonOf(event->button());
+
     if (button != terminalcore::MouseButton::None && mouseBelongsToProgram(event->modifiers())) {
         clearSelection();
         m_reportedButtons |= event->button();
@@ -768,6 +797,7 @@ void TerminalWidget::mousePressEvent(QMouseEvent* event) {
         m_selecting = true;
         startSelection(*event);
     }
+
     event->accept();
 }
 
@@ -813,6 +843,7 @@ void TerminalWidget::mouseReleaseEvent(QMouseEvent* event) {
         m_autoscrollTimer.stop();
         m_session->endSelection(gridPosition(event->position()));
     }
+
     m_selecting = false;
 
     if (m_reportedButtons.testFlag(event->button())) {
@@ -842,9 +873,11 @@ void TerminalWidget::advanceAutoscroll() {
     }
 
     const auto result = m_session->advanceSelectionAutoscroll(gridPosition(m_autoscrollPosition), m_autoscrollRectangle);
+
     if (!result.hasValue()) {
         emit interactionError(result.error().message);
     }
+
     updateAutoscroll();
 }
 
@@ -855,6 +888,7 @@ void TerminalWidget::wheelEvent(QWheelEvent* event) {
     }
 
     int rows = 0;
+
     if (!event->pixelDelta().isNull()) {
         m_wheelPixelRemainder += event->pixelDelta().y();
         rows = m_wheelPixelRemainder / m_cellHeight;
@@ -865,6 +899,7 @@ void TerminalWidget::wheelEvent(QWheelEvent* event) {
         m_wheelAngleRemainder %= 120;
         rows = steps * 3;
     }
+
     if (rows == 0) {
         event->accept();
         return;
@@ -887,6 +922,7 @@ void TerminalWidget::refreshSnapshot() {
     if (m_session == nullptr) {
         return;
     }
+
     terminalcore::TerminalRenderSnapshot snapshot;
     {
         const QMutexLocker locker(&m_snapshotMutex);
@@ -919,6 +955,7 @@ void TerminalWidget::updateTerminalSize() {
     const int columns = std::max(1, contentWidth / m_cellWidth);
     const int rows = std::max(1, contentHeight / m_cellHeight);
     const auto result = m_session->resize(columns, rows, m_cellWidth, m_cellHeight);
+
     if (!result.hasValue()) {
         emit interactionError(result.error().message);
     }

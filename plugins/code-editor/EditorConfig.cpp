@@ -34,6 +34,7 @@ QString EditorConfigHelper::escapedLiteral(QChar character) {
 
 QString EditorConfigHelper::translateSegment(const QString& pattern, qsizetype& index, bool stopOnAlternation) {
     QString expression;
+
     while (index < pattern.size()) {
         const QChar character = pattern.at(index);
         if (character == QLatin1Char('}') || (stopOnAlternation && character == QLatin1Char(','))) {
@@ -103,6 +104,7 @@ QString EditorConfigHelper::translateSegment(const QString& pattern, qsizetype& 
         }
         expression += EditorConfigHelper::escapedLiteral(character);
     }
+
     return expression;
 }
 
@@ -111,17 +113,20 @@ QString EditorConfigHelper::translateBraces(const QString& pattern, qsizetype& i
     const qsizetype start = index;
     QStringList alternatives;
     QString current = EditorConfigHelper::translateSegment(pattern, index, true);
+
     while (index < pattern.size() && pattern.at(index) == QLatin1Char(',')) {
         ++index;
         alternatives.append(current);
         current = EditorConfigHelper::translateSegment(pattern, index, true);
     }
+
     if (index >= pattern.size() || pattern.at(index) != QLatin1Char('}')) {
         index = start;
         return EditorConfigHelper::escapedLiteral(QLatin1Char('{'));
     }
 
     ++index;
+
     if (alternatives.isEmpty()) {
         const QString range = pattern.mid(start, index - start - 1);
         const qsizetype separator = range.indexOf(QStringLiteral(".."));
@@ -146,6 +151,7 @@ QString EditorConfigHelper::translateBraces(const QString& pattern, qsizetype& i
 // A separator inside a character class is one of the characters that class offers rather than a level of the path.
 bool EditorConfigHelper::declaresDirectory(const QString& pattern) {
     bool insideClass = false;
+
     for (qsizetype index = 0; index < pattern.size(); ++index) {
         const QChar character = pattern.at(index);
         if (character == QLatin1Char('\\')) {
@@ -164,12 +170,14 @@ bool EditorConfigHelper::declaresDirectory(const QString& pattern) {
             return true;
         }
     }
+
     return false;
 }
 
 QRegularExpression EditorConfigHelper::sectionExpression(const QString& pattern) {
     QString normalized = pattern;
     const bool anyDirectory = !EditorConfigHelper::declaresDirectory(normalized);
+
     if (normalized.startsWith(QLatin1Char('/'))) {
         normalized = normalized.mid(1);
     }
@@ -192,15 +200,18 @@ std::optional<bool> EditorConfigHelper::parseBoolean(const QString& value) {
     if (value == QStringLiteral("false")) {
         return false;
     }
+
     return std::nullopt;
 }
 
 std::optional<int> EditorConfigHelper::parsePositiveInteger(const QString& value) {
     bool valid = false;
     const int parsed = value.toInt(&valid);
+
     if (!valid || parsed <= 0) {
         return std::nullopt;
     }
+
     return parsed;
 }
 
@@ -209,6 +220,7 @@ void EditorConfigHelper::applyIndentStyle(EditorConfigProperties& properties, co
         properties.indentStyle = IndentStyle::Tab;
         return;
     }
+
     if (value == QStringLiteral("space")) {
         properties.indentStyle = IndentStyle::Space;
     }
@@ -219,10 +231,12 @@ void EditorConfigHelper::applyLineEnding(EditorConfigProperties& properties, con
         properties.lineEnding = LineEnding::Lf;
         return;
     }
+
     if (value == QStringLiteral("crlf")) {
         properties.lineEnding = LineEnding::Crlf;
         return;
     }
+
     if (value == QStringLiteral("cr")) {
         properties.lineEnding = LineEnding::Cr;
     }
@@ -245,32 +259,39 @@ void EditorConfigHelper::clearProperty(EditorConfigProperties& properties, const
         properties.indentStyle = std::nullopt;
         return;
     }
+
     if (key == QStringLiteral("indent_size")) {
         properties.indentSize = std::nullopt;
         indentSizeFollowsTab = false;
         return;
     }
+
     if (key == QStringLiteral("tab_width")) {
         properties.tabWidth = std::nullopt;
         return;
     }
+
     if (key == QStringLiteral("end_of_line")) {
         properties.lineEnding = std::nullopt;
         return;
     }
+
     if (key == QStringLiteral("charset")) {
         properties.charset = std::nullopt;
         properties.unsupportedCharsets.clear();
         return;
     }
+
     if (key == QStringLiteral("trim_trailing_whitespace")) {
         properties.trimTrailingWhitespace = std::nullopt;
         return;
     }
+
     if (key == QStringLiteral("insert_final_newline")) {
         properties.insertFinalNewline = std::nullopt;
         return;
     }
+
     if (key == QStringLiteral("max_line_length")) {
         properties.maximumLineLength = std::nullopt;
     }
@@ -281,36 +302,44 @@ void EditorConfigHelper::applyProperty(EditorConfigProperties& properties, const
         EditorConfigHelper::clearProperty(properties, key, indentSizeFollowsTab);
         return;
     }
+
     if (key == QStringLiteral("indent_style")) {
         EditorConfigHelper::applyIndentStyle(properties, value);
         return;
     }
+
     // An indent size that follows the tab width is resolved once every file has been read, so the two can be written in either order.
     if (key == QStringLiteral("indent_size")) {
         indentSizeFollowsTab = value == QStringLiteral("tab");
         properties.indentSize = indentSizeFollowsTab ? std::nullopt : EditorConfigHelper::parsePositiveInteger(value);
         return;
     }
+
     if (key == QStringLiteral("tab_width")) {
         properties.tabWidth = EditorConfigHelper::parsePositiveInteger(value);
         return;
     }
+
     if (key == QStringLiteral("end_of_line")) {
         EditorConfigHelper::applyLineEnding(properties, value);
         return;
     }
+
     if (key == QStringLiteral("charset")) {
         EditorConfigHelper::applyCharset(properties, value);
         return;
     }
+
     if (key == QStringLiteral("trim_trailing_whitespace")) {
         properties.trimTrailingWhitespace = EditorConfigHelper::parseBoolean(value);
         return;
     }
+
     if (key == QStringLiteral("insert_final_newline")) {
         properties.insertFinalNewline = EditorConfigHelper::parseBoolean(value);
         return;
     }
+
     if (key == QStringLiteral("max_line_length")) {
         properties.maximumLineLength = value == QStringLiteral("off") ? std::nullopt : EditorConfigHelper::parsePositiveInteger(value);
     }
@@ -318,6 +347,7 @@ void EditorConfigHelper::applyProperty(EditorConfigProperties& properties, const
 
 bool EditorConfigHelper::declaresRoot(const QString& content) {
     const QStringList lines = content.split(QLatin1Char('\n'));
+
     for (const auto& rawLine : lines) {
         const QString line = EditorConfigHelper::significantLine(rawLine);
         if (line.isEmpty()) {
@@ -334,6 +364,7 @@ bool EditorConfigHelper::declaresRoot(const QString& content) {
             return line.mid(separator + 1).trimmed().toLower() == QStringLiteral("true");
         }
     }
+
     return false;
 }
 
@@ -341,6 +372,7 @@ void EditorConfigHelper::mergeFile(EditorConfigProperties& properties, const Edi
     const QStringList lines = file.content.split(QLatin1Char('\n'));
     bool sectionMatches = false;
     bool insideSection = false;
+
     for (const auto& rawLine : lines) {
         const QString line = EditorConfigHelper::significantLine(rawLine);
         if (line.isEmpty()) {
@@ -366,6 +398,7 @@ QStringList editorConfigSearchPaths(const QString& filePath, const QString& root
     const QString normalizedRoot = QDir::cleanPath(rootPath);
     QString directory = QFileInfo(QDir::cleanPath(filePath)).absolutePath();
     QStringList paths;
+
     while (directory == normalizedRoot || directory.startsWith(normalizedRoot + QLatin1Char('/'))) {
         paths.append(QDir(directory).filePath(QStringLiteral(".editorconfig")));
         if (directory == normalizedRoot) {
@@ -377,12 +410,14 @@ QStringList editorConfigSearchPaths(const QString& filePath, const QString& root
         }
         directory = parent;
     }
+
     return paths;
 }
 
 bool editorConfigSectionMatches(const QString& pattern, const QString& directoryPath, const QString& filePath) {
     const QString normalizedDirectory = QDir::cleanPath(directoryPath);
     const QString normalizedFile = QDir::cleanPath(filePath);
+
     if (!normalizedFile.startsWith(normalizedDirectory + QLatin1Char('/'))) {
         return false;
     }
@@ -393,6 +428,7 @@ bool editorConfigSectionMatches(const QString& pattern, const QString& directory
 
 EditorConfigProperties resolveEditorConfig(const QString& filePath, const QVector<EditorConfigFile>& files) {
     qsizetype boundary = files.size();
+
     for (qsizetype index = 0; index < files.size(); ++index) {
         if (EditorConfigHelper::declaresRoot(files.at(index).content)) {
             boundary = index + 1;
@@ -402,12 +438,15 @@ EditorConfigProperties resolveEditorConfig(const QString& filePath, const QVecto
 
     EditorConfigProperties properties;
     bool indentSizeFollowsTab = false;
+
     for (qsizetype index = boundary - 1; index >= 0; --index) {
         EditorConfigHelper::mergeFile(properties, files.at(index), filePath, indentSizeFollowsTab);
     }
+
     if (indentSizeFollowsTab) {
         properties.indentSize = properties.tabWidth;
     }
+
     return properties;
 }
 
@@ -425,6 +464,7 @@ QString textCharsetName(TextCharset charset) {
     case TextCharset::Latin1:
         return QStringLiteral("latin1");
     }
+
     Q_UNREACHABLE_RETURN({});
 }
 
@@ -434,6 +474,7 @@ std::optional<TextCharset> parseTextCharset(const QString& name) {
             return charset;
         }
     }
+
     return std::nullopt;
 }
 
@@ -446,6 +487,7 @@ int resolvedIndentWidth(const EditorConfigProperties& properties) {
     if (properties.indentStyle.value_or(IndentStyle::Space) == IndentStyle::Tab) {
         return properties.tabWidth.value_or(properties.indentSize.value_or(4));
     }
+
     return properties.indentSize.value_or(properties.tabWidth.value_or(4));
 }
 

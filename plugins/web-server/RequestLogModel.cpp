@@ -13,9 +13,11 @@ RequestLogModel::RequestLogModel(qsizetype capacity) : m_capacity(capacity) {}
 void RequestLogModel::append(RequestLogEntry entry) {
     const QWriteLocker locker(&m_lock);
     entry.sequence = m_nextSequence++;
+
     while (!m_entries.isEmpty() && m_entries.size() >= m_capacity) {
         m_entries.removeFirst();
     }
+
     if (m_entries.size() < m_capacity) {
         m_entries.append(std::move(entry));
     }
@@ -43,6 +45,7 @@ RequestLogBatch RequestLogModel::entriesSince(std::uint64_t cursor, qsizetype ma
             break;
         }
     }
+
     return batch;
 }
 

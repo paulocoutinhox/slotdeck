@@ -38,6 +38,7 @@ namespace slotdeck {
 
 TEST(RequestLogModelTest, AssignsMonotonicSequencesPagesCapsAndClearsEntries) {
     plugins::webserver::RequestLogModel model(3);
+
     for (int index = 0; index < 5; ++index) {
         model.append({0, QDateTime::fromMSecsSinceEpoch(index, QTimeZone::UTC), QStringLiteral("GET"), QStringLiteral("/%1").arg(index), 200 + index, index, index * 10, QStringLiteral("127.0.0.1")});
     }
@@ -71,9 +72,11 @@ TEST(RequestLogModelTest, SupportsConcurrentWritersAndReaders) {
     };
     // clang-format on
     std::thread reader(readEntries);
+
     for (int index = 0; index < 1000; ++index) {
         model.append({});
     }
+
     reading.store(false, std::memory_order_release);
     reader.join();
     const auto batch = model.entriesSince(0, 500);
@@ -132,9 +135,11 @@ TEST(StaticFileResolverTest, RejectsInvalidRootsTraversalLinksAndUnreadableTarge
     ASSERT_TRUE(resolver.valid());
 
     QList<QByteArray> rejected{QByteArray("/bad\0path", 9), QByteArrayLiteral("/%00"), QByteArrayLiteral("/..%2Fsecret.txt"), QByteArrayLiteral("/../secret.txt"), QByteArrayLiteral("/folder\\file"), QByteArrayLiteral("/missing"), QByteArrayLiteral("/empty/"), QByteArray(8193, 'a')};
+
     if (QFileInfo(root.filePath(QStringLiteral("link.txt"))).isSymLink()) {
         rejected.append(QByteArrayLiteral("/link.txt"));
     }
+
     for (const auto& path : rejected) {
         EXPECT_FALSE(resolver.resolve(path).has_value()) << path.toStdString();
     }
@@ -202,6 +207,7 @@ TEST(WebServerInstanceTest, KeepsServingThroughManyConnectionsIncludingOnesThatL
     ASSERT_TRUE(server.start(directory.path(), QStringLiteral("127.0.0.1"), 0));
 
     int served = 0;
+
     for (int round = 0; round < 60; ++round) {
         // A client that opens a connection and leaves without speaking must not keep the server from answering the next one.
         QTcpSocket abandoned;
@@ -328,6 +334,7 @@ TEST(WebServerPluginTest, OperatesWithoutTerminalAndRemovesIndependentConfigurat
 
     QPushButton* createButton = nullptr;
     QPushButton* terminalButton = nullptr;
+
     for (auto* button : navigation->findChildren<QPushButton*>()) {
         if (button->text() == host.translate(QStringLiteral("web-server.manager.new-server"))) {
             createButton = button;
@@ -336,12 +343,14 @@ TEST(WebServerPluginTest, OperatesWithoutTerminalAndRemovesIndependentConfigurat
             terminalButton = button;
         }
     }
+
     ASSERT_NE(createButton, nullptr);
     ASSERT_NE(terminalButton, nullptr);
     EXPECT_FALSE(createButton->isHidden());
     EXPECT_TRUE(terminalButton->isHidden());
     const QImage createIcon = createButton->icon().pixmap(32, 32).toImage();
     bool foundOpaquePixel = false;
+
     for (int y = 0; y < createIcon.height(); ++y) {
         for (int x = 0; x < createIcon.width(); ++x) {
             const QColor color = createIcon.pixelColor(x, y);
@@ -354,6 +363,7 @@ TEST(WebServerPluginTest, OperatesWithoutTerminalAndRemovesIndependentConfigurat
             EXPECT_EQ(color.blue(), 255);
         }
     }
+
     EXPECT_TRUE(foundOpaquePixel);
 
     host.executeError = utils::Error{QStringLiteral("write_failed"), QStringLiteral("Write failed"), {}};
@@ -376,6 +386,7 @@ TEST(WebServerPluginTest, RejectsInvalidPersistentStateAndStorageFailures) {
     EXPECT_EQ(readFailure.initialize(readFailureHost).error().code, QStringLiteral("read_failed"));
 
     const QList<persistence::DatabaseRows> invalidConfigurations{{{{QStringLiteral("id"), QStringLiteral("server-1")}, {QStringLiteral("name"), QStringLiteral("Preview")}, {QStringLiteral("root"), QStringLiteral("/tmp")}, {QStringLiteral("bind_host"), QStringLiteral("invalid")}, {QStringLiteral("port"), 8080}}}, {{{QStringLiteral("id"), QStringLiteral("server-1")}, {QStringLiteral("name"), QStringLiteral("Preview")}, {QStringLiteral("root"), QStringLiteral("/tmp")}, {QStringLiteral("bind_host"), QStringLiteral("127.0.0.1")}, {QStringLiteral("port"), 0}}}, {{{QStringLiteral("id"), QStringLiteral("server-1")}, {QStringLiteral("name"), QString{}}, {QStringLiteral("root"), QStringLiteral("/tmp")}, {QStringLiteral("bind_host"), QStringLiteral("127.0.0.1")}, {QStringLiteral("port"), 8080}}}, {{{QStringLiteral("id"), QStringLiteral("server-1")}, {QStringLiteral("name"), QStringLiteral(" Preview ")}, {QStringLiteral("root"), QStringLiteral("/tmp")}, {QStringLiteral("bind_host"), QStringLiteral("127.0.0.1")}, {QStringLiteral("port"), 8080}}}, {{{QStringLiteral("id"), QStringLiteral("server-1")}, {QStringLiteral("name"), QStringLiteral("Preview")}, {QStringLiteral("root"), QStringLiteral("relative")}, {QStringLiteral("bind_host"), QStringLiteral("127.0.0.1")}, {QStringLiteral("port"), 8080}}}, {{{QStringLiteral("id"), QStringLiteral("server-1")}, {QStringLiteral("name"), QStringLiteral("Preview")}, {QStringLiteral("root"), QStringLiteral("/tmp")}, {QStringLiteral("bind_host"), QStringLiteral("127.0.0.1")}, {QStringLiteral("port"), 8080.5}}}};
+
     for (const auto& configurations : invalidConfigurations) {
         test::TestPluginHost host;
         WebServerTestsHelper::configureWebDatabase(host, configurations);
@@ -633,10 +644,12 @@ TEST(WebServerViewTest, OpensThePreFilledFormWhenAFolderArrivesFromAnotherPlugin
     ASSERT_NE(dialog, nullptr);
     bool carriesRoot = false;
     bool carriesName = false;
+
     for (auto* field : dialog->findChildren<QLineEdit*>()) {
         carriesRoot = carriesRoot || field->text() == canonicalRoot;
         carriesName = carriesName || field->text() == QFileInfo(canonicalRoot).fileName();
     }
+
     EXPECT_TRUE(carriesRoot);
     EXPECT_TRUE(carriesName);
 
@@ -712,11 +725,13 @@ TEST(WebServerViewTest, KeepsARowActionAliveWhileItIsDeliveringItsOwnClick) {
 
     // A row action follows the selection of its row, so a glyph never sits on the accent in a colour that reads through it.
     QToolButton* edit = nullptr;
+
     for (auto* button : rowActions->findChildren<QToolButton*>()) {
         if (button->toolTip() == host.translate(QStringLiteral("web-server.dialog.edit"))) {
             edit = button;
         }
     }
+
     ASSERT_NE(edit, nullptr);
     table->clearSelection();
     QApplication::processEvents();
@@ -741,11 +756,13 @@ TEST(WebServerViewTest, KeepsARowActionAliveWhileItIsDeliveringItsOwnClick) {
     EXPECT_EQ(edit->icon().pixmap(32, 32).toImage(), ui::icon(ui::IconName::Edit, host.theme().color(ui::ThemeColor::TextMuted)).pixmap(32, 32).toImage());
 
     QToolButton* start = nullptr;
+
     for (auto* button : rowActions->findChildren<QToolButton*>()) {
         if (button->toolTip() == host.translate(QStringLiteral("web-server.manager.start-server"))) {
             start = button;
         }
     }
+
     ASSERT_NE(start, nullptr);
     start->click();
     EXPECT_FALSE(rowActions.isNull());
@@ -800,9 +817,11 @@ void WebServerTestsHelper::writeFile(const QString& path, const QByteArray& cont
 QByteArray WebServerTestsHelper::request(plugins::webserver::WebServerInstance& server, const QByteArray& contents) {
     QTcpSocket socket;
     socket.connectToHost(QHostAddress::LocalHost, server.port());
+
     if (!socket.waitForConnected(2000)) {
         return {};
     }
+
     QByteArray response;
     QEventLoop responseLoop;
     QTimer timeout;
@@ -816,6 +835,7 @@ QByteArray WebServerTestsHelper::request(plugins::webserver::WebServerInstance& 
     socket.write(contents);
     socket.flush();
     timeout.start(3000);
+
     if (socket.state() != QAbstractSocket::UnconnectedState) {
         responseLoop.exec();
     }

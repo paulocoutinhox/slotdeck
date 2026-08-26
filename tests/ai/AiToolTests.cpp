@@ -93,12 +93,14 @@ TEST(AiTaskRepositoryTest, NeverBindsANullValueToATextColumnDeclaredNotNull) {
     EXPECT_TRUE(test::awaitFuture(repository.saveTask(task)).hasValue());
 
     qsizetype inspected = 0;
+
     for (const auto& recorded : host.databaseExecutions) {
         for (const auto& binding : recorded.value(QStringLiteral("bindings")).toList()) {
             EXPECT_FALSE(binding.typeId() == QMetaType::QString && binding.toString().isNull()) << recorded.value(QStringLiteral("statement")).toString().toStdString();
             ++inspected;
         }
     }
+
     for (const auto& transaction : host.databaseTransactions) {
         for (const auto& statement : transaction) {
             for (const auto& binding : statement.bindings) {
@@ -107,6 +109,7 @@ TEST(AiTaskRepositoryTest, NeverBindsANullValueToATextColumnDeclaredNotNull) {
             }
         }
     }
+
     EXPECT_GT(inspected, 0);
 }
 
@@ -414,6 +417,7 @@ TEST(AiPluginTest, BuildsEveryDeclaredSettingsSectionAndRefusesAnUndeclaredOne) 
     const auto groups = plugin.settingsGroups();
     QStringList groupIds;
     QStringList sectionIds;
+
     for (const auto& group : groups) {
         groupIds.append(group.id);
         for (const auto& section : group.sections) {
@@ -423,6 +427,7 @@ TEST(AiPluginTest, BuildsEveryDeclaredSettingsSectionAndRefusesAnUndeclaredOne) 
             page->show();
         }
     }
+
     EXPECT_EQ(groupIds, QStringList({QStringLiteral("connections"), QStringLiteral("providers"), QStringLiteral("agents"), QStringLiteral("tools"), QStringLiteral("general")}));
     EXPECT_EQ(sectionIds, QStringList({QStringLiteral("connections/general"), QStringLiteral("providers/selection"), QStringLiteral("providers/rate-limits"), QStringLiteral("agents/general"), QStringLiteral("tools/mcp"), QStringLiteral("tools/search"), QStringLiteral("tools/speech"), QStringLiteral("general/general")}));
 
@@ -1081,6 +1086,7 @@ TEST(AiPluginTest, RecordsEverySentAndReceivedExchangeNewestFirst) {
     EXPECT_EQ(plugin.executionPhase(task.id), ExecutionPhase::Idle);
 
     QVector<ExecutionLogEntry> written;
+
     for (const auto& recorded : host.databaseExecutions) {
         if (!recorded.value(QStringLiteral("statement")).toString().contains(QStringLiteral("INSERT INTO ai_tasks_logs"))) {
             continue;
@@ -1094,9 +1100,11 @@ TEST(AiPluginTest, RecordsEverySentAndReceivedExchangeNewestFirst) {
     }
 
     QVector<ExecutionLogKind> kinds;
+
     for (const auto& entry : written) {
         kinds.append(entry.kind);
     }
+
     EXPECT_TRUE(kinds.contains(ExecutionLogKind::Started));
     EXPECT_TRUE(kinds.contains(ExecutionLogKind::RequestSent));
     EXPECT_TRUE(kinds.contains(ExecutionLogKind::FirstTokenReceived));
@@ -1123,6 +1131,7 @@ TEST(AiPluginTest, RecordsEverySentAndReceivedExchangeNewestFirst) {
     for (qsizetype index = 1; index < written.size(); ++index) {
         EXPECT_GT(written.at(index).sequence, written.at(index - 1).sequence);
     }
+
     plugin.shutdown();
 }
 
@@ -1351,12 +1360,14 @@ TEST(AiPluginTest, CarriesThePictureAToolReadIntoTheRequestThatFollowsIt) {
 
     // The picture the tool read reaches the model, because a tool result that carries only its text shows nothing.
     bool carried = false;
+
     for (const auto& message : seeingAgent->sentMessages) {
         for (const auto& block : message.toObject().value(QStringLiteral("content")).toArray()) {
             const QJsonObject entry = block.toObject();
             carried = carried || entry.value(QStringLiteral("type")).toString() == QStringLiteral("image_url") || entry.value(QStringLiteral("type")).toString() == QStringLiteral("image");
         }
     }
+
     EXPECT_TRUE(carried);
 
     plugin.shutdown();
@@ -1367,6 +1378,7 @@ TEST(AiToolContractTest, ShortensTheTextOfAResultThatCarriesAnImageWithoutLosing
     const QByteArray pixels = QByteArrayLiteral("-pretend-this-is-a-picture-");
     const QVector<ToolResult> results{{QStringLiteral("call-1"), QStringLiteral("head-marker") + huge + QStringLiteral("tail-marker"), false, pixels, QByteArrayLiteral("image/png")}, {QStringLiteral("call-2"), QStringLiteral("head-marker") + huge + QStringLiteral("tail-marker"), false, {}, {}}};
     QJsonArray messages;
+
     for (const auto& message : serializeToolResults(WireProtocol::Anthropic, results)) {
         messages.append(message);
     }
@@ -1459,6 +1471,7 @@ TEST(AiToolContractTest, RebuildsToolCallsFromTheRecordedAnthropicStream) {
 
     ToolCallAccumulator accumulator(WireProtocol::Anthropic);
     EXPECT_TRUE(accumulator.empty());
+
     for (const auto& event : events) {
         accumulator.consume(QJsonDocument::fromJson(event.toUtf8()).object());
     }
@@ -1476,6 +1489,7 @@ TEST(AiToolContractTest, RebuildsToolCallsFromTheRecordedOpenAiStream) {
     const QStringList events{QStringLiteral(R"({"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_abc123","type":"function","function":{"name":"get_weather","arguments":""}}]}}]})"), QStringLiteral(R"({"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"loc"}}]}}]})"), QStringLiteral(R"({"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"ation\":\"Paris\"}"}}]}}]})"), QStringLiteral(R"({"choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]})")};
 
     ToolCallAccumulator accumulator(WireProtocol::OpenAiCompatible);
+
     for (const auto& event : events) {
         accumulator.consume(QJsonDocument::fromJson(event.toUtf8()).object());
     }
@@ -1724,9 +1738,11 @@ TEST(AiChatClientTest, WithdrawsFromTheQueueWhenTheRunIsStoppedBeforeItsTurnCame
 
     // The place given back is never admitted, so the stopped run is not dispatched when the queue moves.
     holding.cancel();
+
     for (int turn = 0; turn < 30; ++turn) {
         QApplication::processEvents(QEventLoop::AllEvents, 5);
     }
+
     EXPECT_EQ(gate.waiting(openai->id), 0);
     EXPECT_EQ(gate.inFlight(openai->id), 0);
     EXPECT_FALSE(waiting.running());
@@ -1738,6 +1754,7 @@ TEST(AiToolRegistryTest, DeclaresValidSchemasAndKeepsEveryPathInsideTheWorkingDi
     AiToolRegistry registry(host);
 
     ASSERT_FALSE(registry.schemas().isEmpty());
+
     for (const auto& schema : registry.schemas()) {
         EXPECT_TRUE(validateToolSchema(schema).hasValue()) << schema.name.toStdString();
     }
@@ -1757,6 +1774,7 @@ TEST(AiToolRegistryTest, DeclaresValidSchemasAndKeepsEveryPathInsideTheWorkingDi
     registry.invoke({QStringLiteral("c3"), QStringLiteral("read_file"), QJsonObject{{QStringLiteral("path"), QStringLiteral("file.txt")}}}, QString{}, collect);
     registry.invoke({QStringLiteral("c4"), QStringLiteral("nonexistent_tool"), QJsonObject{}}, sandbox, collect);
     ASSERT_EQ(results.size(), 4);
+
     for (const auto& result : results) {
         EXPECT_TRUE(result.failed) << result.text.toStdString();
     }

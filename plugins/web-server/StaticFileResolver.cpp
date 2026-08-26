@@ -24,28 +24,35 @@ std::optional<StaticFile> StaticFileResolver::resolve(const QByteArray& encodedP
     }
 
     const QString decoded = QUrl::fromPercentEncoding(encodedPath);
+
     if (decoded.contains(QChar::Null) || decoded.contains(QLatin1Char('\\'))) {
         return std::nullopt;
     }
 
     QString relativePath = decoded;
+
     while (relativePath.startsWith(QLatin1Char('/'))) {
         relativePath.removeFirst();
     }
+
     const QString cleanPath = QDir::cleanPath(relativePath);
+
     if (cleanPath == QStringLiteral("..") || cleanPath.startsWith(QStringLiteral("../")) || QDir::isAbsolutePath(cleanPath)) {
         return std::nullopt;
     }
 
     QFileInfo candidate(QDir(m_canonicalRoot).filePath(cleanPath));
+
     if (candidate.isDir()) {
         const QDir directory(candidate.absoluteFilePath());
         const QFileInfo htmlIndex(directory.filePath(QStringLiteral("index.html")));
         const QFileInfo htmIndex(directory.filePath(QStringLiteral("index.htm")));
         candidate = htmlIndex.isFile() ? htmlIndex : htmIndex;
     }
+
     const QString canonicalCandidate = candidate.canonicalFilePath();
     const QString relativeCandidate = QDir(m_canonicalRoot).relativeFilePath(canonicalCandidate);
+
     if (canonicalCandidate.isEmpty() || relativeCandidate == QStringLiteral("..") || relativeCandidate.startsWith(QStringLiteral("../")) || QDir::isAbsolutePath(relativeCandidate) || !candidate.isFile() || !candidate.isReadable() || candidate.size() < 0 || candidate.size() > maximumStaticFileSize) {
         return std::nullopt;
     }

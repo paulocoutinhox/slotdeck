@@ -43,6 +43,7 @@ utils::Result<void> DonatePlugin::initialize(PluginHost& host) {
     if (m_host != nullptr) {
         return utils::Result<void>::failure({"donate_already_initialized", "The Donate plugin is already initialized", {}});
     }
+
     m_host = &host;
     return utils::Result<void>::success();
 }

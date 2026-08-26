@@ -41,9 +41,11 @@ utils::Result<domain::Workspace> TerminalWorkspaceRepositoryHelper::failure(cons
 
 bool TerminalWorkspaceRepositoryHelper::readString(const QJsonObject& object, const QString& key, QString& output, bool allowEmpty) {
     const QJsonValue value = object.value(key);
+
     if (!value.isString() || (!allowEmpty && value.toString().isEmpty())) {
         return false;
     }
+
     output = value.toString();
     return true;
 }
@@ -54,9 +56,11 @@ bool TerminalWorkspaceRepositoryHelper::readInteger64(const QJsonObject& object,
 
 bool TerminalWorkspaceRepositoryHelper::readInteger(const QJsonObject& object, const QString& key, int& output) {
     qint64 value = 0;
+
     if (!readInteger64(object, key, value) || value < std::numeric_limits<int>::min() || value > std::numeric_limits<int>::max()) {
         return false;
     }
+
     output = static_cast<int>(value);
     return true;
 }
@@ -65,22 +69,29 @@ bool TerminalWorkspaceRepositoryHelper::parseLayout(const QJsonValue& value, dom
     if (!value.isObject()) {
         return false;
     }
+
     const QJsonObject object = value.toObject();
+
     if (!hasExactKeys(object, {QStringLiteral("presetId"), QStringLiteral("slotCount"), QStringLiteral("slots"), QStringLiteral("shelf")}) || !readString(object, QStringLiteral("presetId"), layout.presetId) || !readInteger(object, QStringLiteral("slotCount"), layout.slotCount)) {
         return false;
     }
+
     const auto expectedCount = layoutSlotCounts().constFind(layout.presetId);
+
     if (expectedCount == layoutSlotCounts().cend() || expectedCount.value() != layout.slotCount) {
         return false;
     }
 
     const QJsonValue slotsValue = object.value(QStringLiteral("slots"));
     const QJsonValue shelfValue = object.value(QStringLiteral("shelf"));
+
     if (!slotsValue.isArray() || slotsValue.toArray().size() != layout.slotCount || !shelfValue.isArray()) {
         return false;
     }
+
     layout.slotAssignments.resize(layout.slotCount);
     const QJsonArray slotValues = slotsValue.toArray();
+
     for (int index = 0; index < slotValues.size(); ++index) {
         if (slotValues.at(index).isNull()) {
             continue;
@@ -90,12 +101,14 @@ bool TerminalWorkspaceRepositoryHelper::parseLayout(const QJsonValue& value, dom
         }
         layout.slotAssignments[index] = slotValues.at(index).toString();
     }
+
     for (const auto& entry : shelfValue.toArray()) {
         if (!entry.isString() || entry.toString().isEmpty()) {
             return false;
         }
         layout.shelf.append(entry.toString());
     }
+
     return true;
 }
 
@@ -103,6 +116,7 @@ bool TerminalWorkspaceRepositoryHelper::parseSession(const QJsonValue& value, do
     if (!value.isObject()) {
         return false;
     }
+
     const QJsonObject object = value.toObject();
     return hasExactKeys(object, {QStringLiteral("id"), QStringLiteral("workspaceId"), QStringLiteral("name"), QStringLiteral("shellProfileId"), QStringLiteral("cwd"), QStringLiteral("dynamicTitle"), QStringLiteral("createdAt"), QStringLiteral("updatedAt")}) && readString(object, QStringLiteral("id"), session.id) && readString(object, QStringLiteral("workspaceId"), session.workspaceId) && readString(object, QStringLiteral("name"), session.name) && readString(object, QStringLiteral("shellProfileId"), session.shellProfileId) && readString(object, QStringLiteral("cwd"), session.cwd) && readString(object, QStringLiteral("dynamicTitle"), session.dynamicTitle, true) && readInteger64(object, QStringLiteral("createdAt"), session.createdAt) && readInteger64(object, QStringLiteral("updatedAt"), session.updatedAt);
 }
@@ -111,11 +125,14 @@ bool TerminalWorkspaceRepositoryHelper::parseTab(const QJsonValue& value, domain
     if (!value.isObject()) {
         return false;
     }
+
     const QJsonObject object = value.toObject();
     QString accentColor;
+
     if (!hasExactKeys(object, {QStringLiteral("id"), QStringLiteral("workspaceId"), QStringLiteral("name"), QStringLiteral("sortOrder"), QStringLiteral("accentColor"), QStringLiteral("focusedSessionId"), QStringLiteral("layout")}) || !readString(object, QStringLiteral("id"), tab.id) || !readString(object, QStringLiteral("workspaceId"), tab.workspaceId) || !readString(object, QStringLiteral("name"), tab.name) || !readInteger(object, QStringLiteral("sortOrder"), tab.sortOrder) || !readString(object, QStringLiteral("accentColor"), accentColor) || !readString(object, QStringLiteral("focusedSessionId"), tab.focusedSessionId, true) || !parseLayout(object.value(QStringLiteral("layout")), tab.layout)) {
         return false;
     }
+
     tab.accentColor = QColor(accentColor);
     return tab.accentColor.isValid();
 }
@@ -126,6 +143,7 @@ bool TerminalWorkspaceRepositoryHelper::validateWorkspace(const domain::Workspac
     }
 
     QSet<QString> sessionIds;
+
     for (const auto& session : workspace.sessions) {
         if (session.id.isEmpty() || session.workspaceId != workspace.id || sessionIds.contains(session.id) || session.name.trimmed().isEmpty() || session.name != session.name.trimmed() || session.shellProfileId.isEmpty() || !QDir::isAbsolutePath(session.cwd) || session.createdAt <= 0 || session.updatedAt < session.createdAt) {
             return false;
@@ -135,6 +153,7 @@ bool TerminalWorkspaceRepositoryHelper::validateWorkspace(const domain::Workspac
 
     QSet<QString> tabIds;
     QSet<QString> assignedIds;
+
     for (int index = 0; index < workspace.tabs.size(); ++index) {
         const auto& tab = workspace.tabs.at(index);
         const auto expectedSlotCount = layoutSlotCounts().constFind(tab.layout.presetId);
@@ -164,6 +183,7 @@ bool TerminalWorkspaceRepositoryHelper::validateWorkspace(const domain::Workspac
             return false;
         }
     }
+
     return tabIds.contains(workspace.selectedMainTabId) && assignedIds == sessionIds;
 }
 
@@ -173,6 +193,7 @@ utils::Result<domain::Workspace> TerminalWorkspaceRepositoryHelper::parseWorkspa
     }
 
     domain::Workspace workspace;
+
     if (!readString(object, QStringLiteral("id"), workspace.id) || !readString(object, QStringLiteral("name"), workspace.name) || !readInteger64(object, QStringLiteral("createdAt"), workspace.createdAt) || !readInteger64(object, QStringLiteral("updatedAt"), workspace.updatedAt) || !readInteger64(object, QStringLiteral("lastOpenedAt"), workspace.lastOpenedAt) || !readString(object, QStringLiteral("selectedMainTabId"), workspace.selectedMainTabId) || !object.value(QStringLiteral("tabs")).isArray() || !object.value(QStringLiteral("sessions")).isArray()) {
         return failure(QStringLiteral("The workspace fields are invalid"));
     }
@@ -184,6 +205,7 @@ utils::Result<domain::Workspace> TerminalWorkspaceRepositoryHelper::parseWorkspa
         }
         workspace.sessions.append(std::move(session));
     }
+
     for (const auto& value : object.value(QStringLiteral("tabs")).toArray()) {
         domain::MainTab tab;
         if (!parseTab(value, tab)) {
@@ -191,33 +213,43 @@ utils::Result<domain::Workspace> TerminalWorkspaceRepositoryHelper::parseWorkspa
         }
         workspace.tabs.append(std::move(tab));
     }
+
     if (!validateWorkspace(workspace)) {
         return failure(QStringLiteral("Workspace references or assignments are invalid"));
     }
+
     return utils::Result<domain::Workspace>::success(std::move(workspace));
 }
 
 QJsonObject TerminalWorkspaceRepositoryHelper::serializeLayout(const domain::SlotLayoutState& layout) {
     QJsonArray slotValues;
+
     for (const auto& assignment : layout.slotAssignments) {
         slotValues.append(assignment.has_value() ? QJsonValue(assignment.value()) : QJsonValue::Null);
     }
+
     QJsonArray shelf;
+
     for (const auto& sessionId : layout.shelf) {
         shelf.append(sessionId);
     }
+
     return {{QStringLiteral("presetId"), layout.presetId}, {QStringLiteral("slotCount"), layout.slotCount}, {QStringLiteral("slots"), slotValues}, {QStringLiteral("shelf"), shelf}};
 }
 
 QJsonObject TerminalWorkspaceRepositoryHelper::serializeWorkspace(const domain::Workspace& workspace) {
     QJsonArray sessions;
+
     for (const auto& session : workspace.sessions) {
         sessions.append(QJsonObject{{QStringLiteral("id"), session.id}, {QStringLiteral("workspaceId"), session.workspaceId}, {QStringLiteral("name"), session.name}, {QStringLiteral("shellProfileId"), session.shellProfileId}, {QStringLiteral("cwd"), session.cwd}, {QStringLiteral("dynamicTitle"), session.dynamicTitle}, {QStringLiteral("createdAt"), session.createdAt}, {QStringLiteral("updatedAt"), session.updatedAt}});
     }
+
     QJsonArray tabs;
+
     for (const auto& tab : workspace.tabs) {
         tabs.append(QJsonObject{{QStringLiteral("id"), tab.id}, {QStringLiteral("workspaceId"), tab.workspaceId}, {QStringLiteral("name"), tab.name}, {QStringLiteral("sortOrder"), tab.sortOrder}, {QStringLiteral("accentColor"), tab.accentColor.name(QColor::HexArgb)}, {QStringLiteral("focusedSessionId"), tab.focusedSessionId}, {QStringLiteral("layout"), serializeLayout(tab.layout)}});
     }
+
     return {{QStringLiteral("id"), workspace.id}, {QStringLiteral("name"), workspace.name}, {QStringLiteral("createdAt"), workspace.createdAt}, {QStringLiteral("updatedAt"), workspace.updatedAt}, {QStringLiteral("lastOpenedAt"), workspace.lastOpenedAt}, {QStringLiteral("selectedMainTabId"), workspace.selectedMainTabId}, {QStringLiteral("tabs"), tabs}, {QStringLiteral("sessions"), sessions}};
 }
 
@@ -227,6 +259,7 @@ utils::Result<void> TerminalWorkspaceRepository::saveInitial(const domain::Works
     if (!TerminalWorkspaceRepositoryHelper::validateWorkspace(workspace)) {
         return utils::Result<void>::failure({"terminal_workspace_invalid", "The terminal workspace is invalid", {}});
     }
+
     const QString data = QString::fromUtf8(QJsonDocument(TerminalWorkspaceRepositoryHelper::serializeWorkspace(workspace)).toJson(QJsonDocument::Compact));
     return m_host.executeBootstrapDatabaseTransaction({{QStringLiteral("INSERT INTO terminal_state(scope_id, data_json) VALUES(?, ?) ON CONFLICT(scope_id) DO UPDATE SET data_json = excluded.data_json"), {QString::fromLatin1(workspaceScope), data}}});
 }
@@ -235,12 +268,14 @@ QFuture<utils::Result<void>> TerminalWorkspaceRepository::save(const domain::Wor
     if (!TerminalWorkspaceRepositoryHelper::validateWorkspace(workspace)) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"terminal_workspace_invalid", "The terminal workspace is invalid", {}}));
     }
+
     const QString data = QString::fromUtf8(QJsonDocument(TerminalWorkspaceRepositoryHelper::serializeWorkspace(workspace)).toJson(QJsonDocument::Compact));
     return m_host.executeDatabase(QStringLiteral("INSERT INTO terminal_state(scope_id, data_json) VALUES(?, ?) ON CONFLICT(scope_id) DO UPDATE SET data_json = excluded.data_json"), {QString::fromLatin1(workspaceScope), data});
 }
 
 utils::Result<domain::Workspace> TerminalWorkspaceRepository::loadLastOpened() const {
     const auto rows = m_host.queryBootstrapDatabase(QStringLiteral("SELECT data_json FROM terminal_state WHERE scope_id = ?"), {QString::fromLatin1(workspaceScope)});
+
     if (!rows.hasValue()) {
         return utils::Result<domain::Workspace>::failure(rows.error());
     }
@@ -253,9 +288,11 @@ utils::Result<domain::Workspace> TerminalWorkspaceRepository::loadLastOpened() c
 
     QJsonParseError parseError;
     const QJsonDocument document = QJsonDocument::fromJson(rows.value().first().value(QStringLiteral("data_json")).toString().toUtf8(), &parseError);
+
     if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
         return TerminalWorkspaceRepositoryHelper::failure(QStringLiteral("The workspace JSON is invalid"));
     }
+
     return TerminalWorkspaceRepositoryHelper::parseWorkspace(document.object());
 }
 

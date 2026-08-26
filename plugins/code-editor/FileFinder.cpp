@@ -25,6 +25,7 @@ int FileFinderHelper::scoreOf(const QString& candidate, const QString& query) {
     qsizetype position = 0;
     int score = 0;
     int run = 0;
+
     for (const QChar wanted : query) {
         const qsizetype found = candidate.indexOf(wanted, position, Qt::CaseInsensitive);
         if (found < 0) {
@@ -45,6 +46,7 @@ int fileMatchScore(const QString& path, const QString& query) {
 
 QStringList rankedFileMatches(const QStringList& paths, const QString& query, int maximumResults) {
     QVector<std::pair<int, QString>> scored;
+
     for (const auto& path : paths) {
         const int score = fileMatchScore(path, query);
         if (score >= 0) {
@@ -56,12 +58,14 @@ QStringList rankedFileMatches(const QStringList& paths, const QString& query, in
     std::stable_sort(scored.begin(), scored.end(), [](const auto& first, const auto& second) { return first.first > second.first; });
     // clang-format on
     QStringList ranked;
+
     for (const auto& entry : scored) {
         if (ranked.size() >= maximumResults) {
             break;
         }
         ranked.append(entry.second);
     }
+
     return ranked;
 }
 
@@ -114,6 +118,7 @@ QString FileFinder::chosenPath() const {
 void FileFinder::refreshMatches() {
     m_matches->clear();
     m_matches->addItems(rankedFileMatches(m_paths, m_query->text(), LanguageRegistry::limits().maximumReferences));
+
     if (m_matches->count() > 0) {
         m_matches->setCurrentRow(0);
     }
@@ -121,6 +126,7 @@ void FileFinder::refreshMatches() {
 
 void FileFinder::chooseCurrent() {
     const QString path = chosenPath();
+
     if (path.isEmpty()) {
         return;
     }

@@ -23,6 +23,7 @@ class DatabaseWorker final : public QObject {
 
         auto stateStore = std::make_unique<StateStore>(m_filePath);
         const auto result = stateStore->initialize();
+
         if (!result.hasValue()) {
             return utils::Result<StateStore*>::failure(result.error());
         }
@@ -62,10 +63,12 @@ template <typename T> QFuture<utils::Result<T>> DatabaseExecutorHelper::submit(D
         promise->finish();
     }, Qt::QueuedConnection);
     // clang-format on
+
     if (!submitted) {
         promise->addResult(utils::Result<T>::failure({"database_executor_unavailable", "The database executor is unavailable", {}}));
         promise->finish();
     }
+
     return future;
 }
 
@@ -86,10 +89,12 @@ template <> QFuture<utils::Result<void>> DatabaseExecutorHelper::submit(Database
         promise->finish();
     }, Qt::QueuedConnection);
     // clang-format on
+
     if (!submitted) {
         promise->addResult(utils::Result<void>::failure({"database_executor_unavailable", "The database executor is unavailable", {}}));
         promise->finish();
     }
+
     return future;
 }
 
@@ -104,6 +109,7 @@ DatabaseExecutor::~DatabaseExecutor() {
         delete m_worker;
         return;
     }
+
     QThread* ownerThread = thread();
     // clang-format off
     QMetaObject::invokeMethod(m_worker, [this, ownerThread]() {

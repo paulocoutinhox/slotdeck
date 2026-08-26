@@ -198,9 +198,11 @@ QStringList PluginManagerHelper::pluginPaths() {
 
     QStringList paths;
     paths.reserve(entries.size());
+
     for (const auto& entry : entries) {
         paths.append(entry.absoluteFilePath());
     }
+
     return paths;
 }
 
@@ -215,11 +217,13 @@ QString PluginManagerHelper::logLevelName(LogLevel level) {
     case LogLevel::Error:
         return QStringLiteral("error");
     }
+
     Q_UNREACHABLE_RETURN({});
 }
 
 PluginManager::PluginManager(QObject* parent) : QObject(parent), m_localization(domain::resolveApplicationLanguage(QLocale::system().name(QLocale::TagSeparator::Dash))), m_fileSystem(std::make_unique<filesystem::FileSystemService>()), m_theme(&ui::themeManager().theme()) {
     const auto result = m_localization.registerCatalog(QStringLiteral("slotdeck"), coretranslations::catalog());
+
     if (!result.hasValue()) {
         m_coreCatalogError = result.error();
     }
@@ -238,6 +242,7 @@ utils::Result<void> PluginManager::loadPlugins() {
     }
 
     const QStringList paths = PluginManagerHelper::pluginPaths();
+
     if (paths.isEmpty()) {
         return utils::Result<void>::failure({"plugin_directory_not_found", "No application plugins were found", PluginManagerHelper::pluginDirectoryPath()});
     }
@@ -267,6 +272,7 @@ utils::Result<void> PluginManager::loadPlugins() {
         }
         m_loaders.push_back(std::move(loader));
     }
+
     return utils::Result<void>::success();
 }
 
@@ -285,6 +291,7 @@ utils::Result<void> PluginManager::initialize(QString applicationDataPath, persi
 
     QVector<PluginInterface*> pending = m_plugins;
     QSet<QString> ready;
+
     while (!pending.isEmpty()) {
         bool progressed = false;
         for (qsizetype index = pending.size() - 1; index >= 0; --index) {
@@ -340,9 +347,11 @@ utils::Result<void> PluginManager::initialize(QString applicationDataPath, persi
 
 void PluginManager::shutdown() {
     cancelRequests();
+
     for (auto loadedPlugin = m_initializedPlugins.crbegin(); loadedPlugin != m_initializedPlugins.crend(); ++loadedPlugin) {
         (*loadedPlugin)->shutdown();
     }
+
     m_initializedPlugins.clear();
     m_initialized = false;
     m_stateStore = nullptr;
@@ -365,21 +374,25 @@ QVector<PluginNavigationItem> PluginManager::navigationItems() const {
 
 QVector<PluginSettingsContribution> PluginManager::settings() const {
     QVector<PluginSettingsContribution> registered;
+
     for (auto* loadedPlugin : m_plugins) {
         for (const auto& group : loadedPlugin->settingsGroups()) {
             registered.append({loadedPlugin->id(), group});
         }
     }
+
     return registered;
 }
 
 QHash<QString, int> PluginManager::databaseSchemaVersions() const {
     QHash<QString, int> versions;
+
     for (auto* loadedPlugin : m_plugins) {
         if (loadedPlugin->databaseSchemaVersion() > 0) {
             versions.insert(loadedPlugin->id(), loadedPlugin->databaseSchemaVersion());
         }
     }
+
     return versions;
 }
 
@@ -400,15 +413,18 @@ QString PluginManager::pluginTitle(const QString& pluginId) const {
 
 QString PluginManager::styleSheet() const {
     QString styles;
+
     for (auto* loadedPlugin : m_plugins) {
         styles.append(loadedPlugin->styleSheet(*m_theme));
     }
+
     return ui::applyThemeTokens(std::move(styles), *m_theme);
 }
 
 void PluginManager::setTheme(const ui::Theme& theme) {
     m_theme = &theme;
     m_navigationItems.clear();
+
     for (auto* loadedPlugin : m_plugins) {
         for (const auto& item : loadedPlugin->navigationItems(theme)) {
             m_navigationItems.append({loadedPlugin->id(), item});
@@ -424,6 +440,7 @@ utils::Result<void> PluginManager::setLocale(const QString& localeName) {
     if (!domain::isSupportedApplicationLanguage(localeName)) {
         return utils::Result<void>::failure({"application_language_invalid", "The application language is unsupported", localeName});
     }
+
     return m_localization.setLocale(localeName);
 }
 
@@ -448,17 +465,20 @@ QFuture<utils::Result<void>> PluginManager::saveSettings(const QString& ownerId,
     if (m_stateStore == nullptr || m_databaseExecutor == nullptr) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"plugin_settings_unavailable", "The settings store is unavailable", ownerId}));
     }
+
     return m_databaseExecutor->saveSettings(ownerId, document);
 }
 
 utils::Result<void> PluginManager::migrateDatabase(const QString& pluginId, const QVector<persistence::DatabaseMigration>& migrations) {
     auto* loadedPlugin = plugin(pluginId);
+
     if (m_stateStore == nullptr || loadedPlugin == nullptr) {
         return utils::Result<void>::failure({"plugin_database_unavailable", "The plugin database is unavailable", pluginId});
     }
     if (migrations.isEmpty() || loadedPlugin->databaseSchemaVersion() <= 0 || migrations.last().version != loadedPlugin->databaseSchemaVersion()) {
         return utils::Result<void>::failure({"plugin_database_version_mismatch", "The plugin database migration plan does not match its declared schema version", pluginId});
     }
+
     return m_stateStore->migratePluginDatabase(pluginId, migrations);
 }
 
@@ -466,6 +486,7 @@ utils::Result<void> PluginManager::executeBootstrapDatabaseTransaction(const QSt
     if (m_stateStore == nullptr || plugin(pluginId) == nullptr) {
         return utils::Result<void>::failure({"plugin_database_unavailable", "The plugin database is unavailable", pluginId});
     }
+
     return m_stateStore->executePluginDatabaseTransaction(pluginId, statements);
 }
 
@@ -473,6 +494,7 @@ utils::Result<persistence::DatabaseRows> PluginManager::queryBootstrapDatabase(c
     if (m_stateStore == nullptr || plugin(pluginId) == nullptr) {
         return utils::Result<persistence::DatabaseRows>::failure({"plugin_database_unavailable", "The plugin database is unavailable", pluginId});
     }
+
     return m_stateStore->queryPluginDatabase(pluginId, statement, bindings);
 }
 
@@ -480,6 +502,7 @@ QFuture<utils::Result<void>> PluginManager::executeDatabase(const QString& plugi
     if (m_databaseExecutor == nullptr || plugin(pluginId) == nullptr) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"plugin_database_unavailable", "The plugin database is unavailable", pluginId}));
     }
+
     return m_databaseExecutor->executePluginDatabase(pluginId, statement, bindings);
 }
 
@@ -487,6 +510,7 @@ QFuture<utils::Result<void>> PluginManager::executeDatabaseTransaction(const QSt
     if (m_databaseExecutor == nullptr || plugin(pluginId) == nullptr) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"plugin_database_unavailable", "The plugin database is unavailable", pluginId}));
     }
+
     return m_databaseExecutor->executePluginDatabaseTransaction(pluginId, statements);
 }
 
@@ -494,6 +518,7 @@ QFuture<utils::Result<persistence::DatabaseRows>> PluginManager::queryDatabase(c
     if (m_databaseExecutor == nullptr || plugin(pluginId) == nullptr) {
         return QtFuture::makeReadyValueFuture(utils::Result<persistence::DatabaseRows>::failure({"plugin_database_unavailable", "The plugin database is unavailable", pluginId}));
     }
+
     return m_databaseExecutor->queryPluginDatabase(pluginId, statement, bindings);
 }
 
@@ -569,12 +594,14 @@ void PluginManager::request(const QString& senderPluginId, const QString& target
 
     auto* sender = plugin(senderPluginId);
     auto* target = plugin(targetPluginId);
+
     if (sender == nullptr || target == nullptr || !m_initializedPlugins.contains(target) || topic.isEmpty()) {
         respond(utils::Result<QJsonObject>::failure({"plugin_message_invalid", "The plugin message is invalid", QStringLiteral("%1 -> %2: %3").arg(senderPluginId, targetPluginId, topic)}));
         return;
     }
 
     auto* targetObject = dynamic_cast<QObject*>(target);
+
     if (targetObject == nullptr) {
         respond(utils::Result<QJsonObject>::failure({"plugin_message_target_invalid", "The target plugin cannot receive messages", targetPluginId}));
         return;
@@ -595,17 +622,20 @@ void PluginManager::request(const QString& senderPluginId, const QString& target
 
 void PluginManager::completeRequest(quint64 requestId, utils::Result<QJsonObject> result) {
     const auto iterator = m_pendingRequests.find(requestId);
+
     if (iterator == m_pendingRequests.end() || iterator.value()->result.has_value()) {
         return;
     }
 
     const auto pending = iterator.value();
     pending->result = std::move(result);
+
     if (pending->timeout != nullptr) {
         pending->timeout->stop();
         pending->timeout->deleteLater();
         pending->timeout = nullptr;
     }
+
     if (pending->callbackContext == nullptr) {
         removeRequest(requestId);
         return;
@@ -624,6 +654,7 @@ void PluginManager::completeRequest(quint64 requestId, utils::Result<QJsonObject
         }
     }, Qt::QueuedConnection);
     // clang-format on
+
     if (!submitted) {
         removeRequest(requestId);
     }
@@ -631,9 +662,11 @@ void PluginManager::completeRequest(quint64 requestId, utils::Result<QJsonObject
 
 void PluginManager::removeRequest(quint64 requestId) {
     const auto iterator = m_pendingRequests.find(requestId);
+
     if (iterator == m_pendingRequests.end()) {
         return;
     }
+
     if (iterator.value()->timeout != nullptr) {
         iterator.value()->timeout->stop();
         iterator.value()->timeout->deleteLater();
@@ -646,6 +679,7 @@ void PluginManager::removeRequest(quint64 requestId) {
 
 void PluginManager::cancelRequests() {
     const auto requestIds = m_pendingRequests.keys();
+
     for (const quint64 requestId : requestIds) {
         removeRequest(requestId);
     }
@@ -687,6 +721,7 @@ void PluginManager::log(const QString& senderPluginId, LogLevel level, const QSt
     if (category.trimmed().isEmpty() || message.trimmed().isEmpty()) {
         return;
     }
+
     publish(senderPluginId, QStringLiteral("slotdeck.log.entry"), {{QStringLiteral("timestampUtc"), persistence::storedTimestamp(QDateTime::currentDateTimeUtc())}, {QStringLiteral("level"), PluginManagerHelper::logLevelName(level)}, {QStringLiteral("category"), category}, {QStringLiteral("message"), message}, {QStringLiteral("details"), details}});
 }
 
@@ -695,6 +730,7 @@ void PluginManager::showNavigation(const QString& pluginId, const QString& navig
     // clang-format off
     const bool declared = std::any_of(m_navigationItems.cbegin(), m_navigationItems.cend(), [&pluginId, &navigationId](const PluginNavigationItem& contribution) { return contribution.pluginId == pluginId && contribution.item.id == navigationId; });
     // clang-format on
+
     if (!declared) {
         log(QString::fromLatin1(coreSourceId), LogLevel::Error, QStringLiteral("slotdeck.navigation"), QStringLiteral("A plugin asked for a navigation destination it does not declare"), {{QStringLiteral("pluginId"), pluginId}, {QStringLiteral("navigationId"), navigationId}});
         return;
@@ -709,12 +745,15 @@ void PluginManager::notify(const QString& title, const QString& message, AlertSe
 
 void PluginManager::notifyPlugin(const QString& senderPluginId, const QString& title, const QString& message, AlertSeverity severity) {
     LogLevel level = LogLevel::Info;
+
     if (severity == AlertSeverity::Warning) {
         level = LogLevel::Warning;
     }
+
     if (severity == AlertSeverity::Error) {
         level = LogLevel::Error;
     }
+
     log(senderPluginId, level, QStringLiteral("notification"), message, {{QStringLiteral("title"), title}});
     emit notificationRequested(title, message, severity);
 }
@@ -725,17 +764,21 @@ utils::Result<void> PluginManager::registerPlugin(PluginInterface& loadedPlugin)
     }
 
     const TranslationCatalog catalog = loadedPlugin.translations();
+
     for (const auto& language : domain::supportedApplicationLanguages()) {
         if (!catalog.contains(language)) {
             return utils::Result<void>::failure({"plugin_translation_language_missing", "A plugin does not support an application language", QStringLiteral("%1: %2").arg(loadedPlugin.id(), language)});
         }
     }
+
     const auto& englishTranslations = catalog.value(QStringLiteral("en"));
+
     if (!PluginManagerHelper::ownsTranslationKey(loadedPlugin.id(), loadedPlugin.titleKey()) || !englishTranslations.contains(loadedPlugin.titleKey())) {
         return utils::Result<void>::failure({"plugin_title_translation_missing", "A plugin title translation is missing", loadedPlugin.titleKey()});
     }
 
     QSet<QString> dependencyIds;
+
     for (const auto& dependencyId : loadedPlugin.dependencies()) {
         if (!PluginManagerHelper::contributionIdPattern().match(dependencyId).hasMatch() || dependencyId == loadedPlugin.id() || dependencyIds.contains(dependencyId)) {
             return utils::Result<void>::failure({"plugin_dependency_invalid", "A plugin dependency is invalid", dependencyId});
@@ -746,9 +789,11 @@ utils::Result<void> PluginManager::registerPlugin(PluginInterface& loadedPlugin)
     const QVector<NavigationItem> navigationItems = loadedPlugin.navigationItems(*m_theme);
     QSet<QString> navigationIds;
     QSet<int> takenOrders;
+
     for (const auto& registeredItem : m_navigationItems) {
         takenOrders.insert(static_cast<int>(registeredItem.item.order));
     }
+
     for (const auto& item : navigationItems) {
         if (!PluginManagerHelper::contributionIdPattern().match(item.id).hasMatch() || item.titleKey.isEmpty() || !PluginManagerHelper::ownsTranslationKey(loadedPlugin.id(), item.titleKey) || item.icon.isNull() || navigationIds.contains(item.id) || !englishTranslations.contains(item.titleKey)) {
             return utils::Result<void>::failure({"plugin_navigation_invalid", "A plugin navigation item is invalid", item.id});
@@ -762,6 +807,7 @@ utils::Result<void> PluginManager::registerPlugin(PluginInterface& loadedPlugin)
     }
 
     QSet<QString> groupIds;
+
     for (const auto& group : loadedPlugin.settingsGroups()) {
         if (!PluginManagerHelper::contributionIdPattern().match(group.id).hasMatch() || group.titleKey.isEmpty() || !PluginManagerHelper::ownsTranslationKey(loadedPlugin.id(), group.titleKey) || groupIds.contains(group.id) || group.sections.isEmpty() || !englishTranslations.contains(group.titleKey)) {
             return utils::Result<void>::failure({"plugin_settings_group_invalid", "A plugin settings group is invalid", group.id});
@@ -788,13 +834,17 @@ utils::Result<void> PluginManager::registerPlugin(PluginInterface& loadedPlugin)
     }
 
     const auto localizationResult = m_localization.registerCatalog(loadedPlugin.id(), catalog);
+
     if (!localizationResult.hasValue()) {
         return localizationResult;
     }
+
     m_plugins.append(&loadedPlugin);
+
     for (const auto& item : navigationItems) {
         m_navigationItems.append({loadedPlugin.id(), item});
     }
+
     m_pluginHosts.push_back(std::make_unique<ScopedPluginHost>(*this, loadedPlugin.id()));
     return utils::Result<void>::success();
 }
@@ -805,6 +855,7 @@ PluginInterface* PluginManager::plugin(const QString& pluginId) const {
             return loadedPlugin;
         }
     }
+
     return nullptr;
 }
 
@@ -818,20 +869,25 @@ PluginHost* PluginManager::hostFor(const QString& pluginId) const {
             return m_pluginHosts.at(static_cast<std::size_t>(index)).get();
         }
     }
+
     return nullptr;
 }
 
 void PluginManager::unloadPlugins() {
     shutdown();
     m_fileSystem->drain();
+
     for (auto* loadedPlugin : m_plugins) {
         m_localization.unregisterCatalog(loadedPlugin->id());
     }
+
     m_plugins.clear();
     m_navigationItems.clear();
+
     for (auto& loader : m_loaders) {
         loader->unload();
     }
+
     m_loaders.clear();
     m_pluginHosts.clear();
 }

@@ -42,31 +42,37 @@ void AiChatClientHelper::removeAtPath(QJsonObject& target, const QStringList& se
         target.remove(segments.first());
         return;
     }
+
     if (!target.value(segments.first()).isObject()) {
         return;
     }
 
     QJsonObject nested = target.value(segments.first()).toObject();
     removeAtPath(nested, segments.mid(1));
+
     if (nested.isEmpty()) {
         target.remove(segments.first());
         return;
     }
+
     target.insert(segments.first(), nested);
 }
 
 void AiChatClientHelper::applyField(QJsonObject& body, const QString& field, const QJsonValue& value) {
     const QStringList segments = field.split(QLatin1Char('.'));
+
     if (value.isNull()) {
         removeAtPath(body, segments);
         return;
     }
+
     insertAtPath(body, segments, value);
 }
 
 // Services report a rejection in more than one shape, and one that reports it in none is quoted so the reason is still readable.
 QString AiChatClientHelper::providerErrorMessage(const QByteArray& body) {
     const QJsonDocument document = QJsonDocument::fromJson(body);
+
     if (!document.isObject()) {
         const QString text = QString::fromUtf8(body).simplified();
         return text.left(maximumReportedReasonCharacters);
@@ -76,24 +82,30 @@ QString AiChatClientHelper::providerErrorMessage(const QByteArray& body) {
     const QJsonObject nested = reported.value(QStringLiteral("error")).toObject();
     const QString type = nested.value(QStringLiteral("type")).toString(reported.value(QStringLiteral("type")).toString());
     QString message = nested.value(QStringLiteral("message")).toString();
+
     if (message.isEmpty()) {
         message = reported.value(QStringLiteral("error")).toString();
     }
+
     if (message.isEmpty()) {
         message = reported.value(QStringLiteral("message")).toString();
     }
+
     if (message.isEmpty()) {
         message = reported.value(QStringLiteral("detail")).toString();
     }
+
     if (message.isEmpty()) {
         return QString::fromUtf8(body).simplified().left(maximumReportedReasonCharacters);
     }
+
     return type.isEmpty() ? message : QStringLiteral("%1: %2").arg(type, message);
 }
 
 // The Anthropic API carries the instructions in its own field instead of a message with a system role.
 QJsonArray AiChatClientHelper::liftInstructions(const QJsonArray& messages, QString& instructions) {
     QJsonArray conversation;
+
     for (const auto& value : messages) {
         const QJsonObject message = value.toObject();
         if (message.value(QStringLiteral("role")).toString() == QStringLiteral("system")) {
@@ -102,6 +114,7 @@ QJsonArray AiChatClientHelper::liftInstructions(const QJsonArray& messages, QStr
         }
         conversation.append(message);
     }
+
     return conversation;
 }
 
@@ -125,6 +138,7 @@ QJsonObject buildRequestBody(const ProviderDescriptor& provider, const ChatReque
     body.insert(QStringLiteral("model"), connection.modelId);
     body.insert(QStringLiteral("messages"), conversation);
     body.insert(QStringLiteral("stream"), true);
+
     if (anthropic) {
         if (!instructions.isEmpty()) {
             body.insert(QStringLiteral("system"), instructions);
@@ -148,6 +162,7 @@ QJsonObject buildRequestBody(const ProviderDescriptor& provider, const ChatReque
         }
         AiChatClientHelper::applyField(body, parameter.field, declared);
     }
+
     for (auto extra = connection.extraParameters.constBegin(); extra != connection.extraParameters.constEnd(); ++extra) {
         AiChatClientHelper::applyField(body, extra.key(), extra.value());
     }
@@ -155,6 +170,7 @@ QJsonObject buildRequestBody(const ProviderDescriptor& provider, const ChatReque
     if (!request.tools.isEmpty()) {
         body.insert(QStringLiteral("tools"), serializeTools(provider.protocol, request.tools, translate));
     }
+
     return body;
 }
 
@@ -173,6 +189,7 @@ AiHttpChatClient::AiHttpChatClient(AiRequestGate& gate, QObject* parent) : AiCha
 
 AiHttpChatClient::~AiHttpChatClient() {
     releaseGate();
+
     if (m_reply != nullptr) {
         m_reply->disconnect(this);
         m_reply->abort();
@@ -191,6 +208,7 @@ void AiHttpChatClient::acquireAndDispatch() {
     const auto admitted = [this]() { dispatch(); };
     // clang-format on
     const qint64 wait = m_gate.acquire(m_providerId, this, admitted);
+
     if (wait != 0) {
         emit throttled(ThrottleReason::RateLimit, std::max<qint64>(0, wait));
     }
@@ -207,16 +225,20 @@ void AiHttpChatClient::send(const ChatRequest& request, const std::function<QStr
     }
 
     const auto validated = validateConnection(request.connection);
+
     if (!validated.hasValue()) {
         reportFailure(validated.error());
         return;
     }
+
     const ProviderDescriptor* provider = findProvider(validated.value().providerId);
     const auto apiKey = resolveSecret(validated.value().apiKey);
+
     if (!apiKey.hasValue()) {
         reportFailure(apiKey.error());
         return;
     }
+
     if (provider->requiresApiKey && apiKey.value().isEmpty()) {
         reportFailure({"ai_api_key_missing", "The provider requires an API key", provider->id});
         return;
@@ -236,6 +258,7 @@ void AiHttpChatClient::send(const ChatRequest& request, const std::function<QStr
 void AiHttpChatClient::dispatch() {
     const ProviderDescriptor* provider = findProvider(m_request.connection.providerId);
     const auto apiKey = resolveSecret(m_request.connection.apiKey);
+
     if (provider == nullptr || !apiKey.hasValue()) {
         reportFailure(apiKey.hasValue() ? utils::Error{"ai_provider_unknown", "The selected AI provider is not supported", m_request.connection.providerId} : apiKey.error());
         return;
@@ -250,6 +273,7 @@ void AiHttpChatClient::dispatch() {
 
     QUrl endpoint(m_request.address);
     endpoint.setPath(endpoint.path() + completionPath(*provider));
+
     if (!provider->queryParameters.isEmpty()) {
         QUrlQuery query(endpoint);
         for (auto parameter = provider->queryParameters.constBegin(); parameter != provider->queryParameters.constEnd(); ++parameter) {
@@ -262,9 +286,11 @@ void AiHttpChatClient::dispatch() {
     httpRequest.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
     httpRequest.setRawHeader(QByteArrayLiteral("accept"), QByteArrayLiteral("text/event-stream"));
     httpRequest.setTransferTimeout(aiLimits().requestTimeoutMs);
+
     for (auto header = provider->httpHeaders.constBegin(); header != provider->httpHeaders.constEnd(); ++header) {
         httpRequest.setRawHeader(header.key().toUtf8(), header.value().toUtf8());
     }
+
     if (m_protocol == WireProtocol::Anthropic) {
         httpRequest.setRawHeader(QByteArrayLiteral("x-api-key"), apiKey.value().toUtf8());
     } else if (!apiKey.value().isEmpty()) {
@@ -276,9 +302,11 @@ void AiHttpChatClient::dispatch() {
     m_reply = m_network.post(httpRequest, QJsonDocument(body).toJson(QJsonDocument::Compact));
     connect(m_reply, &QNetworkReply::readyRead, this, &AiHttpChatClient::readStream);
     connect(m_reply, &QNetworkReply::finished, this, &AiHttpChatClient::completeStream);
+
     if (provider->streamIdleTimeoutMs > 0) {
         m_idleTimer.start(provider->streamIdleTimeoutMs);
     }
+
     emit started();
 
     // The credential travels in a header and is never recorded with the request.
@@ -289,6 +317,7 @@ void AiHttpChatClient::cancel() {
     m_idleTimer.stop();
     m_retryTimer.stop();
     releaseGate();
+
     if (m_reply == nullptr) {
         return;
     }
@@ -314,6 +343,7 @@ void AiHttpChatClient::readStream() {
     if (m_failureBody.size() < maximumFailureBodyBytes) {
         m_failureBody.append(chunk.left(maximumFailureBodyBytes - m_failureBody.size()));
     }
+
     if (m_buffer.size() > maximumStreamBufferBytes) {
         reportFailure({"ai_stream_too_large", "The provider stream exceeded the permitted size", {}});
         cancel();
@@ -321,6 +351,7 @@ void AiHttpChatClient::readStream() {
     }
 
     qsizetype boundary = m_buffer.indexOf('\n');
+
     while (boundary >= 0) {
         const QByteArray line = m_buffer.left(boundary).trimmed();
         m_buffer.remove(0, boundary + 1);
@@ -338,6 +369,7 @@ void AiHttpChatClient::consumeEvent(const QByteArray& payload) {
 
     QJsonParseError parseError;
     const QJsonDocument document = QJsonDocument::fromJson(payload, &parseError);
+
     if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
         reportFailure({"ai_stream_invalid", "The provider returned an invalid stream event", {}});
         cancel();
@@ -347,6 +379,7 @@ void AiHttpChatClient::consumeEvent(const QByteArray& payload) {
     const QJsonObject event = document.object();
     m_tools.consume(event);
     QString delta;
+
     if (m_protocol == WireProtocol::Anthropic) {
         const QString type = event.value(QStringLiteral("type")).toString();
         if (type == QStringLiteral("content_block_delta")) {
@@ -383,11 +416,13 @@ void AiHttpChatClient::consumeEvent(const QByteArray& payload) {
     if (delta.isEmpty()) {
         return;
     }
+
     if (m_content.size() + delta.size() > maximumContentCharacters) {
         reportFailure({"ai_stream_too_large", "The provider stream exceeded the permitted size", {}});
         cancel();
         return;
     }
+
     m_content.append(delta);
     emit contentReceived(delta);
 }
@@ -410,6 +445,7 @@ void AiHttpChatClient::completeStream() {
         m_buffer.append(remainder);
         m_failureBody.append(remainder.left(std::max<qsizetype>(0, maximumFailureBodyBytes - m_failureBody.size())));
     }
+
     if (networkError != QNetworkReply::NoError || status < 200 || status >= 300) {
         if (m_attempt < m_maximumRetries && retryable(networkError, status)) {
             // A rejection that repeats immediately reproduces the condition that caused it, so the next attempt waits.
@@ -430,12 +466,15 @@ void AiHttpChatClient::completeStream() {
     if (m_completed) {
         return;
     }
+
     const auto calls = m_tools.calls();
+
     if (!calls.hasValue()) {
         // A stream the provider cut at the output budget leaves its tool call half written, so what failed is the budget and not the parsing.
         reportFailure(truncatedByOutputBudget(m_finishReason) ? utils::Error{"ai_output_truncated", calls.error().message, m_finishReason} : calls.error());
         return;
     }
+
     m_completed = true;
     emit finished(m_content, calls.value(), m_usage, m_finishReason);
 }
@@ -445,11 +484,13 @@ qint64 AiHttpChatClient::retryDelay(const QByteArray& retryAfter) const {
     const qint64 ceiling = aiLimits().maximumRetryBackoffMs;
     bool seconds = false;
     const qint64 requested = retryAfter.trimmed().toLongLong(&seconds);
+
     if (seconds && requested >= 0) {
         return std::min(ceiling, requested * 1000);
     }
 
     const QDateTime until = QDateTime::fromString(QString::fromLatin1(retryAfter.trimmed()), Qt::RFC2822Date);
+
     if (until.isValid()) {
         return std::clamp<qint64>(QDateTime::currentDateTimeUtc().msecsTo(until.toUTC()), 0, ceiling);
     }
@@ -465,14 +506,17 @@ bool AiHttpChatClient::retryable(QNetworkReply::NetworkError error, int status) 
     if (status > 0) {
         return false;
     }
+
     return error == QNetworkReply::TimeoutError || error == QNetworkReply::TemporaryNetworkFailureError || error == QNetworkReply::RemoteHostClosedError || error == QNetworkReply::ConnectionRefusedError;
 }
 
 void AiHttpChatClient::release() {
     m_idleTimer.stop();
+
     if (m_reply == nullptr) {
         return;
     }
+
     QNetworkReply* reply = m_reply;
     m_reply = nullptr;
     reply->disconnect(this);
@@ -481,9 +525,11 @@ void AiHttpChatClient::release() {
 
 void AiHttpChatClient::reportFailure(const utils::Error& error) {
     releaseGate();
+
     if (m_completed) {
         return;
     }
+
     m_completed = true;
     emit failed(error);
 }

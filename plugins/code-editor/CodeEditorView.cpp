@@ -44,10 +44,13 @@ CodeEditorView::CodeEditorView(CodeEditorPlugin& plugin, QWidget* parent) : QWid
 
 void CodeEditorView::chooseWorkspace() {
     const QString path = QFileDialog::getExistingDirectory(this, m_plugin.host().translate(QStringLiteral("code-editor.actions.open-folder")));
+
     if (path.isEmpty()) {
         return;
     }
+
     const auto result = m_plugin.openWorkspace(path);
+
     if (!result.hasValue()) {
         reportError(result.error().detail.isEmpty() ? result.error().message : result.error().detail);
     }
@@ -55,10 +58,13 @@ void CodeEditorView::chooseWorkspace() {
 
 void CodeEditorView::closeWorkspace(int index) {
     auto* view = qobject_cast<CodeWorkspaceView*>(m_workspaces->widget(index));
+
     if (view == nullptr || !view->canClose()) {
         return;
     }
+
     const auto result = m_plugin.closeWorkspace(view->workspaceId());
+
     if (!result.hasValue()) {
         reportError(result.error().message);
     }
@@ -66,6 +72,7 @@ void CodeEditorView::closeWorkspace(int index) {
 
 void CodeEditorView::synchronizeWorkspaces() {
     m_rebuilding = true;
+
     for (int index = m_workspaces->count() - 1; index >= 0; --index) {
         auto* view = qobject_cast<CodeWorkspaceView*>(m_workspaces->widget(index));
         bool exists = false;
@@ -77,6 +84,7 @@ void CodeEditorView::synchronizeWorkspaces() {
             view->deleteLater();
         }
     }
+
     for (int index = 0; index < m_plugin.workspaces().size(); ++index) {
         const auto& state = m_plugin.workspaces().at(index);
         auto* view = workspaceView(state.id);
@@ -97,6 +105,7 @@ void CodeEditorView::synchronizeWorkspaces() {
             m_workspaces->setCurrentIndex(index);
         }
     }
+
     m_rebuilding = false;
     m_workspaces->setVisible(m_workspaces->count() > 0);
     m_empty->setVisible(m_workspaces->count() == 0);
@@ -131,6 +140,7 @@ CodeWorkspaceView* CodeEditorView::workspaceView(const QString& workspaceId) con
             return view;
         }
     }
+
     return nullptr;
 }
 

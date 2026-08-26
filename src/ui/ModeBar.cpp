@@ -64,6 +64,7 @@ class ModeButton final : public QWidget {
         if (m_selected == selected) {
             return;
         }
+
         m_selected = selected;
         update();
     }
@@ -88,11 +89,13 @@ class ModeButton final : public QWidget {
             event->accept();
             return;
         }
+
         QWidget::mousePressEvent(event);
     }
 
     void paintEvent(QPaintEvent*) override {
         QPainter painter(this);
+
         if (m_selected) {
             painter.fillRect(rect(), AppStyle::color(AppStyle::Color::Raised));
         } else if (m_fader > 0.0) {
@@ -197,6 +200,7 @@ void ModeBar::updateButtonGeometry() {
     for (auto* button : m_buttons) {
         button->setContentWidth(m_preferredWidth);
     }
+
     updateGeometry();
 }
 

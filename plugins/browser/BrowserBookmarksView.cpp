@@ -51,6 +51,7 @@ const BrowserBookmarkGroup* BrowserBookmarksViewHelper::findGroup(const QVector<
             return &group;
         }
     }
+
     return nullptr;
 }
 
@@ -60,6 +61,7 @@ const BrowserBookmark* BrowserBookmarksViewHelper::findBookmark(const QVector<Br
             return &bookmark;
         }
     }
+
     return nullptr;
 }
 
@@ -87,9 +89,11 @@ std::optional<QString> BrowserBookmarksViewHelper::editGroupValue(BrowserPlugin&
     layout->addLayout(form);
     layout->addWidget(editorButtons(plugin, dialog));
     name->setFocus();
+
     if (dialog.exec() != QDialog::Accepted) {
         return std::nullopt;
     }
+
     return name->text();
 }
 
@@ -105,9 +109,11 @@ std::optional<BookmarkEditorValue> BrowserBookmarksViewHelper::editBookmarkValue
     name->setObjectName(QStringLiteral("browserBookmarkName"));
     address->setObjectName(QStringLiteral("browserBookmarkAddress"));
     group->setObjectName(QStringLiteral("browserBookmarkGroup"));
+
     for (const auto& candidate : plugin.bookmarkGroups()) {
         group->addItem(candidate.name, candidate.id);
     }
+
     ui::sortComboBoxItems(group);
     // The ungrouped collection is the choice that means none, so it opens the list instead of being sorted into the names.
     group->insertItem(0, plugin.host().translate(QStringLiteral("browser.bookmarks.ungrouped")), QString());
@@ -118,9 +124,11 @@ std::optional<BookmarkEditorValue> BrowserBookmarksViewHelper::editBookmarkValue
     layout->addLayout(form);
     layout->addWidget(editorButtons(plugin, dialog));
     name->setFocus();
+
     if (dialog.exec() != QDialog::Accepted) {
         return std::nullopt;
     }
+
     return BookmarkEditorValue{name->text(), address->text(), group->currentData().toString()};
 }
 
@@ -134,6 +142,7 @@ BookmarkTree::BookmarkTree(QWidget* parent) : QTreeWidget(parent) {
 
 void BookmarkTree::dropEvent(QDropEvent* event) {
     QTreeWidget::dropEvent(event);
+
     if (event->isAccepted()) {
         emit layoutChanged();
     }
@@ -209,14 +218,18 @@ void BrowserBookmarksView::beginAddBookmark(const QString& suggestedName, const 
     const QString addressName = suggestedUrl.host().isEmpty() ? suggestedUrl.toString() : suggestedUrl.host();
     const QString name = suggestedName.trimmed().isEmpty() ? addressName : suggestedName.trimmed();
     const auto value = BrowserBookmarksViewHelper::editBookmarkValue(m_plugin, this, name, suggestedUrl.toString(), groupId);
+
     if (!value.has_value()) {
         return;
     }
+
     const auto result = m_plugin.createBookmark(value->name, value->address, value->groupId);
+
     if (!result.hasValue()) {
         notifyInvalidEditorValue();
         return;
     }
+
     if (QTreeWidgetItem* created = bookmarkItem(result.value()); created != nullptr) {
         m_tree->setCurrentItem(created);
     }
@@ -224,10 +237,13 @@ void BrowserBookmarksView::beginAddBookmark(const QString& suggestedName, const 
 
 void BrowserBookmarksView::addGroup() {
     const auto value = BrowserBookmarksViewHelper::editGroupValue(m_plugin, this, {});
+
     if (!value.has_value()) {
         return;
     }
+
     const auto result = m_plugin.createBookmarkGroup(value.value());
+
     if (!result.hasValue()) {
         notifyInvalidEditorValue();
     }
@@ -235,11 +251,14 @@ void BrowserBookmarksView::addGroup() {
 
 void BrowserBookmarksView::editSelected() {
     const QString groupId = selectedGroupId();
+
     if (!groupId.isEmpty()) {
         editGroup(groupId);
         return;
     }
+
     const QString bookmarkId = selectedBookmarkId();
+
     if (!bookmarkId.isEmpty()) {
         editBookmark(bookmarkId);
     }
@@ -247,6 +266,7 @@ void BrowserBookmarksView::editSelected() {
 
 void BrowserBookmarksView::removeSelected() {
     const QString bookmarkId = selectedBookmarkId();
+
     if (!bookmarkId.isEmpty()) {
         const BrowserBookmark* bookmark = BrowserBookmarksViewHelper::findBookmark(m_plugin.bookmarks(), bookmarkId);
         if (bookmark == nullptr) {
@@ -263,14 +283,18 @@ void BrowserBookmarksView::removeSelected() {
     }
 
     const QString groupId = selectedGroupId();
+
     if (groupId.isEmpty()) {
         return;
     }
+
     const BrowserBookmarkGroup* group = BrowserBookmarksViewHelper::findGroup(m_plugin.bookmarkGroups(), groupId);
+
     if (group == nullptr) {
         notifyInvalidEditorValue();
         return;
     }
+
     if (m_plugin.host().confirm(this, m_plugin.host().translate(QStringLiteral("browser.bookmarks.remove-group")), m_plugin.host().translate(QStringLiteral("browser.bookmarks.remove-group-question")), group->name, m_plugin.host().translate(QStringLiteral("browser.actions.remove")), true)) {
         const auto result = m_plugin.removeBookmarkGroup(groupId);
         if (!result.hasValue()) {
@@ -282,6 +306,7 @@ void BrowserBookmarksView::removeSelected() {
 void BrowserBookmarksView::openSelectedInCurrentTab() {
     const QString bookmarkId = selectedBookmarkId();
     const BrowserBookmark* bookmark = BrowserBookmarksViewHelper::findBookmark(m_plugin.bookmarks(), bookmarkId);
+
     if (bookmark != nullptr) {
         emit openRequested(bookmark->url, false);
     }
@@ -290,6 +315,7 @@ void BrowserBookmarksView::openSelectedInCurrentTab() {
 void BrowserBookmarksView::openSelectedInNewTab() {
     const QString bookmarkId = selectedBookmarkId();
     const BrowserBookmark* bookmark = BrowserBookmarksViewHelper::findBookmark(m_plugin.bookmarks(), bookmarkId);
+
     if (bookmark != nullptr) {
         emit openRequested(bookmark->url, true);
     }
@@ -304,9 +330,11 @@ void BrowserBookmarksView::openSelectedFromDoubleClick(QTreeWidgetItem* item, in
 
 void BrowserBookmarksView::showContextMenu(const QPoint& position) {
     QTreeWidgetItem* item = m_tree->itemAt(position);
+
     if (item == nullptr || item->data(0, itemKindRole).toInt() != bookmarkItemKind) {
         return;
     }
+
     m_tree->setCurrentItem(item);
     QMenu menu(this);
     QAction* openCurrent = menu.addAction(m_plugin.host().translate(QStringLiteral("browser.bookmarks.open-current")));
@@ -315,18 +343,22 @@ void BrowserBookmarksView::showContextMenu(const QPoint& position) {
     QAction* edit = menu.addAction(m_plugin.host().translate(QStringLiteral("browser.actions.edit")));
     QAction* remove = menu.addAction(m_plugin.host().translate(QStringLiteral("browser.actions.remove")));
     QAction* selected = menu.exec(m_tree->viewport()->mapToGlobal(position));
+
     if (selected == openCurrent) {
         openSelectedInCurrentTab();
         return;
     }
+
     if (selected == openNew) {
         openSelectedInNewTab();
         return;
     }
+
     if (selected == edit) {
         editSelected();
         return;
     }
+
     if (selected == remove) {
         removeSelected();
     }
@@ -336,8 +368,10 @@ void BrowserBookmarksView::applyTreeLayout() {
     if (m_rebuilding) {
         return;
     }
+
     QVector<QString> groupIds;
     QVector<BrowserBookmarkPlacement> bookmarks;
+
     for (int topIndex = 0; topIndex < m_tree->topLevelItemCount(); ++topIndex) {
         QTreeWidgetItem* top = m_tree->topLevelItem(topIndex);
         const int kind = top->data(0, itemKindRole).toInt();
@@ -365,7 +399,9 @@ void BrowserBookmarksView::applyTreeLayout() {
             bookmarks.append({top->data(0, itemIdRole).toString(), {}});
         }
     }
+
     const auto result = m_plugin.applyBookmarkLayout(groupIds, bookmarks);
+
     if (!result.hasValue()) {
         rebuild();
         notifyInvalidEditorValue();
@@ -380,6 +416,7 @@ void BrowserBookmarksView::rebuild() {
     ungrouped->setData(0, itemKindRole, ungroupedItemKind);
     ui::setItemGlyph(ungrouped, 0, ui::IconName::Folder, ui::ThemeColor::Text, m_plugin.host().theme());
     ungrouped->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDropEnabled);
+
     for (const auto& bookmark : m_plugin.bookmarks()) {
         if (!bookmark.groupId.isEmpty()) {
             continue;
@@ -391,7 +428,9 @@ void BrowserBookmarksView::rebuild() {
         item->setToolTip(0, bookmark.url.toString());
         item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDragEnabled);
     }
+
     ungrouped->setExpanded(true);
+
     for (const auto& group : m_plugin.bookmarkGroups()) {
         auto* groupItem = new QTreeWidgetItem(m_tree, QStringList{group.name});
         groupItem->setData(0, itemKindRole, groupItemKind);
@@ -411,6 +450,7 @@ void BrowserBookmarksView::rebuild() {
         }
         groupItem->setExpanded(true);
     }
+
     if (!selectedId.isEmpty()) {
         QTreeWidgetItemIterator iterator(m_tree);
         while (*iterator != nullptr) {
@@ -421,6 +461,7 @@ void BrowserBookmarksView::rebuild() {
             ++iterator;
         }
     }
+
     m_rebuilding = false;
     ui::repaintTreeGlyphs(m_tree, m_plugin.host().theme());
     updateActions();
@@ -447,22 +488,27 @@ QString BrowserBookmarksView::selectedBookmarkId() const {
 
 QTreeWidgetItem* BrowserBookmarksView::bookmarkItem(const QString& bookmarkId) const {
     QTreeWidgetItemIterator iterator(m_tree);
+
     while (*iterator != nullptr) {
         if ((*iterator)->data(0, itemKindRole).toInt() == bookmarkItemKind && (*iterator)->data(0, itemIdRole).toString() == bookmarkId) {
             return *iterator;
         }
         ++iterator;
     }
+
     return nullptr;
 }
 
 void BrowserBookmarksView::editGroup(const QString& groupId) {
     const BrowserBookmarkGroup* group = BrowserBookmarksViewHelper::findGroup(m_plugin.bookmarkGroups(), groupId);
+
     if (group == nullptr) {
         notifyInvalidEditorValue();
         return;
     }
+
     const auto value = BrowserBookmarksViewHelper::editGroupValue(m_plugin, this, group->name);
+
     if (value.has_value() && !m_plugin.updateBookmarkGroup(groupId, value.value()).hasValue()) {
         notifyInvalidEditorValue();
     }
@@ -470,11 +516,14 @@ void BrowserBookmarksView::editGroup(const QString& groupId) {
 
 void BrowserBookmarksView::editBookmark(const QString& bookmarkId) {
     const BrowserBookmark* bookmark = BrowserBookmarksViewHelper::findBookmark(m_plugin.bookmarks(), bookmarkId);
+
     if (bookmark == nullptr) {
         notifyInvalidEditorValue();
         return;
     }
+
     const auto value = BrowserBookmarksViewHelper::editBookmarkValue(m_plugin, this, bookmark->name, bookmark->url.toString(), bookmark->groupId);
+
     if (value.has_value() && !m_plugin.updateBookmark(bookmarkId, value->name, value->address, value->groupId).hasValue()) {
         notifyInvalidEditorValue();
     }

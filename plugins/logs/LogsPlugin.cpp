@@ -41,9 +41,11 @@ class LogsView final : public QWidget {
         m_search->setPlaceholderText(m_host.translate(QStringLiteral("logs.viewer.search")));
         m_level = new ui::ComboBox(m_host.theme(), header);
         m_level->addItem(m_host.translate(QStringLiteral("logs.viewer.all-levels")), QString{});
+
         for (const auto& name : {QStringLiteral("debug"), QStringLiteral("info"), QStringLiteral("warning"), QStringLiteral("error")}) {
             m_level->addItem(name.toUpper(), name);
         }
+
         m_loadOlder = new QPushButton(m_host.translate(QStringLiteral("logs.viewer.load-older")), header);
         auto* refresh = new QPushButton(ui::icon(ui::IconName::Refresh, m_host.theme()), m_host.translate(QStringLiteral("logs.viewer.refresh")), header);
         auto* clear = new QPushButton(ui::destructiveIcon(ui::IconName::Clear, m_host.theme()), m_host.translate(QStringLiteral("logs.viewer.clear")), header);
@@ -115,6 +117,7 @@ class LogsView final : public QWidget {
         if (m_pageLoading) {
             return;
         }
+
         m_pageLoading = true;
         const quint64 generation = m_reloadGeneration;
         const qint64 requestedBeforeSequence = m_beforeSequence;
@@ -146,6 +149,7 @@ class LogsView final : public QWidget {
         const QString search = m_search->text().trimmed();
         const QString level = m_level->currentData().toString();
         m_table->setRowCount(0);
+
         for (const auto& entry : m_entries) {
             if (!level.isEmpty() && entry.level != level) {
                 continue;
@@ -229,12 +233,15 @@ utils::Result<void> LogsPlugin::initialize(PluginHost& host) {
     if (m_host != nullptr) {
         return utils::Result<void>::failure({"logs_already_initialized", "The Logs plugin is already initialized", {}});
     }
+
     m_host = &host;
     m_asyncContext = std::make_unique<QObject>();
     const auto result = m_host->migrateDatabase({{1, {QStringLiteral("CREATE TABLE logs_entries(sequence INTEGER PRIMARY KEY AUTOINCREMENT, timestamp_utc TEXT NOT NULL, source_plugin_id TEXT NOT NULL, level TEXT NOT NULL CHECK(level IN ('debug', 'info', 'warning', 'error')), category TEXT NOT NULL, message TEXT NOT NULL, details_json TEXT NOT NULL) STRICT"), QStringLiteral("CREATE INDEX logs_entries_timestamp_index ON logs_entries(timestamp_utc DESC, sequence DESC)"), QStringLiteral("CREATE INDEX logs_entries_source_index ON logs_entries(source_plugin_id, sequence DESC)")}}});
+
     if (!result.hasValue()) {
         shutdown();
     }
+
     return result;
 }
 
@@ -246,6 +253,7 @@ QWidget* LogsPlugin::createSettingsSection(const QString& groupId, const QString
     if (groupId != QStringLiteral("logs") || sectionId != QStringLiteral("general") || m_host == nullptr) {
         return nullptr;
     }
+
     auto* view = ui::settingsSectionPage(parent);
     auto* layout = qobject_cast<QVBoxLayout*>(view->layout());
     auto* form = ui::settingsForm();
@@ -275,6 +283,7 @@ QWidget* LogsPlugin::createSettingsSection(const QString& groupId, const QString
 void LogsPlugin::handleRequest(const QString&, const QString& topic, const QJsonObject& payload, PluginReply reply) {
     qint64 beforeSequence = 0;
     qint64 limit = 0;
+
     if (topic == QStringLiteral("logs.entries.page") && hasExactKeys(payload, {QStringLiteral("beforeSequence"), QStringLiteral("limit")}) && readJsonInteger(payload.value(QStringLiteral("beforeSequence")), beforeSequence) && readJsonInteger(payload.value(QStringLiteral("limit")), limit) && limit <= std::numeric_limits<int>::max()) {
         auto future = entries(beforeSequence, static_cast<int>(limit));
         // clang-format off
@@ -292,6 +301,7 @@ void LogsPlugin::handleRequest(const QString&, const QString& topic, const QJson
         // clang-format on
         return;
     }
+
     if (topic == QStringLiteral("logs.entries.clear") && payload.isEmpty()) {
         auto future = clearEntries();
         // clang-format off
@@ -299,6 +309,7 @@ void LogsPlugin::handleRequest(const QString&, const QString& topic, const QJson
         // clang-format on
         return;
     }
+
     reply(utils::Result<QJsonObject>::failure({"logs_request_invalid", "The Logs request is invalid", topic}));
 }
 
@@ -306,6 +317,7 @@ void LogsPlugin::handleEvent(const QString& senderPluginId, const QString& topic
     if (topic != QStringLiteral("slotdeck.log.entry")) {
         return;
     }
+
     auto future = appendEntry(senderPluginId, payload);
     Q_UNUSED(future);
 }
@@ -319,6 +331,7 @@ QFuture<utils::Result<QVector<LogEntry>>> LogsPlugin::entries(qint64 beforeSeque
     if (m_host == nullptr || beforeSequence < 0 || limit < 1 || limit > 100) {
         return QtFuture::makeReadyValueFuture(utils::Result<QVector<LogEntry>>::failure({"logs_page_invalid", "The requested log page is invalid", {}}));
     }
+
     const QString statement = beforeSequence == 0 ? QStringLiteral("SELECT sequence, timestamp_utc, source_plugin_id, level, category, message, details_json FROM logs_entries ORDER BY sequence DESC LIMIT ?") : QStringLiteral("SELECT sequence, timestamp_utc, source_plugin_id, level, category, message, details_json FROM logs_entries WHERE sequence < ? ORDER BY sequence DESC LIMIT ?");
     const QVariantList bindings = beforeSequence == 0 ? QVariantList{limit} : QVariantList{beforeSequence, limit};
     auto future = m_host->queryDatabase(statement, bindings);
@@ -352,6 +365,7 @@ QFuture<utils::Result<void>> LogsPlugin::clearEntries() {
     if (m_host == nullptr) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"logs_unavailable", "The Logs plugin is unavailable", {}}));
     }
+
     auto future = m_host->executeDatabase(QStringLiteral("DELETE FROM logs_entries"));
     // clang-format off
     return future.then(m_asyncContext.get(), [this](utils::Result<void> result) {
@@ -367,14 +381,17 @@ QFuture<utils::Result<void>> LogsPlugin::appendEntry(const QString& senderPlugin
     if (m_host == nullptr || senderPluginId.isEmpty() || !hasExactKeys(payload, {QStringLiteral("timestampUtc"), QStringLiteral("level"), QStringLiteral("category"), QStringLiteral("message"), QStringLiteral("details")}) || !payload.value(QStringLiteral("timestampUtc")).isString() || !payload.value(QStringLiteral("level")).isString() || !payload.value(QStringLiteral("category")).isString() || !payload.value(QStringLiteral("message")).isString() || !payload.value(QStringLiteral("details")).isObject()) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"logs_entry_invalid", "The log entry is invalid", senderPluginId}));
     }
+
     const QString timestamp = payload.value(QStringLiteral("timestampUtc")).toString();
     const QDateTime timestampUtc = persistence::parseStoredTimestamp(timestamp);
     const QString level = payload.value(QStringLiteral("level")).toString();
     const QString category = payload.value(QStringLiteral("category")).toString();
     const QString message = payload.value(QStringLiteral("message")).toString();
+
     if (!persistence::validStoredTimestamp(timestampUtc) || !LogsPluginHelper::isLevel(level) || category.trimmed().isEmpty() || message.trimmed().isEmpty()) {
         return QtFuture::makeReadyValueFuture(utils::Result<void>::failure({"logs_entry_invalid", "The log entry is invalid", senderPluginId}));
     }
+
     const QString details = QString::fromUtf8(QJsonDocument(payload.value(QStringLiteral("details")).toObject()).toJson(QJsonDocument::Compact));
     auto future = m_host->executeDatabase(QStringLiteral("INSERT INTO logs_entries(timestamp_utc, source_plugin_id, level, category, message, details_json) VALUES(?, ?, ?, ?, ?, ?)"), {timestamp, senderPluginId, level, category, message, details});
     // clang-format off

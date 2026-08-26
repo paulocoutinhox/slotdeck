@@ -18,6 +18,7 @@ bool AiModelConnectionHelper::integerValue(const QJsonValue& value, qint64& outp
     if (!value.isDouble()) {
         return false;
     }
+
     output = value.toInteger(std::numeric_limits<qint64>::min());
     return output != std::numeric_limits<qint64>::min() && value.toDouble() == static_cast<double>(output);
 }
@@ -36,6 +37,7 @@ utils::Result<void> AiModelConnectionHelper::validateParameter(const ParameterDe
         }
         return utils::Result<void>::failure(invalid);
     }
+
     if (descriptor.type == ParameterType::Integer) {
         qint64 parsed = 0;
         if (!integerValue(value, parsed) || static_cast<double>(parsed) < descriptor.minimum || static_cast<double>(parsed) > descriptor.maximum) {
@@ -43,9 +45,11 @@ utils::Result<void> AiModelConnectionHelper::validateParameter(const ParameterDe
         }
         return utils::Result<void>::success();
     }
+
     if (!value.isDouble() || value.toDouble() < descriptor.minimum || value.toDouble() > descriptor.maximum) {
         return utils::Result<void>::failure(invalid);
     }
+
     return utils::Result<void>::success();
 }
 
@@ -65,9 +69,11 @@ QString connectionLabel(const ModelConnection& connection) {
 // Only a self-hosted service carries its own address, so every other connection answers with the address its provider publishes.
 QString connectionAddress(const ModelConnection& connection) {
     const ProviderDescriptor* provider = findProvider(connection.providerId);
+
     if (provider == nullptr) {
         return {};
     }
+
     return provider->addressConfigurable && !connection.address.isEmpty() ? connection.address : provider->baseUrl;
 }
 
@@ -77,6 +83,7 @@ const ModelConnection* findConnection(const QVector<ModelConnection>& connection
             return &connection;
         }
     }
+
     return nullptr;
 }
 
@@ -84,6 +91,7 @@ utils::Result<QJsonObject> validateParameters(const ProviderDescriptor& provider
     const QVector<ParameterDescriptor> applicable = applicableParameters(provider, modelId);
 
     QJsonObject validated;
+
     for (const auto& descriptor : applicable) {
         if (!parameters.contains(descriptor.id)) {
             return utils::Result<QJsonObject>::failure({"ai_parameter_missing", "The provider parameter is missing", descriptor.id});
@@ -111,6 +119,7 @@ utils::Result<QJsonObject> validateExtraParameters(const QJsonObject& parameters
             return utils::Result<QJsonObject>::failure({"ai_extra_parameter_invalid", "The extra provider parameter is invalid", entry.key()});
         }
     }
+
     return utils::Result<QJsonObject>::success(parameters);
 }
 
@@ -135,15 +144,18 @@ WireProtocol connectionProtocol(const ModelConnection& connection) {
 // A zero budget lets the service answer with everything the model allows, so what it really is worth is that model own maximum.
 qint64 outputBudget(const ModelConnection& connection) {
     const ProviderDescriptor* provider = findProvider(connection.providerId);
+
     if (provider == nullptr) {
         return 0;
     }
 
     const auto budget = outputBudgetParameter(*provider, connection.modelId);
     const qint64 declared = budget.has_value() ? connection.parameters.value(budget->id).toInteger(0) : 0;
+
     if (declared > 0) {
         return declared;
     }
+
     const ModelDescriptor* model = findModel(*provider, connection.modelId);
     return model == nullptr ? 0 : model->maximumOutputTokens;
 }
@@ -151,19 +163,23 @@ qint64 outputBudget(const ModelConnection& connection) {
 // A borrowed budget still has to fit what the model accepts, so it is clamped instead of making the connection invalid.
 void setOutputBudget(ModelConnection& connection, qint64 tokens) {
     const ProviderDescriptor* provider = findProvider(connection.providerId);
+
     if (provider == nullptr) {
         return;
     }
 
     const auto budget = outputBudgetParameter(*provider, connection.modelId);
+
     if (!budget.has_value()) {
         return;
     }
+
     connection.parameters.insert(budget->id, std::clamp<qint64>(tokens, static_cast<qint64>(budget->minimum), static_cast<qint64>(budget->maximum)));
 }
 
 utils::Result<ModelConnection> validateConnection(const ModelConnection& connection) {
     const ProviderDescriptor* provider = findProvider(connection.providerId);
+
     if (provider == nullptr) {
         return utils::Result<ModelConnection>::failure({"ai_provider_unknown", "The selected AI provider is not supported", connection.providerId});
     }
@@ -172,6 +188,7 @@ utils::Result<ModelConnection> validateConnection(const ModelConnection& connect
     validated.modelId = connection.modelId.trimmed();
     validated.displayName = connection.displayName.trimmed();
     validated.address = connection.address.trimmed();
+
     if (validated.modelId.isEmpty()) {
         return utils::Result<ModelConnection>::failure({"ai_model_invalid", "The AI model is required", provider->id});
     }
@@ -183,20 +200,25 @@ utils::Result<ModelConnection> validateConnection(const ModelConnection& connect
     }
 
     const QUrl address(validated.address);
+
     if (provider->addressConfigurable && (validated.address.isEmpty() || !address.isValid() || (address.scheme() != QStringLiteral("http") && address.scheme() != QStringLiteral("https")))) {
         return utils::Result<ModelConnection>::failure({"ai_address_invalid", "The service address is invalid", provider->id});
     }
 
     const auto parameters = validateParameters(*provider, validated.modelId, validated.parameters);
+
     if (!parameters.hasValue()) {
         return utils::Result<ModelConnection>::failure(parameters.error());
     }
     // Asking for the maximum of a model the catalog does not declare has no answer, so it is refused where it is typed.
     const auto budget = outputBudgetParameter(*provider, validated.modelId);
+
     if (budget.has_value() && budget->modelMaximumWhenZero && validated.parameters.value(budget->id).toInteger(0) == 0 && findModel(*provider, validated.modelId) == nullptr) {
         return utils::Result<ModelConnection>::failure({"ai_output_budget_unknown", "The catalog does not declare this model, so its answer budget has to be a number", validated.modelId});
     }
+
     const auto extra = validateExtraParameters(validated.extraParameters);
+
     if (!extra.hasValue()) {
         return utils::Result<ModelConnection>::failure(extra.error());
     }
@@ -209,6 +231,7 @@ utils::Result<ModelConnection> validateConnection(const ModelConnection& connect
 // One key names one configuration, so the same provider and model pair is configured once.
 utils::Result<void> validateConnectionSet(const QVector<ModelConnection>& connections) {
     QSet<QString> keys;
+
     for (const auto& connection : connections) {
         const auto validated = validateConnection(connection);
         if (!validated.hasValue()) {
@@ -220,6 +243,7 @@ utils::Result<void> validateConnectionSet(const QVector<ModelConnection>& connec
         }
         keys.insert(key);
     }
+
     return utils::Result<void>::success();
 }
 

@@ -51,6 +51,7 @@ inline bool hasKnownKeys(const QJsonObject& document, const QSet<QString>& known
             return false;
         }
     }
+
     return true;
 }
 
@@ -62,6 +63,7 @@ inline bool readSettingsBool(const QJsonObject& document, const QString& key, bo
     if (!document.value(key).isBool()) {
         return false;
     }
+
     value = document.value(key).toBool();
     return true;
 }
@@ -70,10 +72,13 @@ inline bool readSettingsInteger(const QJsonObject& document, const QString& key,
     if (!document.contains(key)) {
         return true;
     }
+
     qint64 stored = 0;
+
     if (!readJsonInteger(document.value(key), stored) || stored < std::numeric_limits<int>::min() || stored > std::numeric_limits<int>::max()) {
         return false;
     }
+
     value = static_cast<int>(stored);
     return true;
 }
@@ -85,6 +90,7 @@ inline bool readSettingsText(const QJsonObject& document, const QString& key, QS
     if (!document.value(key).isString()) {
         return false;
     }
+
     value = document.value(key).toString();
     return true;
 }
@@ -96,6 +102,7 @@ inline bool readSettingsObject(const QJsonObject& document, const QString& key, 
     if (!document.value(key).isObject()) {
         return false;
     }
+
     value = document.value(key).toObject();
     return true;
 }
@@ -109,12 +116,14 @@ inline bool readSettingsObjectList(const QJsonObject& document, const QString& k
     }
 
     QVector<QJsonObject> entries;
+
     for (const auto& entry : document.value(key).toArray()) {
         if (!entry.isObject()) {
             return false;
         }
         entries.append(entry.toObject());
     }
+
     value = entries;
     return true;
 }
@@ -128,12 +137,14 @@ inline bool readSettingsTextList(const QJsonObject& document, const QString& key
     }
 
     QStringList entries;
+
     for (const auto& entry : document.value(key).toArray()) {
         if (!entry.isString()) {
             return false;
         }
         entries.append(entry.toString());
     }
+
     value = entries;
     return true;
 }
@@ -168,9 +179,11 @@ class SettingsReader final {
 
 inline bool hasExactKeys(const QJsonObject& object, const QSet<QString>& expected) {
     QSet<QString> actual;
+
     for (auto entry = object.constBegin(); entry != object.constEnd(); ++entry) {
         actual.insert(entry.key());
     }
+
     return actual == expected;
 }
 
@@ -185,18 +198,22 @@ inline bool parseContentFontStep(const QJsonObject& payload, ContentFontStep& ou
     }
 
     const QString step = payload.value(QStringLiteral("step")).toString();
+
     if (step == QStringLiteral("increase")) {
         output = ContentFontStep::Increase;
         return true;
     }
+
     if (step == QStringLiteral("decrease")) {
         output = ContentFontStep::Decrease;
         return true;
     }
+
     if (step == QStringLiteral("reset")) {
         output = ContentFontStep::Reset;
         return true;
     }
+
     return false;
 }
 

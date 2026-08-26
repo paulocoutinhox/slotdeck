@@ -64,6 +64,7 @@ QColor AiConversationViewHelper::footnote(const QColor& ink) {
 // A label that wraps reports the width of one word, so what the bubble really carries is measured from the text itself.
 int AiConversationViewHelper::naturalWidth(const ui::RoundedSurface* bubble, int available) {
     int wanted = 0;
+
     for (const auto* entry : bubble->findChildren<QWidget*>(QStringLiteral("aiConversationTool"))) {
         for (const auto* label : entry->findChildren<QLabel*>()) {
             const int indent = label->contentsMargins().left() + label->contentsMargins().right();
@@ -79,14 +80,17 @@ void AiConversationViewHelper::arrangeBubble(ui::RoundedSurface* bubble, int ava
     auto* line = bubble->findChild<QWidget*>(QStringLiteral("aiConversationLine"));
     auto* sent = bubble->findChild<QLabel*>(QStringLiteral("aiConversationTime"));
     auto* content = line != nullptr ? line->findChild<ui::MarkdownView*>(QStringLiteral("aiConversationContent")) : nullptr;
+
     if (line == nullptr || sent == nullptr) {
         return;
     }
+
     const bool carriesTools = !bubble->findChildren<QWidget*>(QStringLiteral("aiConversationTool")).isEmpty();
 
     auto* lineLayout = qobject_cast<QHBoxLayout*>(line->layout());
     const int beside = sent->sizeHint().width() + bubbleHorizontalPadding;
     bool inlineTime = false;
+
     if (content != nullptr && content->isVisibleTo(bubble)) {
         content->fitTo(available);
         inlineTime = !carriesTools && content->document()->lineCount() <= 1 && content->width() + beside <= available;
@@ -96,6 +100,7 @@ void AiConversationViewHelper::arrangeBubble(ui::RoundedSurface* bubble, int ava
     }
 
     const bool alreadyInline = lineLayout->indexOf(sent) >= 0;
+
     if (inlineTime != alreadyInline) {
         if (inlineTime) {
             bubble->content()->removeWidget(sent);
@@ -214,6 +219,7 @@ void AiConversationView::setTask(const QString& taskId) {
 void AiConversationView::rebuild() {
     const bool following = m_followNewest || m_stickToEnd;
     m_followNewest = false;
+
     while (m_messagesLayout->count() > 1) {
         QLayoutItem* item = m_messagesLayout->takeAt(m_messagesLayout->count() - 1);
         if (QWidget* widget = item->widget(); widget != nullptr) {
@@ -228,6 +234,7 @@ void AiConversationView::rebuild() {
     m_lastRole.reset();
     const QVector<ConversationMessage> conversation = m_plugin.conversation(m_taskId);
     QVector<ConversationMessage> results;
+
     for (const auto& message : conversation) {
         if (message.role == ConversationRole::Tool) {
             results.append(message);
@@ -387,6 +394,7 @@ int AiConversationView::bubbleWidth() const {
 // The bubbles reflow with the window, so a conversation read in a narrow shell wraps where that shell ends.
 void AiConversationView::applyBubbleWidths() {
     const int wide = bubbleWidth();
+
     for (auto* bubble : m_messages->findChildren<ui::RoundedSurface*>(QStringLiteral("aiConversationBubble"))) {
         bubble->setMaximumWidth(wide);
     }
@@ -459,15 +467,18 @@ void AiConversationView::closePendingTurn() {
 
 void AiConversationView::showStreaming(const QString& text) {
     openPendingTurn();
+
     if (m_streaming == nullptr) {
         return;
     }
 
     m_streaming->parentWidget()->setVisible(true);
     m_streaming->setChatMarkdown(text);
+
     if (auto* thinking = m_pendingRow->findChild<QWidget*>(QStringLiteral("aiConversationThinking")); thinking != nullptr) {
         thinking->hide();
     }
+
     applyBubbleWidths();
     scrollToNewest();
 }
@@ -485,6 +496,7 @@ void AiConversationView::scrollToNewest() {
 // A turn that is still running says so inside the bubble it is writing, because a silence reads as a finished run.
 void AiConversationView::updateRunState() {
     const bool running = m_plugin.runState(m_taskId) != TaskRunState::Idle;
+
     if (!running) {
         closePendingTurn();
         return;
@@ -495,6 +507,7 @@ void AiConversationView::updateRunState() {
     auto* busy = m_pendingRow->findChild<ui::BusyIndicator*>(QStringLiteral("aiConversationBusy"));
     auto* phase = m_pendingRow->findChild<QLabel*>(QStringLiteral("aiConversationPhase"));
     auto* sent = m_pendingRow->findChild<QLabel*>(QStringLiteral("aiConversationTime"));
+
     if (thinking == nullptr || busy == nullptr || phase == nullptr || sent == nullptr) {
         return;
     }
@@ -512,6 +525,7 @@ void AiConversationView::updateRunState() {
 
 void AiConversationView::submit() {
     const QString text = m_composer->toPlainText().trimmed();
+
     if (text.isEmpty()) {
         return;
     }
@@ -542,6 +556,7 @@ bool AiConversationView::eventFilter(QObject* watched, QEvent* event) {
     }
 
     auto* keyEvent = static_cast<QKeyEvent*>(event);
+
     if ((keyEvent->key() != Qt::Key_Return && keyEvent->key() != Qt::Key_Enter) || keyEvent->modifiers().testFlag(Qt::ShiftModifier)) {
         return QWidget::eventFilter(watched, event);
     }

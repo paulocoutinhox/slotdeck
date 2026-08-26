@@ -82,15 +82,18 @@ utils::Result<void> TerminalPlugin::initialize(PluginHost& host) {
     if (m_host != nullptr) {
         return utils::Result<void>::failure({"terminal_already_initialized", "The Terminal plugin is already initialized", {}});
     }
+
     m_host = &host;
 
     const auto migrationResult = host.migrateDatabase({{1, {QStringLiteral("CREATE TABLE terminal_state(scope_id TEXT PRIMARY KEY CHECK(scope_id IN ('preferences', 'workspace')), data_json TEXT NOT NULL) STRICT")}}});
+
     if (!migrationResult.hasValue()) {
         shutdown();
         return migrationResult;
     }
 
     const QString historyPath = QDir(host.applicationDataPath()).filePath(QStringLiteral("history"));
+
     if (!QDir().mkpath(historyPath)) {
         shutdown();
         return utils::Result<void>::failure({"terminal_history_unavailable", "The terminal history directory is unavailable", historyPath});
@@ -98,12 +101,14 @@ utils::Result<void> TerminalPlugin::initialize(PluginHost& host) {
 
     m_settings = std::make_unique<TerminalSettingsStore>(host);
     const auto settingsResult = m_settings->initialize();
+
     if (!settingsResult.hasValue()) {
         shutdown();
         return settingsResult;
     }
 
     const auto* selectedTheme = terminalcore::terminalTheme(m_settings->themeId());
+
     if (selectedTheme == nullptr) {
         shutdown();
         return utils::Result<void>::failure({"terminal_theme_unknown", "The stored terminal theme is unknown", m_settings->themeId()});
@@ -112,6 +117,7 @@ utils::Result<void> TerminalPlugin::initialize(PluginHost& host) {
     m_repository = std::make_unique<TerminalWorkspaceRepository>(host);
     m_manager = std::make_unique<workspace::WorkspaceManager>(*m_repository, host, historyPath, *selectedTheme, terminalcore::createSystemPtyBackend);
     const auto workspaceResult = m_manager->initialize();
+
     if (!workspaceResult.hasValue()) {
         shutdown();
         return workspaceResult;
@@ -145,6 +151,7 @@ QWidget* TerminalPlugin::createNavigationView(const QString& itemId, QWidget* pa
     if (itemId != QStringLiteral("workspace") || m_manager == nullptr || m_settings == nullptr) {
         return nullptr;
     }
+
     return new TerminalView(*m_manager, *m_settings, *m_host, parent);
 }
 
@@ -162,9 +169,11 @@ QWidget* TerminalPlugin::createSettingsSection(const QString& groupId, const QSt
     ui::sortComboBoxItems(fontFamily);
     fontFamily->setCurrentText(m_settings->fontFamily());
     auto* theme = new ui::ComboBox(m_host->theme(), page);
+
     for (const auto& item : terminalcore::terminalThemes()) {
         theme->addItem(item.name, item.id);
     }
+
     ui::sortComboBoxItems(theme);
     theme->setCurrentIndex(theme->findData(m_settings->themeId()));
     auto* fontSize = new QSpinBox(page);
@@ -202,14 +211,17 @@ void TerminalPlugin::handleRequest(const QString&, const QString& topic, const Q
         reply(utils::Result<QJsonObject>::success(workspaceSnapshot()));
         return;
     }
+
     reply(utils::Result<QJsonObject>::failure({"plugin_message_topic_unknown", "The Terminal plugin does not handle this topic", topic}));
 }
 
 void TerminalPlugin::handleEvent(const QString&, const QString& topic, const QJsonObject& payload) {
     ContentFontStep step = ContentFontStep::Reset;
+
     if (topic != QString::fromLatin1(contentFontStepTopic) || m_settings == nullptr || !parseContentFontStep(payload, step)) {
         return;
     }
+
     m_settings->stepFontSize(step);
 }
 
@@ -217,6 +229,7 @@ void TerminalPlugin::shutdown() {
     if (m_manager != nullptr) {
         m_manager->shutdown();
     }
+
     m_manager.reset();
     m_repository.reset();
     m_settings.reset();
@@ -225,10 +238,12 @@ void TerminalPlugin::shutdown() {
 
 QJsonObject TerminalPlugin::workspaceSnapshot() const {
     QJsonArray terminals;
+
     for (const auto& value : m_manager->allSessions()) {
         const QVariantMap session = value.toMap();
         terminals.append(QJsonObject{{QStringLiteral("id"), session.value(QStringLiteral("id")).toString()}, {QStringLiteral("name"), session.value(QStringLiteral("name")).toString()}, {QStringLiteral("cwd"), session.value(QStringLiteral("cwd")).toString()}});
     }
+
     return {{QStringLiteral("activeTerminalId"), m_manager->currentFocusedSessionId()}, {QStringLiteral("terminals"), terminals}};
 }
 

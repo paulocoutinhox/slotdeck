@@ -40,12 +40,14 @@ utils::Result<QJsonObject> AiConnectionDialogHelper::parseExtraParameters(const 
 
     QJsonParseError parseError;
     const QJsonDocument document = QJsonDocument::fromJson(text.toUtf8(), &parseError);
+
     if (parseError.error != QJsonParseError::NoError) {
         return utils::Result<QJsonObject>::failure({"ai_extra_parameter_syntax", parseError.errorString(), QString::number(parseError.offset)});
     }
     if (!document.isObject()) {
         return utils::Result<QJsonObject>::failure({"ai_extra_parameter_shape", "The extra parameters are not an object", {}});
     }
+
     return validateExtraParameters(document.object());
 }
 
@@ -63,9 +65,11 @@ AiConnectionDialog::AiConnectionDialog(PluginHost& host, const ModelConnection& 
 
     m_provider = new ui::ComboBox(m_host.theme(), this);
     m_provider->setObjectName(QStringLiteral("aiConnectionProvider"));
+
     for (const auto& descriptor : providerCatalog()) {
         m_provider->addItem(m_host.translate(descriptor.titleKey), descriptor.id);
     }
+
     ui::sortComboBoxItems(m_provider);
 
     m_model = new ui::ComboBox(m_host.theme(), this);
@@ -139,16 +143,20 @@ AiConnectionDialog::AiConnectionDialog(PluginHost& host, const ModelConnection& 
     m_loading = true;
     m_provider->setCurrentIndex(std::max(0, m_provider->findData(connection.providerId)));
     rebuildModels();
+
     if (!connection.modelId.isEmpty()) {
         m_model->setCurrentText(connection.modelId);
     }
+
     const ProviderDescriptor* descriptor = selectedProvider();
     const ModelConnection declared = descriptor != nullptr ? declaredConnection(*descriptor, m_model->currentText().trimmed()) : ModelConnection{};
     m_apiKey->setValue(connection.providerId.isEmpty() ? declared.apiKey : connection.apiKey);
     m_address->setText(connection.providerId.isEmpty() ? declared.address : connection.address);
+
     if (!connection.extraParameters.isEmpty()) {
         m_extraParameters->setPlainText(QString::fromUtf8(QJsonDocument(connection.extraParameters).toJson(QJsonDocument::Indented).trimmed()));
     }
+
     rebuildParameters();
     applyProviderShape();
     validateExtraParameters();
@@ -174,6 +182,7 @@ const ProviderDescriptor* AiConnectionDialog::selectedProvider() const {
 // The credential and the address belong to the provider, so the fields the selected one does not own are closed.
 void AiConnectionDialog::applyProviderShape() {
     const ProviderDescriptor* descriptor = selectedProvider();
+
     if (descriptor == nullptr) {
         return;
     }
@@ -185,6 +194,7 @@ void AiConnectionDialog::applyProviderShape() {
 // Moving to another provider starts from what that provider declares, because the credential of the previous one does not open it.
 void AiConnectionDialog::selectProvider() {
     const ProviderDescriptor* descriptor = selectedProvider();
+
     if (descriptor == nullptr || m_loading) {
         return;
     }
@@ -206,6 +216,7 @@ void AiConnectionDialog::selectModel() {
 
 void AiConnectionDialog::rebuildModels() {
     const ProviderDescriptor* descriptor = selectedProvider();
+
     if (descriptor == nullptr) {
         return;
     }
@@ -213,19 +224,24 @@ void AiConnectionDialog::rebuildModels() {
     const QSignalBlocker blocker(m_model);
     const QString previous = m_model->currentText();
     m_model->clear();
+
     for (const auto& model : descriptor->models) {
         m_model->addItem(model.displayName, model.id);
     }
+
     for (const auto& model : m_discoveredModels) {
         if (findModel(*descriptor, model) == nullptr) {
             m_model->addItem(model, model);
         }
     }
+
     ui::sortComboBoxItems(m_model);
+
     if (!previous.isEmpty() && (findModel(*descriptor, previous) != nullptr || m_discoveredModels.contains(previous))) {
         m_model->setCurrentText(previous);
         return;
     }
+
     // The provider declares which model it opens with, and presenting the list alphabetically does not change that.
     for (const auto& preferred : descriptor->preferredModels) {
         if (const int row = m_model->findData(preferred); row >= 0) {
@@ -233,12 +249,14 @@ void AiConnectionDialog::rebuildModels() {
             return;
         }
     }
+
     m_model->setCurrentIndex(m_model->count() > 0 ? 0 : -1);
 }
 
 // A refreshed catalog belongs to the provider that answered, so it is discarded when the selection moves elsewhere.
 void AiConnectionDialog::refreshModels() {
     const ProviderDescriptor* descriptor = selectedProvider();
+
     if (descriptor == nullptr || m_discovery.running()) {
         return;
     }
@@ -270,6 +288,7 @@ void AiConnectionDialog::clearParameterForm() {
             delete item;
         }
     }
+
     m_parameterEditors.clear();
 }
 
@@ -277,6 +296,7 @@ void AiConnectionDialog::rebuildParameters() {
     clearParameterForm();
 
     const ProviderDescriptor* descriptor = selectedProvider();
+
     if (descriptor == nullptr) {
         return;
     }
@@ -317,11 +337,13 @@ void AiConnectionDialog::rebuildParameters() {
 
 QJsonObject AiConnectionDialog::collectParameters() const {
     const ProviderDescriptor* descriptor = selectedProvider();
+
     if (descriptor == nullptr) {
         return {};
     }
 
     QJsonObject parameters;
+
     for (const auto& parameter : applicableParameters(*descriptor, m_model->currentText().trimmed())) {
         QWidget* editor = m_parameterEditors.value(parameter.id, nullptr);
         if (editor == nullptr) {
@@ -335,6 +357,7 @@ QJsonObject AiConnectionDialog::collectParameters() const {
             parameters.insert(parameter.id, doubleSpinBox->value());
         }
     }
+
     return parameters;
 }
 
@@ -357,18 +380,22 @@ ModelConnection AiConnectionDialog::connection() const {
     connection.address = descriptor != nullptr && descriptor->addressConfigurable ? m_address->text().trimmed() : QString{};
     connection.parameters = collectParameters();
     const auto extra = AiConnectionDialogHelper::parseExtraParameters(m_extraParameters->toPlainText());
+
     if (extra.hasValue()) {
         connection.extraParameters = extra.value();
     }
+
     return connection;
 }
 
 void AiConnectionDialog::accept() {
     const auto validated = validateConnection(connection());
+
     if (!validated.hasValue()) {
         showValidation(validationMessage(validated.error()));
         return;
     }
+
     if (m_takenKeys.contains(connectionKey(validated.value()))) {
         showValidation(m_host.translate(QStringLiteral("ai.validation.connection-duplicate")));
         return;
@@ -408,6 +435,7 @@ QString AiConnectionDialog::validationMessage(const utils::Error& error) const {
     if (error.code == QStringLiteral("ai_extra_parameter_invalid")) {
         return m_host.translate(QStringLiteral("ai.validation.extra-parameters-key"));
     }
+
     return error.message;
 }
 

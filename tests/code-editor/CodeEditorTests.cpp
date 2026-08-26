@@ -323,9 +323,11 @@ TEST(CodeWorkspaceViewTest, PresentsTheAnalysisOfTheWorkspaceAndForgetsItWhenThe
 
     // The surface shows the workspace, so a file the server reported on without anyone opening it is listed too.
     QStringList listed;
+
     for (int index = 0; index < problems->topLevelItemCount(); ++index) {
         listed.append(problems->topLevelItem(index)->text(0));
     }
+
     listed.sort();
     EXPECT_EQ(listed, QStringList({QStringLiteral("included.h"), QStringLiteral("main.cpp")}));
 
@@ -777,6 +779,7 @@ TEST(EditorConfigTest, AnswersTheCasesTheCoreTestSuiteDefines) {
     const QVector<Case> cases{
         {QStringLiteral("*.{py,js,html}"), QStringLiteral("test.py"), true}, {QStringLiteral("*.{py,js,html}"), QStringLiteral("test.pyc"), false}, {QStringLiteral("{single}.b"), QStringLiteral("{single}.b"), true}, {QStringLiteral("{single}.b"), QStringLiteral(".b"), false}, {QStringLiteral("{}.c"), QStringLiteral("{}.c"), true}, {QStringLiteral("{}.c"), QStringLiteral(".c"), false}, {QStringLiteral("a{b,c,}.d"), QStringLiteral("a.d"), true}, {QStringLiteral("a{b,c,}.d"), QStringLiteral("ab.d"), true}, {QStringLiteral("a{b,c,}.d"), QStringLiteral("ac.d"), true}, {QStringLiteral("a{b,c,}.d"), QStringLiteral("a,.d"), false}, {QStringLiteral("a{,b,,c,}.e"), QStringLiteral("a.e"), true}, {QStringLiteral("a{,b,,c,}.e"), QStringLiteral("ab.e"), true}, {QStringLiteral("a{,b,,c,}.e"), QStringLiteral("a,.e"), false}, {QStringLiteral("{.f"), QStringLiteral("{.f"), true}, {QStringLiteral("{.f"), QStringLiteral(".f"), false}, {QStringLiteral("{word,{also},this}.g"), QStringLiteral("word.g"), true}, {QStringLiteral("{word,{also},this}.g"), QStringLiteral("{also}.g"), true}, {QStringLiteral("{word,{also},this}.g"), QStringLiteral("this.g"), true}, {QStringLiteral("{word,{also},this}.g"), QStringLiteral("{also,this}.g"), false}, {QStringLiteral("{{a,b},c}.k"), QStringLiteral("a.k"), true}, {QStringLiteral("{{a,b},c}.k"), QStringLiteral("c.k"), true}, {QStringLiteral("{{a,b},c}.k"), QStringLiteral("{a,b}.k"), false}, {QStringLiteral("{a,{b,c}}.l"), QStringLiteral("a.l"), true}, {QStringLiteral("{a,{b,c}}.l"), QStringLiteral("c.l"), true}, {QStringLiteral("{a,{b,c}}.l"), QStringLiteral("{b,c}.l"), false}, {QStringLiteral("{a\\,b,cd}.txt"), QStringLiteral("a,b.txt"), true}, {QStringLiteral("{a\\,b,cd}.txt"), QStringLiteral("cd.txt"), true}, {QStringLiteral("{a\\,b,cd}.txt"), QStringLiteral("a.txt"), false}, {QStringLiteral("{e,\\},f}.txt"), QStringLiteral("e.txt"), true}, {QStringLiteral("{e,\\},f}.txt"), QStringLiteral("}.txt"), true}, {QStringLiteral("{e,\\},f}.txt"), QStringLiteral("f.txt"), true}, {QStringLiteral("{3..120}"), QStringLiteral("3"), true}, {QStringLiteral("{3..120}"), QStringLiteral("15"), true}, {QStringLiteral("{3..120}"), QStringLiteral("120"), true}, {QStringLiteral("{3..120}"), QStringLiteral("1"), false}, {QStringLiteral("{3..120}"), QStringLiteral("121"), false}, {QStringLiteral("{3..120}"), QStringLiteral("5a"), false}, {QStringLiteral("{3..120}"), QStringLiteral("060"), false}, {QStringLiteral("{aardvark..antelope}"), QStringLiteral("{aardvark..antelope}"), true}, {QStringLiteral("{aardvark..antelope}"), QStringLiteral("aardvark"), false}, {QStringLiteral("{aardvark..antelope}"), QStringLiteral("antelope"), false},
     };
+
     for (const auto& sample : cases) {
         EXPECT_EQ(editorConfigSectionMatches(sample.pattern, root, root + QLatin1Char('/') + sample.name), sample.matches) << sample.pattern.toStdString() << " against " << sample.name.toStdString();
     }
@@ -784,6 +787,7 @@ TEST(EditorConfigTest, AnswersTheCasesTheCoreTestSuiteDefines) {
     const QVector<Case> globs{
         {QStringLiteral("a*e.c"), QStringLiteral("ace.c"), true}, {QStringLiteral("a*e.c"), QStringLiteral("ae.c"), true}, {QStringLiteral("a*e.c"), QStringLiteral("abcde.c"), true}, {QStringLiteral("a*e.c"), QStringLiteral("a/e.c"), false}, {QStringLiteral("Bar/*"), QStringLiteral("Bar/foo.txt"), true}, {QStringLiteral("Bar/*"), QStringLiteral("Bar/.editorconfig"), true}, {QStringLiteral("Bar/*"), QStringLiteral("bat/Bar/foo.txt"), false}, {QStringLiteral("*"), QStringLiteral(".editorconfig"), true}, {QStringLiteral("som?.c"), QStringLiteral("some.c"), true}, {QStringLiteral("som?.c"), QStringLiteral("som.c"), false}, {QStringLiteral("som?.c"), QStringLiteral("something.c"), false}, {QStringLiteral("som?.c"), QStringLiteral("som/.c"), false}, {QStringLiteral("[ab].a"), QStringLiteral("a.a"), true}, {QStringLiteral("[ab].a"), QStringLiteral("c.a"), false}, {QStringLiteral("[!ab].b"), QStringLiteral("c.b"), true}, {QStringLiteral("[!ab].b"), QStringLiteral("a.b"), false}, {QStringLiteral("[d-g].c"), QStringLiteral("f.c"), true}, {QStringLiteral("[d-g].c"), QStringLiteral("h.c"), false}, {QStringLiteral("[!d-g].d"), QStringLiteral("h.d"), true}, {QStringLiteral("[!d-g].d"), QStringLiteral("f.d"), false}, {QStringLiteral("[abd-g].e"), QStringLiteral("e.e"), true}, {QStringLiteral("[-ab].f"), QStringLiteral("-.f"), true}, {QStringLiteral("[\\]ab].g"), QStringLiteral("].g"), true}, {QStringLiteral("[ab]].g"), QStringLiteral("b].g"), true}, {QStringLiteral("[!\\]ab].g"), QStringLiteral("c.g"), true}, {QStringLiteral("[!ab]].g"), QStringLiteral("c].g"), true}, {QStringLiteral("ab[e/]cd.i"), QStringLiteral("ab[e/]cd.i"), true}, {QStringLiteral("ab[e/]cd.i"), QStringLiteral("ab/cd.i"), false}, {QStringLiteral("ab[e/]cd.i"), QStringLiteral("abecd.i"), false}, {QStringLiteral("ab[/c"), QStringLiteral("ab[/c"), true}, {QStringLiteral("a**z.c"), QStringLiteral("a/z.c"), true}, {QStringLiteral("a**z.c"), QStringLiteral("amnz.c"), true}, {QStringLiteral("a**z.c"), QStringLiteral("a/mn/z.c"), true}, {QStringLiteral("b/**z.c"), QStringLiteral("b/z.c"), true}, {QStringLiteral("b/**z.c"), QStringLiteral("b/mn/z.c"), true}, {QStringLiteral("b/**z.c"), QStringLiteral("bmnz.c"), false}, {QStringLiteral("c**/z.c"), QStringLiteral("c/z.c"), true}, {QStringLiteral("c**/z.c"), QStringLiteral("cmn/z.c"), true}, {QStringLiteral("c**/z.c"), QStringLiteral("cm/nz.c"), false}, {QStringLiteral("d/**/z.c"), QStringLiteral("d/z.c"), true}, {QStringLiteral("d/**/z.c"), QStringLiteral("d/mn/z.c"), true}, {QStringLiteral("d/**/z.c"), QStringLiteral("d/mnz.c"), false}, {QStringLiteral("d/**/z.c"), QStringLiteral("dmn/z.c"), false}, {QStringLiteral("*"), QString::fromUtf8("\u4e2d\u6587.txt"), true},
     };
+
     for (const auto& sample : globs) {
         EXPECT_EQ(editorConfigSectionMatches(sample.pattern, root, root + QLatin1Char('/') + sample.name), sample.matches) << sample.pattern.toStdString() << " against " << sample.name.toStdString();
     }
@@ -1015,9 +1019,11 @@ TEST(CodeDocumentTest, SavingKeepsTheCursorAndTheScrollWhereTheReaderLeftThem) {
     ASSERT_TRUE(root.isValid());
 
     QByteArray content;
+
     for (int line = 0; line < 400; ++line) {
         content.append(QStringLiteral("line %1\n").arg(line).toUtf8());
     }
+
     const QString path = QDir(root.path()).filePath(QStringLiteral("long.txt"));
     ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(path, content));
 
@@ -1097,6 +1103,7 @@ TEST(LanguageRegistryTest, LoadsEveryLanguageAndServerTheCatalogDeclares) {
 
     // Every declared language answers for the extensions it claims, and no extension is claimed twice.
     QStringList claimed;
+
     for (const auto& value : declaredLanguages) {
         const QJsonObject entry = value.toObject();
         const QString id = entry.value(QStringLiteral("id")).toString();
@@ -1145,9 +1152,11 @@ TEST(LanguageRegistryTest, LoadsEveryLanguageAndServerTheCatalogDeclares) {
     // The highlighting the catalog declares is loaded, and a language that needs its own patterns declares them there rather than in code.
     EXPECT_FALSE(LanguageRegistry::commonPatterns().isEmpty());
     EXPECT_FALSE(LanguageRegistry::semanticRoles().isEmpty());
+
     for (const auto& pattern : LanguageRegistry::commonPatterns()) {
         EXPECT_TRUE(QRegularExpression(pattern.pattern).isValid()) << pattern.pattern.toStdString();
     }
+
     const LanguageDefinition* markdown = LanguageRegistry::languageForId(QStringLiteral("markdown"));
     ASSERT_NE(markdown, nullptr);
     EXPECT_FALSE(markdown->patterns.isEmpty());
@@ -1269,11 +1278,13 @@ TEST(CodeWorkspaceViewTest, GivesTheBottomPanelEveryPixelItIsDraggedTo) {
     ASSERT_NE(references, nullptr);
 
     QSplitter* editorArea = nullptr;
+
     for (auto* candidate : view.findChildren<QSplitter*>(QStringLiteral("codeEditorSplitter"))) {
         if (candidate->orientation() == Qt::Vertical && candidate->indexOf(panel) >= 0) {
             editorArea = candidate;
         }
     }
+
     ASSERT_NE(editorArea, nullptr);
 
     // The panel opens tall enough to read and is bounded by nothing above it, so dragging it larger really enlarges it.
@@ -1624,10 +1635,12 @@ TEST(CodeEditorRepositoryTest, MigratesLoadsAndPersistsStrictWorkspaceState) {
     EXPECT_EQ(test::awaitFuture(repository.save(state)).error().code, QStringLiteral("code_editor_state_invalid"));
 
     const QStringList invalidTimestamps{QString{}, QStringLiteral("not a timestamp"), QStringLiteral("2026-08-15T12:00:00.000-03:00")};
+
     for (const auto& invalid : invalidTimestamps) {
         CodeEditorTestsHelper::installWorkspaceRow(host, root.path(), now.toString(Qt::ISODateWithMs), invalid);
         EXPECT_EQ(repository.load().error().code, QStringLiteral("code_editor_state_invalid"));
     }
+
     CodeEditorTestsHelper::installWorkspaceRow(host, root.path(), now.addSecs(1).toString(Qt::ISODateWithMs), now.toString(Qt::ISODateWithMs));
     EXPECT_EQ(repository.load().error().code, QStringLiteral("code_editor_state_invalid"));
     CodeEditorTestsHelper::installWorkspaceRow(host, root.path(), now.toString(Qt::ISODateWithMs), now.toString(Qt::ISODateWithMs));
@@ -1952,16 +1965,19 @@ TEST(CodeWorkspaceViewTest, ReadsAndWritesTheOpenFileInAnEncodingTheReaderChoose
     auto* menu = view.findChild<QMenu*>();
     ASSERT_NE(menu, nullptr);
     QVector<QAction*> entries;
+
     for (auto* candidate : menu->findChildren<QAction*>()) {
         if (!candidate->data().toString().isEmpty()) {
             entries.append(candidate);
         }
     }
+
     EXPECT_EQ(entries.size(), textCharsets().size() * 2);
 
     // Reading the same bytes as Latin-1 shows the two bytes the accent really is.
     QAction* reopenLatin1 = nullptr;
     QAction* saveUtf16 = nullptr;
+
     for (auto* candidate : entries) {
         if (candidate->data().toString() == QStringLiteral("reopen/latin1")) {
             reopenLatin1 = candidate;
@@ -1970,6 +1986,7 @@ TEST(CodeWorkspaceViewTest, ReadsAndWritesTheOpenFileInAnEncodingTheReaderChoose
             saveUtf16 = candidate;
         }
     }
+
     ASSERT_NE(reopenLatin1, nullptr);
     ASSERT_NE(saveUtf16, nullptr);
     const QString asLatin1 = QString::fromUtf8("caf\xC3\x83\xC2\xA9\n");
@@ -2128,6 +2145,7 @@ TEST(CodeWorkspaceViewTest, SurvivesManyDocumentsOpenedEditedSavedAndClosedInOne
     QTemporaryDir root;
     ASSERT_TRUE(root.isValid());
     QStringList paths;
+
     for (int index = 0; index < 30; ++index) {
         const QString path = QDir(root.path()).filePath(QStringLiteral("source-%1.cpp").arg(index));
         ASSERT_TRUE(test::awaitFuture(service.createFile(path)).hasValue());
@@ -2141,6 +2159,7 @@ TEST(CodeWorkspaceViewTest, SurvivesManyDocumentsOpenedEditedSavedAndClosedInOne
     ASSERT_NE(documents, nullptr);
 
     QSignalSpy openFailures(&view, &CodeWorkspaceView::operationFailed);
+
     for (int round = 0; round < 3; ++round) {
         for (const auto& path : paths) {
             view.openFile(path);
@@ -2194,9 +2213,11 @@ TEST(CodeWorkspaceViewTest, TracksExternalTreeChangesAndRejectsSymlinkEscape) {
     const QString externalFile = QDir(external.path()).filePath(QStringLiteral("outside.cpp"));
     ASSERT_TRUE(test::awaitFuture(service.createFile(externalFile)).hasValue());
     const QString link = QDir(root.path()).filePath(QStringLiteral("outside.cpp"));
+
     if (!QFile::link(externalFile, link) || !QFileInfo(link).isSymLink()) {
         GTEST_SKIP() << "The platform did not allow creating a symbolic link";
     }
+
     QSignalSpy error(&view, &CodeWorkspaceView::operationFailed);
     view.openFile(link);
     ASSERT_EQ(error.count(), 1);

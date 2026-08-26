@@ -107,6 +107,7 @@ inline TranslationEntries completeCatalog(TranslationEntries values, const Trans
     for (auto entry = languageNames.cbegin(); entry != languageNames.cend(); ++entry) {
         values.insert(entry.key(), entry.value());
     }
+
     return values;
 }
 

@@ -56,6 +56,7 @@ QString AiTaskInfoDialogHelper::statusKey(ExecutionStatus status) {
     case ExecutionStatus::Cancelled:
         return QStringLiteral("ai.status.cancelled");
     }
+
     Q_UNREACHABLE_RETURN(QStringLiteral("ai.status.running"));
 }
 
@@ -98,6 +99,7 @@ QString AiTaskInfoDialogHelper::levelKey(ExecutionLogLevel level) {
     case ExecutionLogLevel::Error:
         return QStringLiteral("ai.log-level.error");
     }
+
     Q_UNREACHABLE_RETURN(QStringLiteral("ai.log-level.info"));
 }
 
@@ -260,6 +262,7 @@ void AiTaskInfoDialog::showExecutions(const utils::Result<QVector<TaskExecution>
     m_executions = loaded.value();
     m_status->setText(m_host.translate(QStringLiteral("ai.execution.count")).arg(QString::number(m_executions.size())));
     m_executionGrid->setRowCount(static_cast<int>(m_executions.size()));
+
     for (int row = 0; row < static_cast<int>(m_executions.size()); ++row) {
         const TaskExecution& execution = m_executions.at(row);
         m_executionGrid->setItem(row, 0, new QTableWidgetItem(ui::localTimestamp(execution.startedAtUtc)));
@@ -268,7 +271,9 @@ void AiTaskInfoDialog::showExecutions(const utils::Result<QVector<TaskExecution>
         m_executionGrid->setItem(row, 3, new QTableWidgetItem(execution.finishReason));
         m_executionGrid->setItem(row, 4, new QTableWidgetItem(execution.errorMessage));
     }
+
     const int wanted = AiTaskInfoDialogHelper::rowOf(m_executions, reading);
+
     if (m_executions.isEmpty()) {
         return;
     }
@@ -291,6 +296,7 @@ void AiTaskInfoDialog::showExecution(int row) {
 
     const TaskExecution& execution = m_executions.at(row);
     m_content->setMarkdown(execution.content);
+
     if (execution.content.isEmpty()) {
         showOutputPlaceholder(outputPlaceholder(execution));
     } else {
@@ -321,6 +327,7 @@ void AiTaskInfoDialog::showLogs(const utils::Result<QVector<ExecutionLogEntry>>&
     const QString anchor = AiTaskInfoDialogHelper::entryAt(m_logEntries, m_logGrid->rowAt(0));
     m_logEntries = logs.value();
     m_logGrid->setRowCount(static_cast<int>(m_logEntries.size()));
+
     for (int entry = 0; entry < static_cast<int>(m_logEntries.size()); ++entry) {
         const ExecutionLogEntry& log = m_logEntries.at(entry);
         m_logGrid->setItem(entry, 0, new QTableWidgetItem(ui::localTimestamp(log.timestampUtc)));
@@ -358,6 +365,7 @@ void AiTaskInfoDialog::showLogs(const utils::Result<QVector<ExecutionLogEntry>>&
     }
 
     const int reading = AiTaskInfoDialogHelper::rowOfEntry(m_logEntries, anchor);
+
     if (reading < 0) {
         return;
     }
@@ -413,6 +421,7 @@ QString AiTaskInfoDialog::outputPlaceholder(const TaskExecution& execution) cons
         // A run that ended for a reason of its own says which one, because an empty answer explains nothing by itself.
         return execution.stopReason == AgentStopReason::Answered ? m_host.translate(QStringLiteral("ai.output.empty")) : m_host.translate(QStringLiteral("ai.stop-reason.") + AiTaskRepository::agentStopReasonName(execution.stopReason));
     }
+
     Q_UNREACHABLE_RETURN(m_host.translate(QStringLiteral("ai.output.empty")));
 }
 

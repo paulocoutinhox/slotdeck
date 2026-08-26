@@ -63,6 +63,7 @@ QString AiTasksViewHelper::scheduleSummary(const AiTask& task, PluginHost& host)
     if (task.schedule->lastTriggeredAtUtc.isValid()) {
         return host.translate(QStringLiteral("ai.task.schedule-done")).arg(ui::localTimestamp(task.schedule->lastTriggeredAtUtc));
     }
+
     return {};
 }
 
@@ -169,10 +170,12 @@ class TaskCard final : public QFrame {
     void mouseDoubleClickEvent(QMouseEvent* event) override {
         QFrame::mouseDoubleClickEvent(event);
         const bool untouched = m_task.column == TaskColumn::Todo && !m_plugin.hasLastExecution(m_task.id) && m_plugin.runState(m_task.id) == TaskRunState::Idle;
+
         if (untouched) {
             m_edit->click();
             return;
         }
+
         m_info->click();
     }
 
@@ -215,6 +218,7 @@ class TaskCard final : public QFrame {
 
     [[nodiscard]] QString badgeName() const {
         const TaskRunState state = m_plugin.runState(m_task.id);
+
         if (state == TaskRunState::Running) {
             return QStringLiteral("running");
         }
@@ -224,6 +228,7 @@ class TaskCard final : public QFrame {
         if (!m_plugin.hasLastExecution(m_task.id)) {
             return scheduled() ? QStringLiteral("scheduled") : QStringLiteral("idle");
         }
+
         switch (m_plugin.lastExecutionStatus(m_task.id)) {
         case ExecutionStatus::Succeeded:
             return m_plugin.lastStopReason(m_task.id) == AgentStopReason::Answered ? QStringLiteral("succeeded") : QStringLiteral("stopped");
@@ -234,6 +239,7 @@ class TaskCard final : public QFrame {
         case ExecutionStatus::Running:
             return QStringLiteral("running");
         }
+
         Q_UNREACHABLE_RETURN(QStringLiteral("idle"));
     }
 
@@ -350,6 +356,7 @@ class KanbanColumn final : public QWidget {
         if (m_cardsLayout->indexOf(card) >= 0) {
             return;
         }
+
         m_cardsLayout->insertWidget(m_cardsLayout->count() - 1, card);
     }
 
@@ -370,6 +377,7 @@ class KanbanColumn final : public QWidget {
         if (!event->mimeData()->hasFormat(taskMimeType)) {
             return;
         }
+
         event->acceptProposedAction();
         m_onDrop(QString::fromUtf8(event->mimeData()->data(taskMimeType)), m_column);
     }
@@ -425,6 +433,7 @@ AiTasksView::AiTasksView(AiPlugin& plugin, PluginHost& host, QWidget* parent) : 
     const auto dropHandler = [this](const QString& taskId, TaskColumn column) { auto future = m_plugin.moveTask(taskId, column); future.then(this, [this](utils::Result<void> result) { if (!result.hasValue()) { showError(result.error(), m_host.translate(QStringLiteral("ai.error.task-save"))); } }); };
     // clang-format on
     const auto boardColumns = AiTaskRepository::columns();
+
     for (const auto column : boardColumns) {
         if (column != boardColumns.first()) {
             kanbanLayout->addWidget(ui::verticalDivider(m_kanban));
@@ -433,6 +442,7 @@ AiTasksView::AiTasksView(AiPlugin& plugin, PluginHost& host, QWidget* parent) : 
         m_columns.insert(column, view);
         kanbanLayout->addWidget(view, 1);
     }
+
     root->addWidget(m_kanban, 1);
 
     m_empty = new QWidget(board);
@@ -466,9 +476,11 @@ AiTasksView::AiTasksView(AiPlugin& plugin, PluginHost& host, QWidget* parent) : 
 void AiTasksView::openTaskSurface(const AiTask& task, bool onConversation) {
     auto* surface = new AiTaskInfoDialog(m_plugin, m_host, task, this);
     surface->setAttribute(Qt::WA_DeleteOnClose);
+
     if (onConversation) {
         surface->showConversation();
     }
+
     ui::showDialogWindow(surface, task.title);
 }
 
@@ -478,14 +490,17 @@ QString AiTasksView::activeWorkspaceId() const {
             return workspace.id;
         }
     }
+
     return {};
 }
 
 void AiTasksView::synchronizeWorkspaces() {
     m_synchronizing = true;
+
     while (m_workspaces->count() > 0) {
         m_workspaces->removeTab(0);
     }
+
     for (const auto& workspace : m_plugin.workspaces()) {
         const int index = m_workspaces->addTab(workspace.name);
         m_workspaces->setTabData(index, workspace.id);
@@ -493,6 +508,7 @@ void AiTasksView::synchronizeWorkspaces() {
             m_workspaces->setCurrentIndex(index);
         }
     }
+
     m_synchronizing = false;
 
     const bool hasWorkspace = m_workspaces->count() > 0;
@@ -506,6 +522,7 @@ void AiTasksView::synchronizeWorkspaces() {
 void AiTasksView::createWorkspace() {
     bool accepted = false;
     const QString name = QInputDialog::getText(this, m_host.translate(QStringLiteral("ai.workspace.add")), m_host.translate(QStringLiteral("ai.workspace.name")), QLineEdit::Normal, {}, &accepted).trimmed();
+
     if (!accepted || name.isEmpty()) {
         return;
     }
@@ -518,16 +535,20 @@ void AiTasksView::createWorkspace() {
 
 void AiTasksView::renameWorkspace() {
     const QString workspaceId = activeWorkspaceId();
+
     if (workspaceId.isEmpty()) {
         return;
     }
 
     QString current;
+
     for (const auto& workspace : m_plugin.workspaces()) {
         current = workspace.id == workspaceId ? workspace.name : current;
     }
+
     bool accepted = false;
     const QString name = QInputDialog::getText(this, m_host.translate(QStringLiteral("ai.workspace.rename")), m_host.translate(QStringLiteral("ai.workspace.name")), QLineEdit::Normal, current, &accepted).trimmed();
+
     if (!accepted || name.isEmpty() || name == current) {
         return;
     }
@@ -540,6 +561,7 @@ void AiTasksView::renameWorkspace() {
 
 void AiTasksView::removeWorkspace() {
     const QString workspaceId = activeWorkspaceId();
+
     if (workspaceId.isEmpty() || !m_host.confirm(this, m_host.translate(QStringLiteral("ai.workspace.remove")), m_host.translate(QStringLiteral("ai.workspace.remove-message")), {}, m_host.translate(QStringLiteral("ai.workspace.remove")), true)) {
         return;
     }
@@ -554,6 +576,7 @@ void AiTasksView::createTask() {
     if (activeWorkspaceId().isEmpty()) {
         return;
     }
+
     editTask(std::nullopt);
 }
 
@@ -573,6 +596,7 @@ void AiTasksView::removeSchedule(const AiTask& task) {
 
 void AiTasksView::editTask(std::optional<AiTask> task) {
     AiTaskDialog dialog(m_host, activeWorkspaceId(), std::move(task), m_plugin.executionSettings(), m_plugin.agents(), this);
+
     if (dialog.exec() != QDialog::Accepted) {
         return;
     }
@@ -593,6 +617,7 @@ void AiTasksView::showError(const utils::Error& error, const QString& message) {
 void AiTasksView::refreshKanban() {
     const QString workspaceId = activeWorkspaceId();
     QSet<QString> present;
+
     for (const auto& task : m_plugin.tasks()) {
         if (task.workspaceId != workspaceId) {
             continue;
@@ -645,6 +670,7 @@ void AiTasksView::requestFolderDestination(const QString& pluginId, const QStrin
     if (path.isEmpty()) {
         return;
     }
+
     if (!m_host.pluginAvailable(pluginId)) {
         m_host.notify(m_host.translate(QStringLiteral("ai.error.title")), m_host.translate(QStringLiteral("ai.error.destination-unavailable")), AlertSeverity::Warning);
         return;

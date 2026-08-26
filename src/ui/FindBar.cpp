@@ -101,10 +101,12 @@ void FindBar::reportMatches(int current, int total, bool capped) {
         m_status->clear();
         return;
     }
+
     if (total <= 0) {
         m_status->setText(m_labels.notFound);
         return;
     }
+
     m_status->setText(QStringLiteral("%1/%2%3").arg(current).arg(total).arg(capped ? QStringLiteral("+") : QString{}));
 }
 
@@ -114,14 +116,17 @@ bool FindBar::eventFilter(QObject* watched, QEvent* event) {
     }
 
     auto* keyEvent = static_cast<QKeyEvent*>(event);
+
     if (keyEvent->key() == Qt::Key_Escape) {
         emit dismissed();
         return true;
     }
+
     if (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter) {
         emit searchRequested(m_query->text(), !keyEvent->modifiers().testFlag(Qt::ShiftModifier));
         return true;
     }
+
     return QWidget::eventFilter(watched, event);
 }
 

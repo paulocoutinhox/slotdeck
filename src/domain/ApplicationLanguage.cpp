@@ -14,12 +14,14 @@ bool isSupportedApplicationLanguage(const QString& language) {
 QString resolveApplicationLanguage(QString localeName) {
     localeName.replace(QLatin1Char('_'), QLatin1Char('-'));
     localeName = localeName.toLower();
+
     if (isSupportedApplicationLanguage(localeName)) {
         return localeName;
     }
 
     const qsizetype separator = localeName.indexOf(QLatin1Char('-'));
     QString baseLanguage = separator > 0 ? localeName.first(separator) : localeName;
+
     if (isSupportedApplicationLanguage(baseLanguage)) {
         return baseLanguage;
     }

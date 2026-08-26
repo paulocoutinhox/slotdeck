@@ -27,6 +27,7 @@ class CodeEditorWidgetHelper final {
 QTextCursor CodeEditorWidgetHelper::rangeCursor(const QTextDocument& document, int startLine, int startCharacter, int endLine, int endCharacter) {
     const QTextBlock start = document.findBlockByNumber(std::max(0, startLine));
     const QTextBlock end = document.findBlockByNumber(std::max(0, endLine));
+
     if (!start.isValid() || !end.isValid()) {
         return {};
     }
@@ -44,6 +45,7 @@ QColor CodeEditorWidgetHelper::severityColor(const ui::Theme& theme, int severit
     if (severity == 2) {
         return theme.color(ui::ThemeColor::Warning);
     }
+
     return theme.color(ui::ThemeColor::TextMuted);
 }
 
@@ -78,9 +80,11 @@ CodeEditorWidget::CodeEditorWidget(const ui::Theme& theme, QWidget* parent) : QP
 
 int CodeEditorWidget::lineNumberAreaWidth() const {
     int digits = 1;
+
     for (int lines = std::max(1, blockCount()); lines >= 10; lines /= 10) {
         ++digits;
     }
+
     return 12 + fontMetrics().horizontalAdvance(QLatin1Char('9')) * digits;
 }
 
@@ -92,6 +96,7 @@ void CodeEditorWidget::paintLineNumbers(QPaintEvent* event) {
     int number = block.blockNumber();
     int top = qRound(blockBoundingGeometry(block).translated(contentOffset()).top());
     int bottom = top + qRound(blockBoundingRect(block).height());
+
     while (block.isValid() && top <= event->rect().bottom()) {
         if (block.isVisible() && bottom >= event->rect().top()) {
             painter.setPen(number == textCursor().blockNumber() ? m_theme.color(ui::ThemeColor::Text) : m_theme.color(ui::ThemeColor::TextMuted));
@@ -141,42 +146,52 @@ void CodeEditorWidget::setWordWrap(bool enabled) {
 void CodeEditorWidget::keyPressEvent(QKeyEvent* event) {
     // The open proposal list owns navigation and acceptance, otherwise the editor would answer them first and write a line break instead of the proposal.
     static const QVector<int> popupKeys{Qt::Key_Enter, Qt::Key_Return, Qt::Key_Tab, Qt::Key_Backtab, Qt::Key_Escape, Qt::Key_Up, Qt::Key_Down, Qt::Key_PageUp, Qt::Key_PageDown};
+
     if (m_completer->popup()->isVisible() && popupKeys.contains(event->key())) {
         event->ignore();
         return;
     }
+
     if (event->matches(QKeySequence::Save)) {
         emit saveRequested();
         return;
     }
+
     if (event->key() == Qt::Key_Space && event->modifiers() == Qt::ControlModifier) {
         emit completionRequested(textCursor().blockNumber(), textCursor().positionInBlock());
         return;
     }
+
     if (event->key() == Qt::Key_F12 && event->modifiers() == Qt::NoModifier) {
         emit definitionRequested(textCursor().blockNumber(), textCursor().positionInBlock());
         return;
     }
+
     if (event->key() == Qt::Key_F12 && event->modifiers() == Qt::ShiftModifier) {
         emit referencesRequested(textCursor().blockNumber(), textCursor().positionInBlock());
         return;
     }
+
     if (event->matches(QKeySequence::Find)) {
         emit findRequested();
         return;
     }
+
     if (event->matches(QKeySequence::FindNext)) {
         emit findNextRequested(true);
         return;
     }
+
     if (event->matches(QKeySequence::FindPrevious)) {
         emit findNextRequested(false);
         return;
     }
+
     if (event->key() == Qt::Key_Backtab || (event->key() == Qt::Key_Tab && event->modifiers() == Qt::ShiftModifier)) {
         indentSelection(false);
         return;
     }
+
     if (event->key() == Qt::Key_Tab && event->modifiers() == Qt::NoModifier) {
         if (textCursor().hasSelection()) {
             indentSelection(true);
@@ -185,7 +200,9 @@ void CodeEditorWidget::keyPressEvent(QKeyEvent* event) {
         insertPlainText(indentText());
         return;
     }
+
     QPlainTextEdit::keyPressEvent(event);
+
     if (m_completer->popup()->isVisible()) {
         m_completer->setCompletionPrefix(completionPrefix());
         if (m_completer->completionCount() == 0) {
@@ -211,6 +228,7 @@ void CodeEditorWidget::indentSelection(bool forward) {
 
     const QString indentation = indentText();
     cursor.beginEditBlock();
+
     for (int number = firstBlock; number <= lastBlock; ++number) {
         QTextCursor lineCursor(document()->findBlockByNumber(number));
         if (forward) {
@@ -227,18 +245,21 @@ void CodeEditorWidget::indentSelection(bool forward) {
         lineCursor.setPosition(lineCursor.block().position() + characters, QTextCursor::KeepAnchor);
         lineCursor.removeSelectedText();
     }
+
     cursor.endEditBlock();
 }
 
 // The server decides what is written and where, because a label carries the signature a user reads and never the text that compiles.
 void CodeEditorWidget::showCompletions(const QVector<CompletionProposal>& proposals) {
     m_proposals = proposals;
+
     if (m_proposals.isEmpty()) {
         hideCompletions();
         return;
     }
 
     m_proposalModel->clear();
+
     for (qsizetype row = 0; row < m_proposals.size(); ++row) {
         const auto& proposal = m_proposals.at(row);
         auto* entry = new QStandardItem(proposal.detail.isEmpty() ? proposal.label : proposal.label + QStringLiteral("   ") + proposal.detail);
@@ -246,7 +267,9 @@ void CodeEditorWidget::showCompletions(const QVector<CompletionProposal>& propos
         entry->setToolTip(proposal.documentation);
         m_proposalModel->appendRow(entry);
     }
+
     m_completer->setCompletionPrefix(completionPrefix());
+
     if (m_completer->completionCount() == 0) {
         hideCompletions();
         return;
@@ -263,7 +286,9 @@ void CodeEditorWidget::setCompletionDocumentation(int row, const QString& docume
     if (row < 0 || row >= m_proposals.size()) {
         return;
     }
+
     m_proposals[row].documentation = documentation;
+
     if (m_completer->popup()->isVisible() && m_completer->popup()->currentIndex().data(Qt::UserRole).toInt() == row) {
         presentDocumentation(row);
     }
@@ -274,22 +299,27 @@ void CodeEditorWidget::presentDocumentation(int row) {
     if (row < 0 || row >= m_proposals.size()) {
         return;
     }
+
     emit completionDocumentationRequested(row);
     const QString text = m_proposals.at(row).documentation.isEmpty() ? m_proposals.at(row).detail : m_proposals.at(row).documentation;
+
     if (text.isEmpty()) {
         QToolTip::hideText();
         return;
     }
+
     QToolTip::showText(m_completer->popup()->mapToGlobal(QPoint(m_completer->popup()->width() + 4, 0)), text, m_completer->popup());
 }
 
 // A range the document no longer has would resolve to the first character, so the word under the cursor answers for it instead.
 void CodeEditorWidget::applyProposal(const CompletionProposal& proposal) {
     QTextCursor cursor = proposal.hasRange ? cursorForRange(proposal.startLine, proposal.startCharacter, proposal.endLine, proposal.endCharacter) : QTextCursor{};
+
     if (cursor.isNull()) {
         cursor = textCursor();
         cursor.select(QTextCursor::WordUnderCursor);
     }
+
     cursor.insertText(proposal.insertText);
     setTextCursor(cursor);
 }
@@ -309,6 +339,7 @@ void CodeEditorWidget::showSignatureHelp(const SignatureHelpInfo& help) {
     if (help.signatures.isEmpty()) {
         return;
     }
+
     const int index = std::clamp(help.activeSignature, 0, static_cast<int>(help.signatures.size()) - 1);
     QToolTip::showText(mapToGlobal(cursorRect().bottomLeft()), help.signatures.at(index), viewport());
 }
@@ -323,11 +354,13 @@ void CodeEditorWidget::showHover(const QString& contents) {
     if (contents.isEmpty()) {
         return;
     }
+
     QToolTip::showText(viewport()->mapToGlobal(m_hoverPoint), contents, viewport());
 }
 
 void CodeEditorWidget::mouseReleaseEvent(QMouseEvent* event) {
     QPlainTextEdit::mouseReleaseEvent(event);
+
     if (event->button() == Qt::LeftButton && event->modifiers() == Qt::ControlModifier) {
         emitPositionRequest(event->position().toPoint(), true);
     }
@@ -346,15 +379,18 @@ bool CodeEditorWidget::eventFilter(QObject* watched, QEvent* event) {
         event->accept();
         return true;
     }
+
     return QPlainTextEdit::eventFilter(watched, event);
 }
 
 void CodeEditorWidget::emitPositionRequest(const QPoint& viewportPoint, bool definition) {
     const QTextCursor cursor = cursorForPosition(viewportPoint);
+
     if (definition) {
         emit definitionRequested(cursor.blockNumber(), cursor.positionInBlock());
         return;
     }
+
     emit hoverRequested(cursor.blockNumber(), cursor.positionInBlock());
 }
 
@@ -368,6 +404,7 @@ void CodeEditorWidget::updateLineNumberArea(const QRect& rectangle, int vertical
     } else {
         m_lineNumberArea->update(0, rectangle.y(), m_lineNumberArea->width(), rectangle.height());
     }
+
     if (rectangle.contains(viewport()->rect())) {
         updateLineNumberAreaWidth();
     }
@@ -381,6 +418,7 @@ void CodeEditorWidget::highlightCurrentLine() {
 void CodeEditorWidget::setDiagnostics(const QVector<LanguageDiagnostic>& diagnostics) {
     m_diagnostics = diagnostics;
     m_diagnosticSelections.clear();
+
     for (const auto& diagnostic : m_diagnostics) {
         QTextEdit::ExtraSelection selection;
         selection.cursor = cursorForRange(diagnostic.startLine, diagnostic.startCharacter, diagnostic.endLine, diagnostic.endCharacter);
@@ -391,6 +429,7 @@ void CodeEditorWidget::setDiagnostics(const QVector<LanguageDiagnostic>& diagnos
         selection.format.setUnderlineColor(CodeEditorWidgetHelper::severityColor(m_theme, diagnostic.severity));
         m_diagnosticSelections.append(selection);
     }
+
     refreshExtraSelections();
 }
 
@@ -398,6 +437,7 @@ void CodeEditorWidget::setOccurrences(const QVector<SourceLocation>& occurrences
     QColor tint = m_theme.color(ui::ThemeColor::Accent);
     tint.setAlphaF(0.25F);
     m_occurrenceSelections.clear();
+
     for (const auto& entry : occurrences) {
         QTextEdit::ExtraSelection selection;
         selection.cursor = cursorForRange(entry.line, entry.character, entry.endLine, entry.endCharacter);
@@ -407,6 +447,7 @@ void CodeEditorWidget::setOccurrences(const QVector<SourceLocation>& occurrences
         selection.format.setBackground(tint);
         m_occurrenceSelections.append(selection);
     }
+
     refreshExtraSelections();
 }
 
@@ -414,6 +455,7 @@ void CodeEditorWidget::setSearchMatches(const QVector<QPair<int, int>>& matches)
     QColor tint = m_theme.color(ui::ThemeColor::Warning);
     tint.setAlphaF(0.35F);
     m_searchSelections.clear();
+
     for (const auto& entry : matches) {
         QTextEdit::ExtraSelection selection;
         selection.cursor = QTextCursor(document());
@@ -422,6 +464,7 @@ void CodeEditorWidget::setSearchMatches(const QVector<QPair<int, int>>& matches)
         selection.format.setBackground(tint);
         m_searchSelections.append(selection);
     }
+
     refreshExtraSelections();
 }
 
@@ -444,12 +487,14 @@ void CodeEditorWidget::refreshExtraSelections() {
 
 QString CodeEditorWidget::diagnosticAt(const QTextCursor& cursor) const {
     QStringList messages;
+
     for (const auto& diagnostic : m_diagnostics) {
         const QTextCursor range = CodeEditorWidgetHelper::rangeCursor(*document(), diagnostic.startLine, diagnostic.startCharacter, diagnostic.endLine, diagnostic.endCharacter);
         if (cursor.position() >= range.selectionStart() && cursor.position() <= range.selectionEnd()) {
             messages.append(diagnostic.message);
         }
     }
+
     return messages.join(QStringLiteral("\n"));
 }
 

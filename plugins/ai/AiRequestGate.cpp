@@ -18,11 +18,13 @@ void AiRequestGate::setLimits(const QVector<ProviderRateLimit>& limits) {
     for (auto provider = m_providers.begin(); provider != m_providers.end(); ++provider) {
         provider->limit = {};
     }
+
     for (const auto& limit : limits) {
         state(limit.providerId).limit = limit;
     }
 
     const QStringList providers = m_providers.keys();
+
     for (const auto& providerId : providers) {
         pump(providerId);
     }
@@ -30,6 +32,7 @@ void AiRequestGate::setLimits(const QVector<ProviderRateLimit>& limits) {
 
 AiRequestGate::ProviderState& AiRequestGate::state(const QString& providerId) {
     auto position = m_providers.find(providerId);
+
     if (position != m_providers.end()) {
         return *position;
     }
@@ -50,9 +53,11 @@ bool AiRequestGate::concurrencyAvailable(const ProviderState& provider) const {
 // A zero on any limit means the service was never told to wait for that one.
 qint64 AiRequestGate::admissionDelay(const ProviderState& provider, qint64 now) const {
     qint64 delay = 0;
+
     if (provider.limit.minimumIntervalMs > 0 && provider.lastAdmittedMs >= 0) {
         delay = std::max(delay, provider.lastAdmittedMs + provider.limit.minimumIntervalMs - now);
     }
+
     if (provider.limit.maximumRequestsPerMinute > 0 && provider.admissions.size() >= provider.limit.maximumRequestsPerMinute) {
         const qint64 oldest = provider.admissions.at(provider.admissions.size() - provider.limit.maximumRequestsPerMinute);
         delay = std::max(delay, oldest + rateWindowMs - now);
@@ -66,6 +71,7 @@ void AiRequestGate::admit(const QString& providerId, ProviderState& provider, qi
     const Waiter waiter = provider.waiters.takeFirst();
     provider.lastAdmittedMs = now;
     provider.admissions.append(now);
+
     while (!provider.admissions.isEmpty() && provider.admissions.first() + rateWindowMs <= now) {
         provider.admissions.removeFirst();
     }
@@ -82,11 +88,13 @@ void AiRequestGate::admit(const QString& providerId, ProviderState& provider, qi
 // A waiter whose caller is gone is dropped instead of being admitted into nothing.
 void AiRequestGate::pump(const QString& providerId) {
     auto position = m_providers.find(providerId);
+
     if (position == m_providers.end()) {
         return;
     }
 
     ProviderState& provider = *position;
+
     while (!provider.waiters.isEmpty()) {
         if (provider.waiters.first().context.isNull()) {
             provider.waiters.removeFirst();
@@ -119,11 +127,13 @@ qint64 AiRequestGate::acquire(const QString& providerId, QObject* context, std::
 // A holder gives back one slot when it finishes with it, and every slot it still had when it was destroyed.
 void AiRequestGate::release(const QString& providerId, QObject* context) {
     auto position = m_providers.find(providerId);
+
     if (position == m_providers.end()) {
         return;
     }
 
     const auto held = position->held.find(context);
+
     if (held == position->held.end()) {
         return;
     }
@@ -135,6 +145,7 @@ void AiRequestGate::release(const QString& providerId, QObject* context) {
 
 void AiRequestGate::withdraw(const QString& providerId, QObject* context) {
     auto position = m_providers.find(providerId);
+
     if (position == m_providers.end()) {
         return;
     }
@@ -146,6 +157,7 @@ void AiRequestGate::withdraw(const QString& providerId, QObject* context) {
 
 void AiRequestGate::reclaim(const QString& providerId, QObject* context) {
     auto position = m_providers.find(providerId);
+
     if (position == m_providers.end() || position->held.remove(context) == 0) {
         return;
     }

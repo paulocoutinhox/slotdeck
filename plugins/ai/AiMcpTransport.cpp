@@ -20,6 +20,7 @@ void AiMcpTransport::start() {
     }
 
     m_process = new QProcess(this);
+
     if (!m_workdir.isEmpty() && QDir(m_workdir).exists()) {
         m_process->setWorkingDirectory(m_workdir);
     }
@@ -35,11 +36,13 @@ void AiMcpTransport::send(const QJsonObject& message) {
     if (m_process == nullptr || m_process->state() == QProcess::NotRunning) {
         return;
     }
+
     m_process->write(QJsonDocument(message).toJson(QJsonDocument::Compact) + '\n');
 }
 
 void AiMcpTransport::requestTermination() {
     m_stopping = true;
+
     if (m_process == nullptr || m_process->state() == QProcess::NotRunning) {
         return;
     }
@@ -58,6 +61,7 @@ void AiMcpTransport::requestTermination() {
 
 void AiMcpTransport::shutdown() {
     requestTermination();
+
     if (QThread* owning = thread(); owning != nullptr) {
         owning->quit();
     }
@@ -65,12 +69,14 @@ void AiMcpTransport::shutdown() {
 
 void AiMcpTransport::readMessages() {
     m_buffer.append(m_process->readAllStandardOutput());
+
     if (m_buffer.size() > transportMaximumMessageBytes) {
         emit failed(QStringLiteral("ai_mcp_message_too_large"), QStringLiteral("The MCP server message exceeded the permitted size"));
         return;
     }
 
     qsizetype boundary = m_buffer.indexOf('\n');
+
     while (boundary >= 0) {
         const QByteArray line = m_buffer.left(boundary).trimmed();
         m_buffer.remove(0, boundary + 1);

@@ -35,11 +35,13 @@ QString AiSkillCatalogHelper::frontMatterValue(const QString& content, const QSt
     }
 
     const qsizetype closing = content.indexOf(QStringLiteral("\n---"), 3);
+
     if (closing < 0) {
         return {};
     }
 
     const QString frontMatter = content.mid(3, closing - 3);
+
     for (const auto& line : frontMatter.split(QLatin1Char('\n'))) {
         const qsizetype separator = line.indexOf(QLatin1Char(':'));
         if (separator < 0 || line.left(separator).trimmed() != key) {
@@ -63,6 +65,7 @@ AiSkillCatalog::AiSkillCatalog(PluginHost& host, QObject* parent) : QObject(pare
 // The project roots come first because a workspace overrides what the machine offers, and the published names are all accepted.
 QStringList AiSkillCatalog::roots(const QString& workdir) {
     QStringList roots;
+
     if (!workdir.isEmpty()) {
         const QDir project(workdir);
         for (const auto& location : {QStringLiteral(".claude/skills"), QStringLiteral(".agents/skills"), QStringLiteral(".skills"), QStringLiteral("skills")}) {
@@ -71,6 +74,7 @@ QStringList AiSkillCatalog::roots(const QString& workdir) {
     }
 
     const QString home = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
+
     if (!home.isEmpty()) {
         const QDir user(home);
         for (const auto& location : {QStringLiteral(".claude/skills"), QStringLiteral(".agents/skills")}) {
@@ -85,6 +89,7 @@ SkillDescriptor AiSkillCatalog::describe(const QString& name, const QString& pat
     SkillDescriptor skill{name, {}, path, root};
     skill.name = AiSkillCatalogHelper::frontMatterValue(content, QStringLiteral("name"));
     skill.description = AiSkillCatalogHelper::frontMatterValue(content, QStringLiteral("description"));
+
     if (skill.name.isEmpty()) {
         skill.name = name;
     }
@@ -136,6 +141,7 @@ void AiSkillCatalog::scanEntry(const std::shared_ptr<Scan>& scan) {
 
     // Both published layouts are accepted, the directory holding its instructions and the single file that is the skill.
     const bool flat = !entry.directory && entry.name.endsWith(QStringLiteral(".md"), Qt::CaseInsensitive);
+
     if (!entry.directory && !flat) {
         scanEntry(scan);
         return;
@@ -143,6 +149,7 @@ void AiSkillCatalog::scanEntry(const std::shared_ptr<Scan>& scan) {
 
     const QString name = flat ? entry.name.chopped(3) : entry.name;
     const QString path = flat ? QDir(root).filePath(entry.name) : QDir(root).filePath(entry.name + QStringLiteral("/SKILL.md"));
+
     if (AiSkillCatalogHelper::claimed(scan->found, name)) {
         scanEntry(scan);
         return;

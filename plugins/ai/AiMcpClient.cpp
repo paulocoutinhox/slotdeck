@@ -74,9 +74,11 @@ AiMcpClient::~AiMcpClient() {
 // Sampling is declared only when the server is explicitly allowed to spend the configured model.
 QJsonObject AiMcpClient::capabilities() const {
     QJsonObject declared{{QStringLiteral("roots"), QJsonObject{{QStringLiteral("listChanged"), true}}}};
+
     if (m_descriptor.samplingEnabled && m_samplingHandler) {
         declared.insert(QStringLiteral("sampling"), QJsonObject{});
     }
+
     return declared;
 }
 
@@ -105,10 +107,12 @@ void AiMcpClient::start() {
         reportFailure({"ai_mcp_busy", "The MCP server is already running", m_descriptor.id});
         return;
     }
+
     if (m_descriptor.transport == McpTransport::Stdio && m_descriptor.command.trimmed().isEmpty()) {
         reportFailure({"ai_mcp_invalid", "The MCP server command is required", m_descriptor.id});
         return;
     }
+
     if (m_descriptor.transport == McpTransport::Http) {
         const QUrl endpoint(m_descriptor.url);
         if (!endpoint.isValid() || endpoint.host().isEmpty() || (endpoint.scheme() != QStringLiteral("http") && endpoint.scheme() != QStringLiteral("https"))) {
@@ -120,11 +124,13 @@ void AiMcpClient::start() {
     m_stopping = false;
     m_ready = false;
     m_sessionId.clear();
+
     if (m_descriptor.transport == McpTransport::Http) {
         startHttp();
         performInitialize();
         return;
     }
+
     startStdio();
     performInitialize();
 }
@@ -178,9 +184,11 @@ void AiMcpClient::performInitialize() {
 
 void AiMcpClient::stop() {
     m_startTimeout.stop();
+
     if (m_descriptor.transport == McpTransport::Http) {
         deleteSession();
     }
+
     cancelPending();
     m_stopping = true;
     m_ready = false;
@@ -218,9 +226,11 @@ void AiMcpClient::callTool(const QString& name, const QJsonObject& arguments, co
 
 void AiMcpClient::listResources(const QString& cursor, const McpReply& reply) {
     QJsonObject parameters;
+
     if (!cursor.isEmpty()) {
         parameters.insert(QStringLiteral("cursor"), cursor);
     }
+
     request(QStringLiteral("resources/list"), parameters, reply);
 }
 
@@ -230,9 +240,11 @@ void AiMcpClient::readResource(const QString& uri, const McpReply& reply) {
 
 void AiMcpClient::listPrompts(const QString& cursor, const McpReply& reply) {
     QJsonObject parameters;
+
     if (!cursor.isEmpty()) {
         parameters.insert(QStringLiteral("cursor"), cursor);
     }
+
     request(QStringLiteral("prompts/list"), parameters, reply);
 }
 
@@ -253,22 +265,27 @@ void AiMcpClient::dispatch(const QJsonObject& message) {
 
     const bool hasMethod = message.contains(QStringLiteral("method"));
     const bool hasId = message.contains(QStringLiteral("id"));
+
     if (hasMethod && hasId) {
         handleServerRequest(message);
         return;
     }
+
     if (hasMethod) {
         handleNotification(message.value(QStringLiteral("method")).toString(), message.value(QStringLiteral("params")).toObject());
         return;
     }
+
     if (!hasId) {
         return;
     }
 
     const auto pending = m_pending.find(message.value(QStringLiteral("id")).toInteger(-1));
+
     if (pending == m_pending.end()) {
         return;
     }
+
     const McpReply reply = pending.value();
     m_pending.erase(pending);
 
@@ -277,6 +294,7 @@ void AiMcpClient::dispatch(const QJsonObject& message) {
         reply(utils::Result<QJsonObject>::failure({"ai_mcp_error", error.value(QStringLiteral("message")).toString(QStringLiteral("The MCP server reported an error")), QString::number(error.value(QStringLiteral("code")).toInteger(0))}));
         return;
     }
+
     reply(utils::Result<QJsonObject>::success(message.value(QStringLiteral("result")).toObject()));
 }
 
@@ -289,6 +307,7 @@ void AiMcpClient::handleServerRequest(const QJsonObject& message) {
         respond(id, {});
         return;
     }
+
     if (method == QStringLiteral("roots/list")) {
         QJsonArray roots;
         for (const auto& root : m_descriptor.roots) {
@@ -297,6 +316,7 @@ void AiMcpClient::handleServerRequest(const QJsonObject& message) {
         respond(id, {{QStringLiteral("roots"), roots}});
         return;
     }
+
     if (method == QStringLiteral("sampling/createMessage")) {
         if (!m_descriptor.samplingEnabled || !m_samplingHandler) {
             respondWithError(id, methodNotFound, QStringLiteral("The client does not implement %1").arg(method));
@@ -308,6 +328,7 @@ void AiMcpClient::handleServerRequest(const QJsonObject& message) {
         // clang-format on
         return;
     }
+
     respondWithError(id, methodNotFound, QStringLiteral("The client does not implement %1").arg(method));
 }
 
@@ -315,6 +336,7 @@ void AiMcpClient::handleNotification(const QString& method, const QJsonObject& p
     if (method == QStringLiteral("notifications/tools/list_changed")) {
         refreshTools();
     }
+
     if (method == QStringLiteral("notifications/progress")) {
         emit progressReported(parameters.value(QStringLiteral("progressToken")).toVariant().toString(), parameters.value(QStringLiteral("progress")).toDouble(), parameters.value(QStringLiteral("total")).toDouble(), parameters.value(QStringLiteral("message")).toString());
     }
@@ -363,9 +385,11 @@ void AiMcpClient::send(const QJsonObject& message) {
         post(message);
         return;
     }
+
     if (m_transport == nullptr) {
         return;
     }
+
     QMetaObject::invokeMethod(m_transport, "send", Qt::QueuedConnection, Q_ARG(QJsonObject, message));
 }
 
@@ -384,9 +408,11 @@ void AiMcpClient::post(const QJsonObject& message) {
     request.setRawHeader(QByteArrayLiteral("accept"), QByteArrayLiteral("application/json, text/event-stream"));
     request.setRawHeader(QByteArrayLiteral("mcp-protocol-version"), QByteArrayLiteral(mcpProtocolVersion));
     request.setTransferTimeout(aiLimits().serverStartTimeoutMs);
+
     if (!m_sessionId.isEmpty()) {
         request.setRawHeader(QByteArrayLiteral("mcp-session-id"), m_sessionId);
     }
+
     if (!m_descriptor.apiKey.isEmpty()) {
         request.setRawHeader(QByteArrayLiteral("authorization"), QByteArrayLiteral("Bearer ") + m_descriptor.apiKey.toUtf8());
     }
@@ -470,6 +496,7 @@ void AiMcpClient::cancelPending() {
     if (m_stopping) {
         return;
     }
+
     for (auto entry = m_pending.constBegin(); entry != m_pending.constEnd(); ++entry) {
         notify(QStringLiteral("notifications/cancelled"), {{QStringLiteral("requestId"), entry.key()}, {QStringLiteral("reason"), QStringLiteral("The client stopped the execution")}});
     }
@@ -478,6 +505,7 @@ void AiMcpClient::cancelPending() {
 void AiMcpClient::completeAll(const utils::Error& error) {
     const auto pending = m_pending;
     m_pending.clear();
+
     for (const auto& reply : pending) {
         reply(utils::Result<QJsonObject>::failure(error));
     }

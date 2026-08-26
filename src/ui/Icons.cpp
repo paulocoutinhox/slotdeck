@@ -55,11 +55,13 @@ class LayoutIconEngine final : public QIconEngine {
 
         const qreal cellWidth = (bounds.width() - gap * (m_columns - 1)) / m_columns;
         const qreal cellHeight = (bounds.height() - gap * (m_rows - 1)) / m_rows;
+
         for (int index = 0; index < m_slotCount; ++index) {
             const int row = index / m_columns;
             const int column = index % m_columns;
             painter->drawRect(QRectF(bounds.left() + column * (cellWidth + gap), bounds.top() + row * (cellHeight + gap), cellWidth, cellHeight));
         }
+
         painter->restore();
     }
 
@@ -111,6 +113,7 @@ class IconEngine final : public QIconEngine {
 
     void paint(QPainter* painter, const QRect& rect, QIcon::Mode mode, QIcon::State) override {
         QColor foreground = mode == QIcon::Active || mode == QIcon::Selected ? m_activeColor : m_color;
+
         if (mode == QIcon::Disabled) {
             foreground.setAlphaF(0.42F);
         }

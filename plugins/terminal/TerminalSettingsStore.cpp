@@ -29,12 +29,15 @@ TerminalSettings TerminalSettingsStoreHelper::settingsFromDocument(const QJsonOb
     if (!ui::monospacedFontFamilies().contains(settings.fontFamily)) {
         settings.fontFamily = declared.fontFamily;
     }
+
     if (!ui::validContentFontSize(settings.fontSize)) {
         settings.fontSize = declared.fontSize;
     }
+
     if (!terminalcore::terminalThemeExists(settings.themeId)) {
         settings.themeId = declared.themeId;
     }
+
     return settings;
 }
 
@@ -46,6 +49,7 @@ TerminalSettingsStore::TerminalSettingsStore(PluginHost& host, QObject* parent) 
 
 utils::Result<void> TerminalSettingsStore::initialize() {
     const auto& families = ui::monospacedFontFamilies();
+
     if (families.isEmpty()) {
         return utils::Result<void>::failure({"terminal_fonts_unavailable", "No monospaced terminal font is installed", {}});
     }
@@ -102,6 +106,7 @@ void TerminalSettingsStore::stepFontSize(ContentFontStep step) {
         setFontSize(defaultTerminalFontSize);
         return;
     }
+
     setFontSize(ui::steppedContentFontSize(m_settings.fontSize, step == ContentFontStep::Increase ? 1 : -1));
 }
 

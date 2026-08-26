@@ -68,26 +68,31 @@ class TestPluginHost final : public plugins::PluginHost {
 
     [[nodiscard]] utils::Result<void> migrateDatabase(const QVector<persistence::DatabaseMigration>& migrations) override {
         appliedMigrations += migrations;
+
         if (migrationHandler) {
             return migrationHandler(migrations);
         }
         if (migrationError.has_value()) {
             return utils::Result<void>::failure(migrationError.value());
         }
+
         if (!migrations.isEmpty()) {
             schemaVersion = migrations.last().version;
         }
+
         return utils::Result<void>::success();
     }
 
     [[nodiscard]] utils::Result<void> executeBootstrapDatabaseTransaction(const QVector<persistence::DatabaseStatement>& statements) override {
         databaseTransactions.append(statements);
+
         if (transactionHandler) {
             return transactionHandler(statements);
         }
         if (transactionError.has_value()) {
             return utils::Result<void>::failure(transactionError.value());
         }
+
         return utils::Result<void>::success();
     }
 
@@ -97,6 +102,7 @@ class TestPluginHost final : public plugins::PluginHost {
 
     [[nodiscard]] QFuture<utils::Result<void>> executeDatabase(const QString& statement, const QVariantList& bindings) override {
         databaseExecutions.append({{QStringLiteral("statement"), statement}, {QStringLiteral("bindings"), bindings}});
+
         if (executeHandler) {
             return QtFuture::makeReadyValueFuture(executeHandler(statement, bindings));
         }
@@ -106,17 +112,20 @@ class TestPluginHost final : public plugins::PluginHost {
         if (executeError.has_value()) {
             return QtFuture::makeReadyValueFuture(utils::Result<void>::failure(executeError.value()));
         }
+
         return QtFuture::makeReadyValueFuture(utils::Result<void>::success());
     }
 
     [[nodiscard]] QFuture<utils::Result<void>> executeDatabaseTransaction(const QVector<persistence::DatabaseStatement>& statements) override {
         databaseTransactions.append(statements);
+
         if (transactionFutureHandler) {
             return transactionFutureHandler(statements);
         }
         if (transactionError.has_value()) {
             return QtFuture::makeReadyValueFuture(utils::Result<void>::failure(transactionError.value()));
         }
+
         return QtFuture::makeReadyValueFuture(utils::Result<void>::success());
     }
 
@@ -124,6 +133,7 @@ class TestPluginHost final : public plugins::PluginHost {
         if (queryFutureHandler) {
             return queryFutureHandler(statement, bindings);
         }
+
         return QtFuture::makeReadyValueFuture(queryResult(statement, bindings));
     }
 
@@ -209,6 +219,7 @@ class TestPluginHost final : public plugins::PluginHost {
         if (queryHandler) {
             return queryHandler(statement, bindings);
         }
+
         return utils::Result<persistence::DatabaseRows>::success(databaseRows);
     }
 
@@ -218,6 +229,7 @@ class TestPluginHost final : public plugins::PluginHost {
 
     void request(const QString& targetPluginId, const QString& topic, const QJsonObject& payload, QObject& callbackContext, plugins::PluginReply reply) override {
         requests.append({targetPluginId, topic, payload, &callbackContext});
+
         if (requestHandler) {
             requestHandler(targetPluginId, topic, payload, &callbackContext, std::move(reply));
         }

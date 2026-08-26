@@ -25,16 +25,19 @@ class ConfigurationTransferHelper final {
 
 utils::Result<void> ConfigurationTransferHelper::copyAtomically(const QString& sourcePath, const QString& destinationPath) {
     QFile source(sourcePath);
+
     if (!source.open(QIODevice::ReadOnly)) {
         return utils::Result<void>::failure({"configuration_source_open_failed", "The configuration source could not be opened", source.errorString()});
     }
 
     QSaveFile destination(destinationPath);
+
     if (!destination.open(QIODevice::WriteOnly)) {
         return utils::Result<void>::failure({"configuration_destination_open_failed", "The configuration destination could not be opened", destination.errorString()});
     }
 
     constexpr qint64 chunkSize = 1024LL * 1024;
+
     while (!source.atEnd()) {
         const QByteArray chunk = source.read(chunkSize);
         if (chunk.isEmpty() && source.error() != QFileDevice::NoError) {
@@ -57,6 +60,7 @@ QString ConfigurationTransferHelper::fileIdentity(const QString& filePath) {
 
 utils::Result<void> ConfigurationTransferHelper::validateDatabase(const QString& filePath, const QHash<QString, int>& pluginSchemaVersions) {
     const QFileInfo file(filePath);
+
     if (!file.isAbsolute() || !file.isFile() || !file.isReadable()) {
         return utils::Result<void>::failure({"configuration_file_invalid", "The configuration file is invalid", filePath});
     }
@@ -65,6 +69,7 @@ utils::Result<void> ConfigurationTransferHelper::validateDatabase(const QString&
     QSqlDatabase database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
     database.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
     database.setDatabaseName(filePath);
+
     if (!database.open()) {
         const QString detail = database.lastError().text();
         database = {};
@@ -86,24 +91,30 @@ utils::Result<void> ConfigurationTransferHelper::validateDatabase(const QString&
     if (!integrityValid || !coreValidation.hasValue() || coreValidation.value() != pluginSchemaVersions) {
         return utils::Result<void>::failure({"configuration_database_invalid", "The configuration database is invalid or incompatible", filePath});
     }
+
     return utils::Result<void>::success();
 }
 
 utils::Result<void> ConfigurationTransferHelper::createSnapshot(const QString& databasePath, const QString& destinationPath) {
     const QFileInfo destination(destinationPath);
+
     if (!destination.isAbsolute() || !destination.dir().exists()) {
         return utils::Result<void>::failure({"configuration_destination_invalid", "The configuration destination is invalid", destinationPath});
     }
+
     const QString sourceIdentity = fileIdentity(databasePath);
     const QString destinationIdentity = fileIdentity(destinationPath);
+
     if (!sourceIdentity.isEmpty() && sourceIdentity == destinationIdentity) {
         return utils::Result<void>::failure({"configuration_destination_conflict", "The active configuration database cannot be used as the export destination", destinationPath});
     }
 
     QTemporaryFile snapshot(destination.dir().filePath(QStringLiteral(".slotdeck-export-XXXXXX.sqlite3")));
+
     if (!snapshot.open()) {
         return utils::Result<void>::failure({"configuration_snapshot_create_failed", "The configuration snapshot could not be created", snapshot.errorString()});
     }
+
     const QString snapshotPath = snapshot.fileName();
     snapshot.close();
     QFile::remove(snapshotPath);
@@ -112,6 +123,7 @@ utils::Result<void> ConfigurationTransferHelper::createSnapshot(const QString& d
     QSqlDatabase database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
     database.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
     database.setDatabaseName(databasePath);
+
     if (!database.open()) {
         const QString detail = database.lastError().text();
         database = {};
@@ -131,6 +143,7 @@ utils::Result<void> ConfigurationTransferHelper::createSnapshot(const QString& d
     database.close();
     database = {};
     QSqlDatabase::removeDatabase(connectionName);
+
     if (!exported) {
         return utils::Result<void>::failure({"configuration_export_failed", "The application configuration could not be exported", exportError});
     }
@@ -140,14 +153,17 @@ utils::Result<void> ConfigurationTransferHelper::createSnapshot(const QString& d
     snapshotDatabase.setDatabaseName(snapshotPath);
     bool normalized = snapshotDatabase.open();
     QString normalizationError = snapshotDatabase.lastError().text();
+
     if (normalized) {
         QSqlQuery query(snapshotDatabase);
         normalized = query.exec(QStringLiteral("UPDATE core_state SET clean_shutdown = 1 WHERE singleton = 1")) && query.numRowsAffected() == 1;
         normalizationError = query.lastError().text();
     }
+
     snapshotDatabase.close();
     snapshotDatabase = {};
     QSqlDatabase::removeDatabase(snapshotConnectionName);
+
     if (!normalized) {
         return utils::Result<void>::failure({"configuration_snapshot_invalid", "The configuration snapshot could not be finalized", normalizationError});
     }
@@ -198,6 +214,7 @@ utils::Result<bool> ConfigurationTransfer::beginPendingImport(const QString& dat
         }
         return utils::Result<bool>::success(false);
     }
+
     if (!QFileInfo::exists(pendingPath)) {
         return utils::Result<bool>::success(false);
     }
@@ -206,18 +223,24 @@ utils::Result<bool> ConfigurationTransfer::beginPendingImport(const QString& dat
     }
 
     const auto validation = ConfigurationTransferHelper::validateDatabase(pendingPath, pluginSchemaVersions);
+
     if (!validation.hasValue()) {
         return utils::Result<bool>::failure(validation.error());
     }
+
     const auto backup = ConfigurationTransferHelper::createSnapshot(databasePath, backupPath);
+
     if (!backup.hasValue()) {
         return utils::Result<bool>::failure(backup.error());
     }
+
     const auto result = ConfigurationTransferHelper::copyAtomically(pendingPath, databasePath);
+
     if (!result.hasValue()) {
         QFile::remove(backupPath);
         return utils::Result<bool>::failure(result.error());
     }
+
     return utils::Result<bool>::success(true);
 }
 
@@ -228,6 +251,7 @@ utils::Result<void> ConfigurationTransfer::finalizePendingImport(const QString& 
     if (!QFileInfo::exists(backupPath) || !QFile::remove(backupPath)) {
         return utils::Result<void>::failure({"configuration_backup_remove_failed", "The configuration backup could not be removed", backupPath});
     }
+
     return utils::Result<void>::success();
 }
 
@@ -235,7 +259,9 @@ utils::Result<void> ConfigurationTransfer::rollbackPendingImport(const QString& 
     if (!QFileInfo::exists(backupPath)) {
         return utils::Result<void>::failure({"configuration_backup_missing", "The configuration backup is unavailable", backupPath});
     }
+
     const auto restore = ConfigurationTransferHelper::copyAtomically(backupPath, databasePath);
+
     if (!restore.hasValue()) {
         return restore;
     }
@@ -245,6 +271,7 @@ utils::Result<void> ConfigurationTransfer::rollbackPendingImport(const QString& 
     if (!QFile::remove(backupPath)) {
         return utils::Result<void>::failure({"configuration_backup_remove_failed", "The configuration backup could not be removed", backupPath});
     }
+
     return utils::Result<void>::success();
 }
 

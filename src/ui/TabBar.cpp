@@ -73,11 +73,13 @@ TabBar::TabBar(const Theme& theme, QWidget* parent) : QTabBar(parent), m_theme(&
 
 void TabBar::applyTheme(const Theme& theme) {
     m_theme = &theme;
+
     for (int index = 0; index < count(); ++index) {
         if (auto* button = qobject_cast<TabCloseButton*>(tabButton(index, QTabBar::RightSide)); button != nullptr) {
             button->applyTheme(theme);
         }
     }
+
     update();
 }
 

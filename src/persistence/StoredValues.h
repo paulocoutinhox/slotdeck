@@ -27,6 +27,7 @@ inline bool validStoredTimestamp(const QDateTime& value) {
 
 inline bool readStoredInteger(const QVariant& value, qint64& output) {
     const int type = value.metaType().id();
+
     if (type != QMetaType::Int && type != QMetaType::UInt && type != QMetaType::LongLong && type != QMetaType::ULongLong) {
         return false;
     }

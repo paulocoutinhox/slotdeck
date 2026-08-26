@@ -72,6 +72,7 @@ void ShelfSessionChip::keyPressEvent(QKeyEvent* event) {
 void ShelfSessionChip::mousePressEvent(QMouseEvent* event) {
     m_dragStarted = false;
     m_leftButtonPressed = event->button() == Qt::LeftButton;
+
     if (m_leftButtonPressed) {
         m_dragOrigin = event->position().toPoint();
         setCursor(Qt::ClosedHandCursor);
@@ -86,6 +87,7 @@ void ShelfSessionChip::mouseMoveEvent(QMouseEvent* event) {
         event->accept();
         return;
     }
+
     if (!m_leftButtonPressed || !event->buttons().testFlag(Qt::LeftButton) || (event->position().toPoint() - m_dragOrigin).manhattanLength() < QApplication::startDragDistance()) {
         QFrame::mouseMoveEvent(event);
         return;

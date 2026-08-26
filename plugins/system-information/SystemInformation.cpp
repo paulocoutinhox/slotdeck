@@ -63,6 +63,7 @@ QString SystemInformationHelper::batteryStateName(const hwinfo::Battery& battery
     if (battery.discharging()) {
         return QStringLiteral("discharging");
     }
+
     return QStringLiteral("unknown");
 }
 
@@ -72,9 +73,11 @@ quint64 SystemInformationHelper::totalMemoryBytes(const hwinfo::Memory& memory) 
     Q_UNUSED(memory);
     quint64 physicalBytes = 0;
     size_t valueSize = sizeof(physicalBytes);
+
     if (sysctlbyname("hw.memsize", &physicalBytes, &valueSize, nullptr, 0) != 0) {
         return 0;
     }
+
     return physicalBytes;
 #else
     return memory.size();
@@ -111,6 +114,7 @@ utils::Result<SystemSnapshot> HwinfoSystemInformationProvider::collect(const std
 
     const auto nativeProcessors = hwinfo::getAllCPUs();
     snapshot.processors.reserve(static_cast<qsizetype>(nativeProcessors.size()));
+
     for (const auto& nativeProcessor : nativeProcessors) {
         if (SystemInformationHelper::isCancelled(cancelled)) {
             return SystemInformationHelper::cancelledCollection();
@@ -136,6 +140,7 @@ utils::Result<SystemSnapshot> HwinfoSystemInformationProvider::collect(const std
     }
 
 #if defined(Q_OS_LINUX) || defined(Q_OS_WIN)
+
     if (!snapshot.processors.isEmpty() && !SystemInformationHelper::isCancelled(cancelled)) {
         const auto liveProcessor = hwinfo::monitoring::cpu::fetch(std::chrono::milliseconds(200));
         if (std::isfinite(liveProcessor.utilization) && liveProcessor.utilization >= 0.0 && liveProcessor.utilization <= 1.0) {
@@ -152,6 +157,7 @@ utils::Result<SystemSnapshot> HwinfoSystemInformationProvider::collect(const std
             snapshot.processorUsage.threadFrequencyHz.append(frequency);
         }
     }
+
 #endif
 
     if (SystemInformationHelper::isCancelled(cancelled)) {
@@ -163,6 +169,7 @@ utils::Result<SystemSnapshot> HwinfoSystemInformationProvider::collect(const std
     snapshot.memory.freeBytes = nativeMemory.free();
     snapshot.memory.availableBytes = nativeMemory.available();
     snapshot.memory.modules.reserve(static_cast<qsizetype>(nativeMemory.modules().size()));
+
     for (const auto& nativeModule : nativeMemory.modules()) {
         if (SystemInformationHelper::isCancelled(cancelled)) {
             return SystemInformationHelper::cancelledCollection();
@@ -177,6 +184,7 @@ utils::Result<SystemSnapshot> HwinfoSystemInformationProvider::collect(const std
 
     const auto nativeGraphicsProcessors = hwinfo::getAllGPUs();
     snapshot.graphicsProcessors.reserve(static_cast<qsizetype>(nativeGraphicsProcessors.size()));
+
     for (const auto& nativeGraphicsProcessor : nativeGraphicsProcessors) {
         if (SystemInformationHelper::isCancelled(cancelled)) {
             return SystemInformationHelper::cancelledCollection();
@@ -198,6 +206,7 @@ utils::Result<SystemSnapshot> HwinfoSystemInformationProvider::collect(const std
 
     const auto nativeDisks = hwinfo::getAllDisks();
     snapshot.disks.reserve(static_cast<qsizetype>(nativeDisks.size()));
+
     for (const auto& nativeDisk : nativeDisks) {
         if (SystemInformationHelper::isCancelled(cancelled)) {
             return SystemInformationHelper::cancelledCollection();
@@ -228,6 +237,7 @@ utils::Result<SystemSnapshot> HwinfoSystemInformationProvider::collect(const std
 
     const auto nativeBatteries = hwinfo::getAllBatteries();
     snapshot.batteries.reserve(static_cast<qsizetype>(nativeBatteries.size()));
+
     for (const auto& nativeBattery : nativeBatteries) {
         if (SystemInformationHelper::isCancelled(cancelled)) {
             return SystemInformationHelper::cancelledCollection();
@@ -255,6 +265,7 @@ utils::Result<SystemSnapshot> HwinfoSystemInformationProvider::collect(const std
 
     const auto nativeNetworkInterfaces = hwinfo::getAllNetworks();
     snapshot.networkInterfaces.reserve(static_cast<qsizetype>(nativeNetworkInterfaces.size()));
+
     for (const auto& nativeNetworkInterface : nativeNetworkInterfaces) {
         if (SystemInformationHelper::isCancelled(cancelled)) {
             return SystemInformationHelper::cancelledCollection();
@@ -268,6 +279,7 @@ utils::Result<SystemSnapshot> HwinfoSystemInformationProvider::collect(const std
 
 SystemInformationCollection collectSystemInformation(std::shared_ptr<SystemInformationProvider> provider) {
     auto cancelled = std::make_shared<std::atomic_bool>(false);
+
     if (provider == nullptr) {
         return {QtFuture::makeReadyValueFuture(utils::Result<SystemSnapshot>::failure({"system_information_provider_unavailable", "The System Information provider is unavailable", {}})), std::move(cancelled)};
     }

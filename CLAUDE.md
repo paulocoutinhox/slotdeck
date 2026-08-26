@@ -1113,6 +1113,9 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A header carries no comment that describes what a declaration does, and carries a one line comment only when it records a decision the declaration cannot express.
 - A comment above an implementation inside a header follows the same rules as a comment inside an implementation file.
 - A method reads as a beginning, a middle and an end, so a validation block, a mutation block and a return block are separated by one blank line.
+- A branch or a loop that spans lines is separated from the statements around it by one blank line, because a block glued to the paragraph above it reads as one more line of that paragraph.
+- Consecutive guard clauses stay together, because a run of validations that each return is one block rather than several.
+- No blank line follows the brace that opens a scope and none precedes the brace that closes it, because the scope already begins and ends there.
 - A method that accumulates responsibilities is split into small named methods, and a linear sequence or a mapping table stays whole because splitting it would hide the flow.
 - Includes are one group for the header of the file, one group for project headers, one group for Qt headers, one group for platform and third-party headers and one group for standard headers, in that order.
 - The formatter owns the order inside a group, so the sorting is the case-sensitive one it applies and never a hand-made ordering.

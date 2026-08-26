@@ -43,6 +43,7 @@ IconName ToastOverlayHelper::severityIcon(plugins::AlertSeverity severity) {
     case plugins::AlertSeverity::Error:
         return IconName::Error;
     }
+
     Q_UNREACHABLE_RETURN(IconName::Information);
 }
 
@@ -57,6 +58,7 @@ ThemeColor ToastOverlayHelper::severityColor(plugins::AlertSeverity severity) {
     case plugins::AlertSeverity::Error:
         return ThemeColor::Danger;
     }
+
     Q_UNREACHABLE_RETURN(ThemeColor::Accent);
 }
 
@@ -146,11 +148,13 @@ class Toast final : public QFrame {
         animation->setStartValue(m_opacity->opacity());
         animation->setEndValue(target);
         animation->setEasingCurve(QEasingCurve::OutCubic);
+
         if (notifyOnFinish) {
             // clang-format off
             connect(animation, &QPropertyAnimation::finished, this, [this]() { m_onDismiss(this); });
             // clang-format on
         }
+
         animation->start(QAbstractAnimation::DeleteWhenStopped);
     }
 
@@ -174,9 +178,11 @@ ToastOverlay::ToastOverlay(const Theme& theme, QWidget* host) : QWidget(host), m
 
 void ToastOverlay::showNotification(const QString& title, const QString& message, plugins::AlertSeverity severity) {
     qsizetype liveCount = 0;
+
     for (auto* visible : m_toasts) {
         liveCount += visible->isDismissing() ? 0 : 1;
     }
+
     for (auto* visible : m_toasts) {
         if (liveCount < maximumVisibleToasts) {
             break;
@@ -198,14 +204,17 @@ void ToastOverlay::showNotification(const QString& title, const QString& message
 
 void ToastOverlay::applyTheme(const Theme& theme) {
     m_theme = &theme;
+
     for (auto* toast : m_toasts) {
         toast->applyTheme(theme);
     }
+
     relayout();
 }
 
 void ToastOverlay::dismissAll() {
     const auto visible = m_toasts;
+
     for (auto* toast : visible) {
         toast->dismiss();
     }
@@ -215,6 +224,7 @@ bool ToastOverlay::eventFilter(QObject* watched, QEvent* event) {
     if (watched == parentWidget() && (event->type() == QEvent::Resize || event->type() == QEvent::Show)) {
         relayout();
     }
+
     return QWidget::eventFilter(watched, event);
 }
 
@@ -233,10 +243,12 @@ void ToastOverlay::relayout() {
 
     QList<int> heights;
     int total = 0;
+
     for (auto* toast : m_toasts) {
         heights.append(toast->preferredHeight(toastWidth));
         total += heights.last() + toastSpacing;
     }
+
     total -= toastSpacing;
 
     const QRect available = parentWidget()->rect();
@@ -244,6 +256,7 @@ void ToastOverlay::relayout() {
 
     int bottom = total;
     QRegion interactive;
+
     for (qsizetype index = m_toasts.size() - 1; index >= 0; --index) {
         const QRect local(0, bottom - heights.at(index), toastWidth, heights.at(index));
         m_toasts.at(index)->setGeometry(local);

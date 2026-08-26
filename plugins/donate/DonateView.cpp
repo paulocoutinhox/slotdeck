@@ -84,6 +84,7 @@ void DonateView::openDonationPage(const QUrl& url) {
     if (QDesktopServices::openUrl(url)) {
         return;
     }
+
     m_host.notify(m_host.translate(QStringLiteral("donate.error.open-title")), m_host.translate(QStringLiteral("donate.error.open-message")), AlertSeverity::Error);
 }
 
@@ -93,6 +94,7 @@ QPixmap profilePixmap(int logicalSize, qreal devicePixelRatio) {
     }
 
     const QImage source(QStringLiteral(":/slotdeck/donate/assets/profile.png"));
+
     if (source.isNull()) {
         return {};
     }

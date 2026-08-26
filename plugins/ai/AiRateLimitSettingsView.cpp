@@ -75,11 +75,13 @@ void AiRateLimitSettingsView::persist() {
     const QString providerId = m_scope.providerId();
     const ProviderRateLimit edited{providerId, m_interval->value(), m_perMinute->value(), m_concurrent->value()};
     QVector<ProviderRateLimit> limits;
+
     for (const auto& limit : m_plugin.rateLimits()) {
         if (limit.providerId != providerId) {
             limits.append(limit);
         }
     }
+
     if (edited.minimumIntervalMs > 0 || edited.maximumRequestsPerMinute > 0 || edited.maximumConcurrentRequests > 0) {
         limits.append(edited);
     }

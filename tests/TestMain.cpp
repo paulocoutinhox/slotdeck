@@ -39,6 +39,7 @@ bool TestMainHelper::hasArgument(int argc, char** argv, std::string_view expecte
             return true;
         }
     }
+
     return false;
 }
 
@@ -56,6 +57,7 @@ void TestMainHelper::sendLanguageServerDiagnostic(const QString& message) {
 
 int TestMainHelper::runMcpServerFixture() {
     std::string line;
+
     while (std::getline(std::cin, line)) {
         if (line.empty()) {
             continue;
@@ -100,6 +102,7 @@ int TestMainHelper::runMcpServerFixture() {
         }
         std::cout << QJsonDocument(QJsonObject{{QStringLiteral("jsonrpc"), QStringLiteral("2.0")}, {QStringLiteral("id"), message.value(QStringLiteral("id"))}, {QStringLiteral("result"), result}}).toJson(QJsonDocument::Compact).toStdString() << std::endl;
     }
+
     return 0;
 }
 
@@ -205,6 +208,7 @@ int TestMainHelper::runLanguageServerFixture(LanguageServerFixture mode) {
             return 0;
         }
     }
+
     return 0;
 }
 
@@ -213,10 +217,12 @@ int main(int argc, char** argv) {
         char input{};
         return std::cin.get(input) ? 1 : 0;
     }
+
     if (TestMainHelper::hasArgument(argc, argv, "--slotdeck-test-hang")) {
         std::this_thread::sleep_for(std::chrono::seconds(30));
         return 0;
     }
+
     if (TestMainHelper::hasArgument(argc, argv, "--slotdeck-test-mcp")) {
         return TestMainHelper::runMcpServerFixture();
     }
@@ -239,6 +245,7 @@ int main(int argc, char** argv) {
     if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM")) {
         qputenv("QT_QPA_PLATFORM", QByteArrayLiteral("offscreen"));
     }
+
     QStandardPaths::setTestModeEnabled(true);
     QApplication application(argc, argv);
     QCoreApplication::setApplicationVersion(QStringLiteral(SLOTDECK_APP_VERSION));

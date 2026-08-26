@@ -51,21 +51,25 @@ qint64 AiToolContractHelper::messageTokens(const QJsonObject& message) {
 
 bool AiToolContractHelper::answersToolCalls(const QJsonObject& message) {
     const QString role = message.value(QStringLiteral("role")).toString();
+
     if (role == QStringLiteral("tool")) {
         return true;
     }
     if (role != QStringLiteral("user")) {
         return false;
     }
+
     const QJsonArray blocks = message.value(QStringLiteral("content")).toArray();
     return !blocks.isEmpty() && blocks.first().toObject().value(QStringLiteral("type")).toString() == QStringLiteral("tool_result");
 }
 
 qint64 estimateTokens(const QJsonArray& messages) {
     qint64 total = 0;
+
     for (const auto& value : messages) {
         total += AiToolContractHelper::messageTokens(value.toObject());
     }
+
     return total;
 }
 
@@ -83,12 +87,14 @@ QString AiToolContractHelper::prunedText(const QString& text) {
     if (text.size() <= prunedToolResultThreshold) {
         return text;
     }
+
     return text.left(prunedToolResultHead) + QStringLiteral("\n[... %1 characters pruned ...]\n").arg(QString::number(text.size() - prunedToolResultHead - prunedToolResultTail)) + text.right(prunedToolResultTail);
 }
 
 // A result that carries an image holds its text in its own blocks, so only text is shortened and everything else is left exactly as it was.
 QJsonObject AiToolContractHelper::prunedBlock(const QJsonObject& block, bool& changed) {
     QJsonObject shortened = block;
+
     if (block.value(QStringLiteral("content")).isString()) {
         const QString text = block.value(QStringLiteral("content")).toString();
         const QString reduced = prunedText(text);
@@ -96,6 +102,7 @@ QJsonObject AiToolContractHelper::prunedBlock(const QJsonObject& block, bool& ch
         shortened.insert(QStringLiteral("content"), reduced);
         return shortened;
     }
+
     if (block.value(QStringLiteral("text")).isString()) {
         const QString text = block.value(QStringLiteral("text")).toString();
         const QString reduced = prunedText(text);
@@ -103,6 +110,7 @@ QJsonObject AiToolContractHelper::prunedBlock(const QJsonObject& block, bool& ch
         shortened.insert(QStringLiteral("text"), reduced);
         return shortened;
     }
+
     if (block.value(QStringLiteral("content")).isArray()) {
         QJsonArray carried;
         for (const auto& value : block.value(QStringLiteral("content")).toArray()) {
@@ -110,11 +118,13 @@ QJsonObject AiToolContractHelper::prunedBlock(const QJsonObject& block, bool& ch
         }
         shortened.insert(QStringLiteral("content"), carried);
     }
+
     return shortened;
 }
 
 QJsonObject AiToolContractHelper::prunedToolResult(const QJsonObject& message, bool& changed) {
     QJsonObject pruned = message;
+
     if (message.value(QStringLiteral("content")).isString()) {
         const QString text = message.value(QStringLiteral("content")).toString();
         const QString shortened = prunedText(text);
@@ -124,9 +134,11 @@ QJsonObject AiToolContractHelper::prunedToolResult(const QJsonObject& message, b
     }
 
     QJsonArray blocks;
+
     for (const auto& value : message.value(QStringLiteral("content")).toArray()) {
         blocks.append(prunedBlock(value.toObject(), changed));
     }
+
     pruned.insert(QStringLiteral("content"), blocks);
     return pruned;
 }
@@ -140,6 +152,7 @@ qsizetype pruneToolResults(QJsonArray& messages, qint64 limit) {
     // The conversation is measured again only when a result was actually shortened, because measuring it serializes every message.
     qsizetype pruned = 0;
     qint64 current = estimateTokens(messages);
+
     for (qsizetype index = 0; index < messages.size() && current > limit; ++index) {
         const QJsonObject message = messages.at(index).toObject();
         if (!AiToolContractHelper::answersToolCalls(message)) {
@@ -153,6 +166,7 @@ qsizetype pruneToolResults(QJsonArray& messages, qint64 limit) {
             ++pruned;
         }
     }
+
     return pruned;
 }
 
@@ -164,6 +178,7 @@ FittedConversation fitConversation(const QJsonArray& messages, qint64 limit) {
     // The instructions and the task itself are never dropped, because without them the run loses its purpose.
     QJsonArray preserved;
     qsizetype start = 0;
+
     while (start < messages.size() && preserved.size() < 2) {
         const QJsonObject message = messages.at(start).toObject();
         const QString role = message.value(QStringLiteral("role")).toString();
@@ -175,11 +190,13 @@ FittedConversation fitConversation(const QJsonArray& messages, qint64 limit) {
     }
 
     QJsonArray remaining;
+
     for (qsizetype index = start; index < messages.size(); ++index) {
         remaining.append(messages.at(index));
     }
 
     QJsonArray dropped;
+
     while (!remaining.isEmpty() && estimateTokens(preserved) + estimateTokens(remaining) > limit) {
         dropped.append(remaining.first());
         remaining.removeFirst();
@@ -190,9 +207,11 @@ FittedConversation fitConversation(const QJsonArray& messages, qint64 limit) {
     }
 
     const qsizetype preservedHead = preserved.size();
+
     for (const auto& value : remaining) {
         preserved.append(value);
     }
+
     return {preserved, dropped, preservedHead};
 }
 
@@ -212,6 +231,7 @@ bool AiToolContractHelper::matchesDeclaredType(const QString& declared, const QJ
     if (declared == QStringLiteral("object")) {
         return value.isObject();
     }
+
     return true;
 }
 
@@ -225,12 +245,14 @@ utils::Result<void> validateToolSchema(const ToolSchema& schema) {
     if (schema.parameters.value(QStringLiteral("type")).toString() != QStringLiteral("object") || !schema.parameters.value(QStringLiteral("properties")).isObject()) {
         return utils::Result<void>::failure({"ai_tool_invalid", "The tool parameters must be a JSON Schema object", schema.name});
     }
+
     return utils::Result<void>::success();
 }
 
 // An argument the schema declares is judged only by what that schema says, so a server tool is checked exactly like a native one.
 std::optional<ToolArgumentError> findToolArgumentError(const ToolSchema& schema, const QJsonObject& arguments) {
     const QJsonObject properties = schema.parameters.value(QStringLiteral("properties")).toObject();
+
     for (const auto& value : schema.parameters.value(QStringLiteral("required")).toArray()) {
         const QString name = value.toString();
         if (!arguments.contains(name)) {
@@ -245,11 +267,13 @@ std::optional<ToolArgumentError> findToolArgumentError(const ToolSchema& schema,
         }
         return ToolArgumentError{argument.key(), declared};
     }
+
     return std::nullopt;
 }
 
 QJsonArray serializeTools(WireProtocol protocol, const QVector<ToolSchema>& tools, const std::function<QString(const QString&)>& translate) {
     QJsonArray serialized;
+
     for (const auto& tool : tools) {
         const QString description = translate(tool.descriptionKey);
         if (protocol == WireProtocol::Anthropic) {
@@ -259,6 +283,7 @@ QJsonArray serializeTools(WireProtocol protocol, const QVector<ToolSchema>& tool
         const QJsonObject function{{QStringLiteral("name"), tool.name}, {QStringLiteral("description"), description}, {QStringLiteral("parameters"), tool.parameters}};
         serialized.append(QJsonObject{{QStringLiteral("type"), QStringLiteral("function")}, {QStringLiteral("function"), function}});
     }
+
     return serialized;
 }
 
@@ -275,14 +300,17 @@ QJsonObject serializeAssistantTurn(WireProtocol protocol, const QString& content
     }
 
     QJsonObject message{{QStringLiteral("role"), QStringLiteral("assistant")}, {QStringLiteral("content"), content}};
+
     if (calls.isEmpty()) {
         return message;
     }
 
     QJsonArray toolCalls;
+
     for (const auto& call : calls) {
         toolCalls.append(AiToolContractHelper::openAiToolCall(call));
     }
+
     message.insert(QStringLiteral("tool_calls"), toolCalls);
     return message;
 }
@@ -308,6 +336,7 @@ QVector<QJsonObject> serializeToolResults(WireProtocol protocol, const QVector<T
     // The OpenAI tool message carries text alone, so an image the tool read follows it as the user turn that shows it.
     QVector<QJsonObject> messages;
     QJsonArray images;
+
     for (const auto& result : results) {
         messages.append({{QStringLiteral("role"), QStringLiteral("tool")}, {QStringLiteral("tool_call_id"), result.callId}, {QStringLiteral("content"), result.text}});
         if (!result.imageData.isEmpty()) {
@@ -315,9 +344,11 @@ QVector<QJsonObject> serializeToolResults(WireProtocol protocol, const QVector<T
             images.append(QJsonObject{{QStringLiteral("type"), QStringLiteral("image_url")}, {QStringLiteral("image_url"), QJsonObject{{QStringLiteral("url"), url}}}});
         }
     }
+
     if (!images.isEmpty()) {
         messages.append({{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), images}});
     }
+
     return messages;
 }
 
@@ -347,9 +378,11 @@ void ToolCallAccumulator::consume(const QJsonObject& event) {
     }
 
     const QJsonArray choices = event.value(QStringLiteral("choices")).toArray();
+
     if (choices.isEmpty()) {
         return;
     }
+
     for (const auto& value : choices.first().toObject().value(QStringLiteral("delta")).toObject().value(QStringLiteral("tool_calls")).toArray()) {
         const QJsonObject call = value.toObject();
         const int index = call.value(QStringLiteral("index")).toInt(-1);
@@ -398,6 +431,7 @@ QJsonArray enforceProtocolShape(WireProtocol protocol, const QJsonArray& message
 
     QJsonArray shaped;
     bool opened = false;
+
     for (const auto& value : messages) {
         const QJsonObject message = value.toObject();
         const QString role = message.value(QStringLiteral("role")).toString();
@@ -425,6 +459,7 @@ QJsonArray enforceProtocolShape(WireProtocol protocol, const QJsonArray& message
 
 utils::Result<QVector<ToolCall>> ToolCallAccumulator::calls() const {
     QVector<ToolCall> completed;
+
     for (auto entry = m_pending.constBegin(); entry != m_pending.constEnd(); ++entry) {
         const PendingCall& pending = entry.value();
         if (pending.id.isEmpty() || pending.name.isEmpty()) {
@@ -440,6 +475,7 @@ utils::Result<QVector<ToolCall>> ToolCallAccumulator::calls() const {
         }
         completed.append({pending.id, pending.name, document.object(), {}});
     }
+
     return utils::Result<QVector<ToolCall>>::success(std::move(completed));
 }
 

@@ -69,6 +69,7 @@ void AiSearchSettingsView::applyService() {
     const bool selfHosted = selected.has_value() && selected.value() == SearchProvider::SearxNg;
     m_form->setRowVisible(instanceRow, selfHosted);
     m_form->setRowVisible(keyRow, !selfHosted);
+
     if (selected.has_value() && !selfHosted && m_apiKey->value().isEmpty()) {
         m_apiKey->setValue(defaultSecretReference(searchProviderKeyVariable(selected.value())));
     }
@@ -76,6 +77,7 @@ void AiSearchSettingsView::applyService() {
 
 void AiSearchSettingsView::persist() {
     const auto selected = searchProviderFromIdentifier(m_service->currentData().toString());
+
     if (!selected.has_value()) {
         return;
     }
@@ -147,9 +149,11 @@ void AiSpeechSettingsView::applyService() {
     const QStringList declared = speechProviderDeclaredVoices(selected);
     m_loading = true;
     m_declaredVoice->clear();
+
     for (const auto& voice : declared) {
         m_declaredVoice->addItem(voice, voice);
     }
+
     ui::sortComboBoxItems(m_declaredVoice);
     const int stored = m_declaredVoice->findData(m_plugin.effectiveSpeechSettings().voiceId);
     m_declaredVoice->setCurrentIndex(stored >= 0 ? stored : m_declaredVoice->findData(speechProviderDefaultVoice(selected)));
@@ -157,6 +161,7 @@ void AiSpeechSettingsView::applyService() {
 
     m_form->setRowVisible(voiceRow, declared.isEmpty());
     m_form->setRowVisible(declaredVoiceRow, !declared.isEmpty());
+
     if (m_apiKey->value().isEmpty()) {
         m_apiKey->setValue(defaultSecretReference(speechProviderKeyVariable(selected)));
     }

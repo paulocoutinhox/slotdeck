@@ -33,12 +33,14 @@ class TerminalPaneHelper final {
 
 QString TerminalPaneHelper::displayPath(const QString& path) {
     const QString home = QDir::homePath();
+
     if (path == home) {
         return QStringLiteral("~");
     }
     if (path.startsWith(home + QLatin1Char('/'))) {
         return QStringLiteral("~") + path.sliced(home.size());
     }
+
     return path;
 }
 
@@ -157,6 +159,7 @@ void TerminalPane::setSelected(bool isSelected) {
     if (m_selected == isSelected) {
         return;
     }
+
     m_selected = isSelected;
     m_header->setProperty("active", m_selected);
     m_focusIndicator->setColor(m_host.theme().color(m_selected ? ThemeColor::Accent : ThemeColor::TextMuted));
@@ -179,6 +182,7 @@ void TerminalPane::focusTerminal() {
 
 void TerminalPane::deactivate() {
     m_terminal->setSession(nullptr);
+
     if (m_session != nullptr) {
         disconnect(m_session, nullptr, this, nullptr);
         m_session.clear();
@@ -232,6 +236,7 @@ bool TerminalPane::eventFilter(QObject* watched, QEvent* event) {
             m_header->setCursor(Qt::OpenHandCursor);
         }
     }
+
     return QFrame::eventFilter(watched, event);
 }
 
@@ -266,17 +271,20 @@ void TerminalPane::showActionsMenu() {
     auto* shelfAction = menu->addAction(icon(IconName::Shelf, m_host.theme()), m_host.translate(QStringLiteral("terminal.actions.move-to-shelf")));
     shelfAction->setIconVisibleInMenu(true);
     shelfAction->setData(QStringLiteral("shelf"));
+
     // The directory the shell is standing in is a folder like any other, so it is opened where folders are edited.
     if (m_host.pluginAvailable(QStringLiteral("code-editor")) && m_session != nullptr && !m_session->cwd().isEmpty()) {
         auto* editorAction = menu->addAction(icon(IconName::Folder, m_host.theme()), m_host.translate(QStringLiteral("terminal.actions.open-in-editor")));
         editorAction->setIconVisibleInMenu(true);
         editorAction->setData(QStringLiteral("editor"));
     }
+
     if (m_host.pluginAvailable(QStringLiteral("web-server")) && m_session != nullptr && !m_session->cwd().isEmpty()) {
         auto* serverAction = menu->addAction(icon(IconName::WebServer, m_host.theme()), m_host.translate(QStringLiteral("terminal.actions.serve-directory")));
         serverAction->setIconVisibleInMenu(true);
         serverAction->setData(QStringLiteral("server"));
     }
+
     auto* closeAction = menu->addAction(icon(IconName::Close, m_host.theme()), m_host.translate(QStringLiteral("terminal.actions.close-terminal")));
     closeAction->setIconVisibleInMenu(true);
     closeAction->setData(QStringLiteral("close"));
@@ -286,24 +294,29 @@ void TerminalPane::showActionsMenu() {
 
 void TerminalPane::handleAction(QAction* action) {
     const QString actionId = action->data().toString();
+
     if (actionId == QStringLiteral("restart")) {
         if (m_session != nullptr) {
             m_session->restart();
         }
         return;
     }
+
     if (actionId == QStringLiteral("shelf")) {
         emit shelfRequested(m_sessionId);
         return;
     }
+
     if (actionId == QStringLiteral("editor")) {
         offerDirectory(QStringLiteral("code-editor"), QStringLiteral("code-editor.workspace.open"));
         return;
     }
+
     if (actionId == QStringLiteral("server")) {
         offerDirectory(QStringLiteral("web-server"), QStringLiteral("web-server.instance.create"));
         return;
     }
+
     if (actionId == QStringLiteral("close")) {
         requestClose();
     }
@@ -312,6 +325,7 @@ void TerminalPane::handleAction(QAction* action) {
 // An address printed by a program opens where the application browses, and falls back to the browser of the system when the plugin is not there.
 void TerminalPane::openAddress(const QString& address) {
     const QUrl url(address, QUrl::StrictMode);
+
     if (!url.isValid()) {
         return;
     }
@@ -378,10 +392,12 @@ void TerminalPane::beginDrag() {
     if (result != Qt::MoveAction) {
         return;
     }
+
     if (destination.target == SessionDropTarget::Slot) {
         emit slotDropRequested(m_sessionId, destination.slotIndex);
         return;
     }
+
     if (destination.target == SessionDropTarget::Shelf) {
         emit shelfRequested(m_sessionId);
     }

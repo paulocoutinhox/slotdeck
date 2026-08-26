@@ -12,6 +12,7 @@ QVector<domain::LayoutPreset> LayoutManager::presets() {
 utils::Result<domain::LayoutPreset> LayoutManager::preset(const QString& presetId) {
     const auto availablePresets = presets();
     const auto match = std::ranges::find(availablePresets, presetId, &domain::LayoutPreset::id);
+
     if (match == availablePresets.end()) {
         return utils::Result<domain::LayoutPreset>::failure({"terminal_layout_preset_unknown", "The terminal layout preset is unknown", presetId});
     }
@@ -28,6 +29,7 @@ bool LayoutManager::contains(const domain::SlotLayoutState& layout, const QStrin
 
 int LayoutManager::visibleSlotIndex(const domain::SlotLayoutState& layout, const QString& sessionId) {
     const auto assignment = std::ranges::find(layout.slotAssignments, sessionId);
+
     if (assignment == layout.slotAssignments.end()) {
         return -1;
     }
@@ -37,6 +39,7 @@ int LayoutManager::visibleSlotIndex(const domain::SlotLayoutState& layout, const
 
 utils::Result<void> LayoutManager::changePreset(domain::SlotLayoutState& layout, const QString& presetId) {
     const auto requested = preset(presetId);
+
     if (!requested.hasValue()) {
         return utils::Result<void>::failure(requested.error());
     }
@@ -100,6 +103,7 @@ void LayoutManager::remove(domain::SlotLayoutState& layout, const QString& sessi
             assigned.reset();
         }
     }
+
     layout.shelf.removeAll(sessionId);
 }
 

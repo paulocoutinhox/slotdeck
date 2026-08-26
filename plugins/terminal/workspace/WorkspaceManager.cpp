@@ -34,9 +34,11 @@ std::int64_t WorkspaceManagerHelper::now() {
 QVariantList WorkspaceManagerHelper::optionalSessionIds(const QVector<std::optional<QString>>& assignments) {
     QVariantList result;
     result.reserve(assignments.size());
+
     for (const auto& slot : assignments) {
         result.append(slot.has_value() ? QVariant(slot.value()) : QVariant(QString{}));
     }
+
     return result;
 }
 
@@ -69,6 +71,7 @@ void WorkspaceManager::setCurrentTabIndex(int index) {
     if (index == m_currentTabIndex && m_workspace.selectedMainTabId == m_workspace.tabs.at(index).id) {
         return;
     }
+
     m_currentTabIndex = index;
     m_workspace.selectedMainTabId = m_workspace.tabs.at(index).id;
     m_workspace.lastOpenedAt = WorkspaceManagerHelper::now();
@@ -88,14 +91,18 @@ QVariantList WorkspaceManager::currentSlots() const {
 
 QVariantList WorkspaceManager::currentShelf() const {
     const auto* tab = currentTab();
+
     if (tab == nullptr) {
         return {};
     }
+
     QVariantList result;
     result.reserve(tab->layout.shelf.size());
+
     for (const auto& sessionId : tab->layout.shelf) {
         result.append(sessionId);
     }
+
     return result;
 }
 
@@ -122,9 +129,11 @@ int WorkspaceManager::currentLayoutColumns() const {
 
 QString WorkspaceManager::currentCwd() const {
     const auto* tab = currentTab();
+
     if (tab == nullptr) {
         return {};
     }
+
     const auto* session = runtimeSession(tab->focusedSessionId);
     return session == nullptr ? QString{} : session->cwd();
 }
@@ -136,14 +145,17 @@ int WorkspaceManager::terminalCount() const {
 QVariantList WorkspaceManager::allSessions() const {
     QVariantList sessions;
     sessions.reserve(m_workspace.sessions.size());
+
     for (const auto& session : m_workspace.sessions) {
         sessions.append(sessionData(session.id));
     }
+
     return sessions;
 }
 
 utils::Result<void> WorkspaceManager::initialize() {
     const auto loaded = m_repository.loadLastOpened();
+
     if (loaded.hasValue()) {
         m_workspace = loaded.value();
     } else if (loaded.error().code == QStringLiteral("terminal_workspace_not_found")) {
@@ -157,6 +169,7 @@ utils::Result<void> WorkspaceManager::initialize() {
     }
 
     m_currentTabIndex = 0;
+
     for (int index = 0; index < m_workspace.tabs.size(); ++index) {
         if (m_workspace.tabs.at(index).id == m_workspace.selectedMainTabId) {
             m_currentTabIndex = index;
@@ -166,10 +179,12 @@ utils::Result<void> WorkspaceManager::initialize() {
 
     beginResetModel();
     const auto sessionsResult = startRuntimeSessions();
+
     if (!sessionsResult.hasValue()) {
         endResetModel();
         return sessionsResult;
     }
+
     endResetModel();
     emit currentTabChanged();
     emit sessionsChanged();
@@ -180,14 +195,18 @@ void WorkspaceManager::shutdown(ShutdownMode mode) {
     if (m_shuttingDown) {
         return;
     }
+
     m_shuttingDown = true;
+
     if (mode == ShutdownMode::Persist) {
         persist();
     }
+
     for (auto& [id, session] : m_runtimeSessions) {
         Q_UNUSED(id);
         session->terminate();
     }
+
     m_runtimeSessions.clear();
 }
 
@@ -197,11 +216,13 @@ void WorkspaceManager::setTerminalTheme(const QString& themeId) {
     }
 
     const auto* selected = terminalcore::terminalTheme(themeId);
+
     if (selected == nullptr) {
         return;
     }
 
     m_terminalTheme = *selected;
+
     for (auto& [id, session] : m_runtimeSessions) {
         Q_UNUSED(id);
         session->setTheme(m_terminalTheme);
@@ -210,6 +231,7 @@ void WorkspaceManager::setTerminalTheme(const QString& themeId) {
 
 void WorkspaceManager::setClipboardWriteAllowed(bool allowed) {
     m_clipboardWriteAllowed = allowed;
+
     for (auto& [id, session] : m_runtimeSessions) {
         Q_UNUSED(id);
         session->setClipboardWriteAllowed(allowed);
@@ -222,17 +244,21 @@ QObject* WorkspaceManager::sessionObject(const QString& sessionId) const {
 
 QVariantMap WorkspaceManager::sessionData(const QString& sessionId) const {
     const auto* session = runtimeSession(sessionId);
+
     if (session == nullptr) {
         return {};
     }
+
     return {{QStringLiteral("id"), session->id()}, {QStringLiteral("name"), session->name()}, {QStringLiteral("cwd"), session->cwd()}, {QStringLiteral("shell"), session->shellName()}, {QStringLiteral("status"), session->status()}, {QStringLiteral("exitCode"), session->exitCode()}};
 }
 
 QVariantList WorkspaceManager::layoutPresets() const {
     QVariantList output;
+
     for (const auto& preset : LayoutManager::presets()) {
         output.append(QVariantMap{{QStringLiteral("id"), preset.id}, {QStringLiteral("name"), preset.name}, {QStringLiteral("slotCount"), preset.slotCount}, {QStringLiteral("columns"), preset.columns}, {QStringLiteral("rows"), preset.rows}});
     }
+
     return output;
 }
 
@@ -258,16 +284,20 @@ void WorkspaceManager::moveTab(int from, int to) {
     }
 
     const int destination = from < to ? to + 1 : to;
+
     if (!beginMoveRows({}, from, from, {}, destination)) {
         return;
     }
+
     m_workspace.tabs.move(from, to);
+
     for (int index = 0; index < m_workspace.tabs.size(); ++index) {
         m_workspace.tabs[index].sortOrder = index;
         if (m_workspace.tabs.at(index).id == m_workspace.selectedMainTabId) {
             m_currentTabIndex = index;
         }
     }
+
     endMoveRows();
 
     m_workspace.lastOpenedAt = WorkspaceManagerHelper::now();
@@ -279,6 +309,7 @@ void WorkspaceManager::renameTab(int index, const QString& name) {
     if (index < 0 || index >= m_workspace.tabs.size() || name.trimmed().isEmpty()) {
         return;
     }
+
     m_workspace.tabs[index].name = name.trimmed();
     m_workspace.updatedAt = WorkspaceManagerHelper::now();
     emit dataChanged(this->index(index), this->index(index), {NameRole});
@@ -292,12 +323,15 @@ void WorkspaceManager::closeTab(int index) {
 
     const auto tab = m_workspace.tabs.at(index);
     QVector<QString> sessionIds;
+
     for (const auto& slot : tab.layout.slotAssignments) {
         if (slot.has_value()) {
             sessionIds.append(slot.value());
         }
     }
+
     sessionIds.append(tab.layout.shelf);
+
     for (const auto& sessionId : sessionIds) {
         emit terminalClosing(sessionId);
     }
@@ -306,6 +340,7 @@ void WorkspaceManager::closeTab(int index) {
     const bool closingSelectedTab = tab.id == selectedTabId;
     beginRemoveRows({}, index, index);
     m_workspace.tabs.removeAt(index);
+
     for (int tabIndex = 0; tabIndex < m_workspace.tabs.size(); ++tabIndex) {
         m_workspace.tabs[tabIndex].sortOrder = tabIndex;
     }
@@ -314,16 +349,20 @@ void WorkspaceManager::closeTab(int index) {
         const auto selected = std::ranges::find(m_workspace.tabs, selectedTabId, &domain::MainTab::id);
         m_currentTabIndex = selected == m_workspace.tabs.end() ? std::min(index, static_cast<int>(m_workspace.tabs.size()) - 1) : static_cast<int>(std::distance(m_workspace.tabs.begin(), selected));
     }
+
     if (!m_workspace.tabs.isEmpty() && closingSelectedTab) {
         m_currentTabIndex = std::min(index, static_cast<int>(m_workspace.tabs.size()) - 1);
     }
+
     if (!m_workspace.tabs.isEmpty()) {
         m_workspace.selectedMainTabId = m_workspace.tabs.at(m_currentTabIndex).id;
     }
+
     if (m_workspace.tabs.isEmpty()) {
         m_currentTabIndex = -1;
         m_workspace.selectedMainTabId.clear();
     }
+
     endRemoveRows();
 
     for (const auto& sessionId : sessionIds) {
@@ -335,9 +374,11 @@ void WorkspaceManager::closeTab(int index) {
 
     const bool needsDefaultTab = m_workspace.tabs.isEmpty();
     emit sessionsChanged();
+
     if (needsDefaultTab) {
         createTab();
     }
+
     if (!needsDefaultTab) {
         emit currentTabChanged();
     }
@@ -362,11 +403,13 @@ void WorkspaceManager::closeTab(int index) {
 
 QString WorkspaceManager::createTerminal(int slotIndex) {
     auto* tab = currentTab();
+
     if (tab == nullptr || m_backendFactory == nullptr) {
         return {};
     }
 
     auto backend = m_backendFactory();
+
     if (backend == nullptr) {
         return {};
     }
@@ -384,9 +427,11 @@ QString WorkspaceManager::createTerminal(int slotIndex) {
     m_runtimeSessions.emplace(sessionId, std::move(session));
 
     int destinationSlot = -1;
+
     if (slotIndex >= 0 && slotIndex < tab->layout.slotCount && !tab->layout.slotAssignments.at(slotIndex).has_value()) {
         destinationSlot = slotIndex;
     }
+
     if (destinationSlot < 0) {
         // clang-format off
         const auto emptySlot = std::ranges::find_if(tab->layout.slotAssignments, [](const auto& assignment) { return !assignment.has_value(); });
@@ -395,9 +440,11 @@ QString WorkspaceManager::createTerminal(int slotIndex) {
             destinationSlot = static_cast<int>(std::distance(tab->layout.slotAssignments.begin(), emptySlot));
         }
     }
+
     if (destinationSlot < 0) {
         destinationSlot = LayoutManager::visibleSlotIndex(tab->layout, tab->focusedSessionId);
     }
+
     if (!LayoutManager::assignToSlot(tab->layout, sessionId, destinationSlot).hasValue()) {
         LayoutManager::moveToShelf(tab->layout, sessionId);
     }
@@ -405,9 +452,11 @@ QString WorkspaceManager::createTerminal(int slotIndex) {
     tab->focusedSessionId = sessionId;
 
     const auto result = runtimeSession(sessionId)->start();
+
     if (!result.hasValue()) {
         emit notificationRequested(m_host.translate(QStringLiteral("terminal.error.start-title")), result.error().message, true);
     }
+
     notifyTabChanged(m_currentTabIndex);
     emit sessionsChanged();
     persist();
@@ -417,6 +466,7 @@ QString WorkspaceManager::createTerminal(int slotIndex) {
 // The runtime leaves the collection before anything is announced, so no signal can reach a session this is already closing.
 void WorkspaceManager::closeTerminal(QString sessionId) {
     auto closing = m_runtimeSessions.extract(sessionId);
+
     if (closing.empty()) {
         return;
     }
@@ -427,6 +477,7 @@ void WorkspaceManager::closeTerminal(QString sessionId) {
     removeSessionFromAllTabs(sessionId);
 
     const auto state = std::ranges::find(m_workspace.sessions, sessionId, &domain::TerminalSessionState::id);
+
     if (state != m_workspace.sessions.end()) {
         m_workspace.sessions.erase(state);
     }
@@ -441,6 +492,7 @@ void WorkspaceManager::closeTerminal(QString sessionId) {
 
 void WorkspaceManager::changeLayout(const QString& presetId) {
     auto* tab = currentTab();
+
     if (tab == nullptr) {
         return;
     }
@@ -460,6 +512,7 @@ void WorkspaceManager::changeLayout(const QString& presetId) {
 
 void WorkspaceManager::assignToSlot(const QString& sessionId, int slotIndex) {
     auto* tab = currentTab();
+
     if (tab == nullptr || !LayoutManager::contains(tab->layout, sessionId)) {
         return;
     }
@@ -476,6 +529,7 @@ void WorkspaceManager::assignToSlot(const QString& sessionId, int slotIndex) {
 
 void WorkspaceManager::activateShelvedSession(const QString& sessionId) {
     auto* tab = currentTab();
+
     if (tab == nullptr || !tab->layout.shelf.contains(sessionId)) {
         return;
     }
@@ -484,12 +538,15 @@ void WorkspaceManager::activateShelvedSession(const QString& sessionId) {
     // clang-format off
     const auto emptySlot = std::ranges::find_if(tab->layout.slotAssignments, [](const auto& assignment) { return !assignment.has_value(); });
     // clang-format on
+
     if (emptySlot != tab->layout.slotAssignments.end()) {
         destinationSlot = static_cast<int>(std::distance(tab->layout.slotAssignments.begin(), emptySlot));
     }
+
     if (destinationSlot < 0) {
         destinationSlot = LayoutManager::visibleSlotIndex(tab->layout, tab->focusedSessionId);
     }
+
     if (!LayoutManager::assignToSlot(tab->layout, sessionId, destinationSlot).hasValue()) {
         LayoutManager::moveToShelf(tab->layout, sessionId);
     }
@@ -501,9 +558,11 @@ void WorkspaceManager::activateShelvedSession(const QString& sessionId) {
 
 void WorkspaceManager::moveToShelf(const QString& sessionId, int shelfIndex) {
     auto* tab = currentTab();
+
     if (tab == nullptr || !LayoutManager::contains(tab->layout, sessionId)) {
         return;
     }
+
     LayoutManager::moveToShelf(tab->layout, sessionId, shelfIndex);
     normalizeFocusedSession(*tab);
     notifyTabChanged(m_currentTabIndex);
@@ -512,9 +571,11 @@ void WorkspaceManager::moveToShelf(const QString& sessionId, int shelfIndex) {
 
 void WorkspaceManager::focusSession(const QString& sessionId) {
     auto* tab = currentTab();
+
     if (tab == nullptr || LayoutManager::visibleSlotIndex(tab->layout, sessionId) < 0) {
         return;
     }
+
     tab->focusedSessionId = sessionId;
     emit focusedSessionChanged(sessionId);
     emit currentTabChanged();
@@ -523,22 +584,29 @@ void WorkspaceManager::focusSession(const QString& sessionId) {
 
 void WorkspaceManager::persistRuntimeSession() {
     auto* runtime = qobject_cast<terminalcore::TerminalSession*>(sender());
+
     if (runtime == nullptr) {
         return;
     }
+
     auto* state = sessionState(runtime->id());
+
     if (state != nullptr) {
         *state = runtime->state();
     }
+
     const auto* tab = currentTab();
+
     if (tab != nullptr && tab->focusedSessionId == runtime->id()) {
         emit currentTabChanged();
     }
+
     persist();
 }
 
 void WorkspaceManager::notifySessionNameChanged() {
     const auto* runtime = qobject_cast<terminalcore::TerminalSession*>(sender());
+
     if (runtime != nullptr) {
         emit sessionNameChanged(runtime->id());
     }
@@ -552,6 +620,7 @@ domain::MainTab* WorkspaceManager::currentTab() {
     if (m_currentTabIndex < 0 || m_currentTabIndex >= m_workspace.tabs.size()) {
         return nullptr;
     }
+
     return &m_workspace.tabs[m_currentTabIndex];
 }
 
@@ -559,6 +628,7 @@ const domain::MainTab* WorkspaceManager::currentTab() const {
     if (m_currentTabIndex < 0 || m_currentTabIndex >= m_workspace.tabs.size()) {
         return nullptr;
     }
+
     return &m_workspace.tabs.at(m_currentTabIndex);
 }
 
@@ -617,6 +687,7 @@ utils::Result<void> WorkspaceManager::startRuntimeSessions() {
     }
 
     const auto profiles = terminalcore::ShellProfileResolver::availableProfiles();
+
     for (auto& state : m_workspace.sessions) {
         const auto savedProfile = std::ranges::find(profiles, state.shellProfileId, &terminalcore::ShellProfile::id);
         if (savedProfile == profiles.end()) {
@@ -640,6 +711,7 @@ utils::Result<void> WorkspaceManager::startRuntimeSessions() {
             emit notificationRequested(m_host.translate(QStringLiteral("terminal.error.start-title")), result.error().message, true);
         }
     }
+
     return utils::Result<void>::success();
 }
 
@@ -670,6 +742,7 @@ void WorkspaceManager::normalizeFocusedSession(domain::MainTab& tab) {
     }
 
     tab.focusedSessionId.clear();
+
     for (const auto& assignment : tab.layout.slotAssignments) {
         if (assignment.has_value()) {
             tab.focusedSessionId = assignment.value();
@@ -682,6 +755,7 @@ void WorkspaceManager::persist() {
     if (m_workspace.id.isEmpty()) {
         return;
     }
+
     m_workspace.updatedAt = WorkspaceManagerHelper::now();
     auto future = m_repository.save(m_workspace);
     // clang-format off
@@ -697,6 +771,7 @@ void WorkspaceManager::notifyTabChanged(int index) {
     if (index < 0 || index >= m_workspace.tabs.size()) {
         return;
     }
+
     if (index == m_currentTabIndex) {
         emit layoutChanged();
         emit currentTabChanged();

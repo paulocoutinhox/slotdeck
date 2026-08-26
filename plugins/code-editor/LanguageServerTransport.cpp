@@ -83,6 +83,7 @@ LanguageServerTransport::~LanguageServerTransport() {
 
 void LanguageServerTransport::shutdown() {
     releaseProcess();
+
     if (QThread* owning = thread(); owning != nullptr) {
         owning->quit();
     }
@@ -90,15 +91,18 @@ void LanguageServerTransport::shutdown() {
 
 void LanguageServerTransport::readOutput() {
     m_inputBuffer.append(m_process->readAllStandardOutput());
+
     if (m_inputBuffer.size() > transportMaximumMessageSize + transportMaximumHeaderSize) {
         abort(QStringLiteral("The language server response exceeded the permitted size"));
         return;
     }
+
     parseMessages();
 }
 
 bool LanguageServerTransport::readHeader(qsizetype headerEnd, qsizetype& contentLength) {
     bool found = false;
+
     for (const auto& line : m_inputBuffer.left(headerEnd).split('\n')) {
         const QByteArray trimmed = line.trimmed();
         if (!trimmed.toLower().startsWith("content-length:")) {
@@ -116,10 +120,12 @@ bool LanguageServerTransport::readHeader(qsizetype headerEnd, qsizetype& content
             return false;
         }
     }
+
     if (!found) {
         abort(QStringLiteral("The language server response omitted its content length"));
         return false;
     }
+
     return true;
 }
 

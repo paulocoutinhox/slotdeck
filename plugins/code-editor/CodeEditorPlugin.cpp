@@ -72,15 +72,19 @@ utils::Result<void> CodeEditorPlugin::initialize(PluginHost& host) {
     m_asyncContext = std::make_unique<QObject>();
     m_repository = std::make_unique<CodeEditorRepository>(host);
     const auto migration = m_repository->initialize();
+
     if (!migration.hasValue()) {
         shutdown();
         return migration;
     }
+
     const auto state = m_repository->load();
+
     if (!state.hasValue()) {
         shutdown();
         return utils::Result<void>::failure(state.error());
     }
+
     m_settings = m_repository->loadSettings();
     m_workspaces = state.value();
     m_committedWorkspaces = m_workspaces;
@@ -109,6 +113,7 @@ QWidget* CodeEditorPlugin::createSettingsSection(const QString& groupId, const Q
     if (sectionId == QStringLiteral("language-servers")) {
         return createLanguageServersSection(parent);
     }
+
     return nullptr;
 }
 
@@ -118,9 +123,11 @@ QWidget* CodeEditorPlugin::createFilesSection(QWidget* parent) {
     auto* form = ui::settingsForm();
     auto* charset = new ui::ComboBox(m_host->theme(), view);
     charset->setObjectName(QStringLiteral("codeEditorDefaultCharset"));
+
     for (const auto declared : textCharsets()) {
         charset->addItem(textCharsetName(declared), textCharsetName(declared));
     }
+
     ui::sortComboBoxItems(charset);
     charset->setCurrentIndex(std::max(0, charset->findData(textCharsetName(m_settings.defaultCharset))));
     charset->setToolTip(m_host->translate(QStringLiteral("code-editor.settings.default-charset-description")));
@@ -139,9 +146,11 @@ QWidget* CodeEditorPlugin::createAppearanceSection(QWidget* parent) {
     auto* fontFamily = new ui::ComboBox(m_host->theme(), view);
     fontFamily->setObjectName(QStringLiteral("codeEditorFontFamily"));
     fontFamily->addItem(m_host->translate(QStringLiteral("code-editor.settings.font-family-system")), QString{});
+
     for (const auto& family : ui::monospacedFontFamilies()) {
         fontFamily->addItem(family, family);
     }
+
     ui::sortComboBoxItems(fontFamily);
     fontFamily->setCurrentIndex(std::max(0, fontFamily->findData(m_settings.fontFamily)));
     auto* fontSize = new QSpinBox(view);
@@ -167,7 +176,6 @@ QWidget* CodeEditorPlugin::createAppearanceSection(QWidget* parent) {
 }
 
 QWidget* CodeEditorPlugin::createLanguageServersSection(QWidget* parent) {
-
     auto* view = ui::settingsSectionPage(parent);
     auto* layout = qobject_cast<QVBoxLayout*>(view->layout());
     auto* form = ui::settingsForm();
@@ -217,26 +225,32 @@ void CodeEditorPlugin::handleRequest(const QString&, const QString& topic, const
         reply(result.hasValue() ? utils::Result<QJsonObject>::success({{QStringLiteral("workspaceId"), result.value()}}) : utils::Result<QJsonObject>::failure({result.error().code, m_host->translate(QStringLiteral("code-editor.error.workspace-open")), result.error().detail}));
         return;
     }
+
     reply(utils::Result<QJsonObject>::failure({"code_editor_request_invalid", "The Code Editor request is invalid", topic}));
 }
 
 void CodeEditorPlugin::handleEvent(const QString&, const QString& topic, const QJsonObject& payload) {
     ContentFontStep step = ContentFontStep::Reset;
+
     if (topic != QString::fromLatin1(contentFontStepTopic) || m_repository == nullptr || !parseContentFontStep(payload, step)) {
         return;
     }
+
     if (step == ContentFontStep::Reset) {
         setEditorFontSize(defaultEditorFontSize);
         return;
     }
+
     setEditorFontSize(ui::steppedContentFontSize(m_settings.fontSize, step == ContentFontStep::Increase ? 1 : -1));
 }
 
 void CodeEditorPlugin::shutdown() {
     m_persistenceTimer.stop();
+
     if (m_repository != nullptr && m_stateRevision != m_persistedRevision) {
         [[maybe_unused]] auto pendingPersistence = m_repository->save(m_workspaces);
     }
+
     m_asyncContext.reset();
     m_languageServerDiscoveryFuture.waitForFinished();
     // A transport thread outlives the client that asked it to end, so this waits for the ones still finishing before the library they run is unloaded.
@@ -361,10 +375,13 @@ PluginHost& CodeEditorPlugin::host() const {
 
 utils::Result<QString> CodeEditorPlugin::openWorkspace(const QString& rootPath) {
     const QFileInfo directory(QDir::cleanPath(rootPath));
+
     if (!directory.isAbsolute() || !directory.isDir() || !directory.isReadable()) {
         return utils::Result<QString>::failure({"code_editor_workspace_invalid", "The code editor workspace is unavailable", rootPath});
     }
+
     const QString canonicalPath = directory.canonicalFilePath();
+
     for (const auto& existing : m_workspaces) {
         if (existing.rootPath == canonicalPath) {
             if (const auto activation = activateWorkspace(existing.id); !activation.hasValue()) {
@@ -377,9 +394,11 @@ utils::Result<QString> CodeEditorPlugin::openWorkspace(const QString& rootPath) 
     }
 
     const QDateTime now = QDateTime::currentDateTimeUtc();
+
     for (auto& existing : m_workspaces) {
         existing.active = false;
     }
+
     const QString workspaceId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     m_workspaces.append({workspaceId, canonicalPath, static_cast<int>(m_workspaces.size()), true, now, now, {}});
     schedulePersistence();
@@ -402,18 +421,22 @@ utils::Result<void> CodeEditorPlugin::closeWorkspace(const QString& workspaceId)
         emit workspacesChanged();
         return utils::Result<void>::success();
     }
+
     return utils::Result<void>::failure({"code_editor_workspace_unknown", "The code editor workspace is unknown", workspaceId});
 }
 
 utils::Result<void> CodeEditorPlugin::activateWorkspace(const QString& workspaceId) {
     bool found = false;
+
     for (auto& current : m_workspaces) {
         current.active = current.id == workspaceId;
         found = found || current.active;
     }
+
     if (!found) {
         return utils::Result<void>::failure({"code_editor_workspace_unknown", "The code editor workspace is unknown", workspaceId});
     }
+
     schedulePersistence();
     return utils::Result<void>::success();
 }
@@ -422,19 +445,24 @@ utils::Result<void> CodeEditorPlugin::moveWorkspace(int from, int to) {
     if (from < 0 || from >= m_workspaces.size() || to < 0 || to >= m_workspaces.size()) {
         return utils::Result<void>::failure({"code_editor_workspace_position_invalid", "The code editor workspace position is invalid", QStringLiteral("%1 -> %2").arg(from).arg(to)});
     }
+
     m_workspaces.move(from, to);
+
     for (int index = 0; index < m_workspaces.size(); ++index) {
         m_workspaces[index].position = index;
     }
+
     schedulePersistence();
     return utils::Result<void>::success();
 }
 
 utils::Result<void> CodeEditorPlugin::updateWorkspace(CodeWorkspaceState workspaceState) {
     auto* existing = workspace(workspaceState.id);
+
     if (existing == nullptr || workspaceState.rootPath != existing->rootPath || workspaceState.createdAtUtc != existing->createdAtUtc) {
         return utils::Result<void>::failure({"code_editor_workspace_update_invalid", "The code editor workspace update is invalid", workspaceState.id});
     }
+
     workspaceState.position = existing->position;
     workspaceState.active = existing->active;
     *existing = std::move(workspaceState);
@@ -446,6 +474,7 @@ void CodeEditorPlugin::refreshLanguageServers() {
     if (m_languageServerDiscoveryInFlight) {
         return;
     }
+
     m_languageServerDiscoveryInFlight = true;
     emit languageServerDiscoveryStateChanged(true);
     // clang-format off
@@ -472,6 +501,7 @@ void CodeEditorPlugin::persistState() {
     if (m_persistenceInFlight || m_repository == nullptr) {
         return;
     }
+
     m_persistenceInFlight = true;
     const quint64 revision = m_stateRevision;
     const QVector<CodeWorkspaceState> snapshot = m_workspaces;
@@ -505,6 +535,7 @@ CodeWorkspaceState* CodeEditorPlugin::workspace(const QString& workspaceId) {
             return &current;
         }
     }
+
     return nullptr;
 }
 

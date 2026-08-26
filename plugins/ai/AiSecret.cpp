@@ -30,9 +30,11 @@ utils::Result<QString> resolveSecret(const QString& secret) {
 
     const QString name = environmentReferenceName(secret);
     const QString value = qEnvironmentVariable(name.toLatin1().constData());
+
     if (value.isEmpty()) {
         return utils::Result<QString>::failure({"ai_secret_environment_missing", "The referenced environment variable is not set", name});
     }
+
     return utils::Result<QString>::success(value);
 }
 

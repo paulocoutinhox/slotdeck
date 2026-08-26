@@ -52,6 +52,7 @@ TEST(LogsPluginTest, ParsesRowsAndRejectsCorruptStoredDetails) {
 
     const QStringList invalidFields{QStringLiteral("sequence"), QStringLiteral("timestamp_utc"), QStringLiteral("source_plugin_id"), QStringLiteral("level"), QStringLiteral("category"), QStringLiteral("message"), QStringLiteral("details_json")};
     const QVariantList invalidValues{0, QStringLiteral("2026-08-14T12:00:00.000-03:00"), QString{}, QStringLiteral("fatal"), QString{}, QString{}, QStringLiteral("[")};
+
     for (qsizetype index = 0; index < invalidFields.size(); ++index) {
         auto corrupted = host.databaseRows;
         corrupted.first()[invalidFields.at(index)] = invalidValues.at(index);
@@ -59,6 +60,7 @@ TEST(LogsPluginTest, ParsesRowsAndRejectsCorruptStoredDetails) {
         EXPECT_EQ(test::awaitFuture(plugin.entries(0, 100)).error().code, QStringLiteral("logs_entry_invalid"));
         host.databaseRows = {{{QStringLiteral("sequence"), 1}, {QStringLiteral("timestamp_utc"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)}, {QStringLiteral("source_plugin_id"), QStringLiteral("terminal")}, {QStringLiteral("level"), QStringLiteral("error")}, {QStringLiteral("category"), QStringLiteral("terminal.process")}, {QStringLiteral("message"), QStringLiteral("Exited")}, {QStringLiteral("details_json"), QStringLiteral("{}")}}};
     }
+
     host.databaseRows.first()[QStringLiteral("sequence")] = 1.5;
     EXPECT_EQ(test::awaitFuture(plugin.entries(0, 100)).error().code, QStringLiteral("logs_entry_invalid"));
 }
@@ -82,12 +84,14 @@ TEST(LogsPluginTest, RequiresConfirmationBeforeClearingFromTheViewer) {
     EXPECT_EQ(table->geometry().right(), view->rect().right());
     EXPECT_EQ(table->geometry().bottom(), view->rect().bottom());
     QPushButton* clear = nullptr;
+
     for (auto* button : view->findChildren<QPushButton*>()) {
         if (button->text() == QStringLiteral("logs.viewer.clear")) {
             clear = button;
             break;
         }
     }
+
     ASSERT_NE(clear, nullptr);
 
     host.confirmation = false;
