@@ -424,6 +424,9 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A notification a program posts is shown through the shared toast overlay, where every other message of the application is shown.
 - The render snapshot is read only through the lock that guards it, and a surface painting one works on the copy it took rather than on whatever the next refresh has already replaced.
 - PTY output and input queues remain bounded.
+- A notifier stops watching at once and is destroyed when the event loop returns to it, because the read it is delivering is what closes the terminal it was watching.
+- The last thing a program wrote reaches the reader before the reader is told that program ended, whatever order the bytes and the end of the stream were read in.
+- A value a waiting thread reads under a lock is changed under that same lock, because a change only announced beside it is a notification nobody was waiting for yet.
 - Missing directories and unavailable shell profiles are explicit startup failures.
 - Themes own foreground, background, cursor and all sixteen ANSI base colors.
 - Resolving an ANSI theme requires an identifier already validated against the catalog and no caller resolves a literal identifier, and an identifier nobody declares is answered rather than thrown.
@@ -1444,7 +1447,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 344 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 345 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
@@ -1465,6 +1468,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Typing while a large file is being read keeps what was typed and reports the conflict instead of losing it.
 - [x] A second save asked for while the first is still being written reaches the file.
 - [x] A connection that bursts more than any request may occupy is refused and the server keeps serving.
+- [x] The real pseudo-terminal starts a shell, delivers what it wrote and reports its exit after it.
+- [x] Nothing destroys a socket notifier from inside the read that notifier is delivering.
 - [x] A full review with the sanitizers, Cppcheck, clang-tidy and hand inspection found no orphan translation key, no unused theme role or icon, no legacy marker and no plugin that clears its host before its asynchronous context.
 - [x] The language-server transport disconnects from the process it abandons, so a read already queued never reaches it without one.
 - [x] A request that was given its turn and stopped before hearing about it returns that turn, so a provider limited to one request at a time keeps admitting.

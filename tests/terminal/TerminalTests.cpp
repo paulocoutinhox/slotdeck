@@ -10,6 +10,7 @@
 #include "terminal/TerminalSession.h"
 #include "terminal/TerminalShortcuts.h"
 #include "terminal/TerminalThemeCatalog.h"
+#include "terminal/platform/posix/PosixPtyBackend.h"
 #include "ui/ApplicationShortcuts.h"
 #include "ui/Components.h"
 #include "ui/FindBar.h"
@@ -403,6 +404,32 @@ TEST(ShellProfileTest, QuotesLocalPathsAndResolvesExecutableProfiles) {
     EXPECT_TRUE(QFileInfo(fromAccount.executable).isExecutable());
 #endif
 }
+
+#ifndef Q_OS_WIN
+TEST(PosixPtyBackendTest, DeliversWhatAProgramWroteBeforeItReportsThatItEnded) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    terminalcore::PosixPtyBackend backend;
+    QByteArray received;
+    bool wroteBeforeExit = false;
+    bool exited = false;
+    // clang-format off
+    QObject::connect(&backend, &terminalcore::IPtyBackend::outputReady, &backend, [&received](const QByteArray& bytes) { received.append(bytes); });
+    QObject::connect(&backend, &terminalcore::IPtyBackend::processExited, &backend, [&](int) { wroteBeforeExit = received.contains(QByteArrayLiteral("SDMARK")); exited = true; });
+    // clang-format on
+
+    const terminalcore::ShellProfile profile = terminalcore::ShellProfileResolver::systemDefault();
+    ASSERT_TRUE(backend.start(profile, directory.path(), directory.filePath(QStringLiteral("history")), 80, 24).hasValue());
+    ASSERT_TRUE(backend.running());
+    ASSERT_TRUE(backend.write(QByteArrayLiteral("printf 'SD%s\\n' MARK; exit 0\n")).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return exited; }));
+    // clang-format on
+
+    EXPECT_TRUE(wroteBeforeExit);
+    EXPECT_FALSE(backend.running());
+}
+#endif
 
 TEST(TerminalThemeCatalogTest, ProvidesCompleteThemesAndRejectsUnknownTheme) {
     const auto& themes = terminalcore::terminalThemes();

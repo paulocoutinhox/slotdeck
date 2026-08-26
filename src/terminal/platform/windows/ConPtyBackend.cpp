@@ -198,8 +198,12 @@ utils::Result<void> ConPtyBackend::resize(int columns, int rows, int, int) {
     return utils::Result<void>::success();
 }
 
+// The reader waits on this under its own lock, so the change is made under that lock and never only announced beside it.
 void ConPtyBackend::setOutputPaused(bool paused) {
-    m_outputPaused = paused;
+    {
+        const std::lock_guard lock(m_outputMutex);
+        m_outputPaused = paused;
+    }
     if (!paused) {
         m_outputCondition.notify_all();
     }

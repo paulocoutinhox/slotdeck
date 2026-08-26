@@ -322,8 +322,7 @@ void PosixPtyBackend::setOutputPaused(bool paused) {
 void PosixPtyBackend::terminate() {
     m_exitTimer.stop();
     m_directoryTimer.stop();
-    m_readNotifier.reset();
-    m_writeNotifier.reset();
+    releaseNotifiers();
     m_pendingInput.clear();
     m_lastWorkingDirectory.clear();
     m_outputPaused = false;
@@ -346,6 +345,7 @@ bool PosixPtyBackend::running() const {
 void PosixPtyBackend::drainOutput() {
     std::array<char, 64 * 1024> buffer{};
     QByteArray batch;
+    bool ended = false;
 
     for (;;) {
         const ssize_t count = ::read(m_descriptor, buffer.data(), buffer.size());
@@ -357,7 +357,7 @@ void PosixPtyBackend::drainOutput() {
             continue;
         }
         if (count == 0 || (count < 0 && errno == EIO)) {
-            checkProcess();
+            ended = true;
             break;
         }
         if (errno == EINTR) {
@@ -371,6 +371,10 @@ void PosixPtyBackend::drainOutput() {
 
     if (!batch.isEmpty()) {
         emit outputReady(batch);
+    }
+    // The last thing a program wrote reaches the reader before the reader is told that program ended.
+    if (ended) {
+        checkProcess();
     }
 }
 
@@ -434,11 +438,27 @@ void PosixPtyBackend::closeDescriptor() {
     }
 }
 
+// A notifier is reached from the read it is delivering, so it stops watching at once and is destroyed once the event loop returns to it.
+void PosixPtyBackend::releaseNotifier(std::unique_ptr<QSocketNotifier>& notifier) {
+    if (notifier == nullptr) {
+        return;
+    }
+
+    QSocketNotifier* released = notifier.release();
+    released->setEnabled(false);
+    released->disconnect(this);
+    released->deleteLater();
+}
+
+void PosixPtyBackend::releaseNotifiers() {
+    releaseNotifier(m_readNotifier);
+    releaseNotifier(m_writeNotifier);
+}
+
 void PosixPtyBackend::finishProcess(int status) {
     m_exitTimer.stop();
     m_directoryTimer.stop();
-    m_readNotifier.reset();
-    m_writeNotifier.reset();
+    releaseNotifiers();
     m_pendingInput.clear();
     closeDescriptor();
     m_childProcessId = -1;

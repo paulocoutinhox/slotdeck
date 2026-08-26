@@ -32,6 +32,8 @@ class PosixPtyBackend final : public IPtyBackend {
 
   private:
     void closeDescriptor();
+    void releaseNotifier(std::unique_ptr<QSocketNotifier>& notifier);
+    void releaseNotifiers();
     void finishProcess(int status);
 
     int m_descriptor{-1};
