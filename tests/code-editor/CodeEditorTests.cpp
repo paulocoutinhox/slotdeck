@@ -2137,6 +2137,8 @@ TEST(CodeDocumentTest, WritesTheEditThatArrivedWhileTheEarlierSaveWasStillInFlig
 }
 
 TEST(CodeWorkspaceViewTest, SurvivesManyDocumentsOpenedEditedSavedAndClosedInOneWorkspace) {
+    // Thirty documents reach one serialized worker, so this wait is measured by what it asks for rather than by the default one condition gets.
+    constexpr int savingBudgetMilliseconds = 120000;
     filesystem::FileSystemService service;
     test::TestPluginHost host;
     host.useFileSystem(service);
@@ -2176,7 +2178,7 @@ TEST(CodeWorkspaceViewTest, SurvivesManyDocumentsOpenedEditedSavedAndClosedInOne
         }
         view.saveAll();
         // clang-format off
-        ASSERT_TRUE(test::waitUntil([&]() { for (int index = 0; index < documents->count(); ++index) { if (qobject_cast<CodeDocument*>(documents->widget(index))->dirty()) { return false; } } return true; })) << "round " << round << " left documents dirty, reported: " << failures.join(QStringLiteral(" | ")).toStdString();
+        ASSERT_TRUE(test::waitUntil([&]() { for (int index = 0; index < documents->count(); ++index) { if (qobject_cast<CodeDocument*>(documents->widget(index))->dirty()) { return false; } } return true; }, savingBudgetMilliseconds)) << "round " << round << " left documents dirty, reported: " << failures.join(QStringLiteral(" | ")).toStdString();
         // clang-format on
         while (documents->count() > 0) {
             documents->setCurrentIndex(0);

@@ -1201,6 +1201,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Concurrency tests synchronize through observable conditions and never depend on arbitrary sleeps.
 - Asynchronous waiting uses `slotdeck::test::waitUntil` inside a GoogleTest assertion so an expired condition fails the test instead of ending it silently.
 - The asynchronous wait budget scales with the toolchain so an instrumented build waits longer for the same condition instead of relaxing the assertion.
+- A wait whose condition is many operations carries a budget measured by that count rather than the default one condition gets, because a case sitting at the edge of its budget fails whenever the machine is busy and teaches nobody anything.
+- A case that waits for work to finish reports what the work said when it failed, so a real failure is never read as slowness.
 - The registered case timeout scales with the same toolchain and always stays above that wait budget, so an expired condition fails its assertion instead of killing the process.
 - A case chains many of those conditions and the registered timeout covers the whole case, so that timeout stays far above the per-condition budget and only a stuck process is killed.
 - The discovery of a suite has its own timeout, because a suite that links Qt WebEngine needs seconds to answer the listing on a cold runner and the default of five seconds fails the whole run.
