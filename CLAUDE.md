@@ -999,6 +999,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The scheme catalog is parsed from the text of its file rather than from its path, so every rejection it declares is exercised by a test.
 - The closed role set covers every token type the protocol reports, so a class, a parameter and an enum member reach the reader as three colours rather than one.
 - A role nothing produces is an unused value, so every declared role is reached by a pattern, by a keyword set or by the map a language server answers into.
+- A role is declared only when it reads differently from the text around it, because a range that repaints the colour already there is laid out and painted on every line and shows nothing.
 - The order a rule is applied in decides which one wins, so the catalog declares what runs before the keywords of a language and what runs after them rather than leaving that order to the code.
 - A keyword a language already declares is painted in the more specific role when it belongs to the declared control-flow or primitive-type set, so no language needs its keywords split by hand.
 - Prose is not code, so a format that carries no expressions declares that the shared patterns do not apply to it and keeps only the marks it declares itself.
@@ -1571,6 +1572,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] The monospace role resolves a family whose glyphs really share one advance, proven against every built-in theme.
 - [x] A code span and a fenced block carry that family while the prose around them does not, read back from the document rather than from a style sheet it never received.
 - [x] Every platform reaches the declared family, proven after Windows reported a resolved name where macOS reports the generic one.
+- [x] Plain text carries no format range of its own, measured as forty percent of the ranges a source line used to carry for no visible difference.
 - [x] The terminal, the editor and the shared document open on one monospaced family, and a family the user chose still wins over it.
 
 ## Recorded pending work

@@ -75,9 +75,6 @@
         "operator": {
           "foreground": "#56b6c2"
         },
-        "punctuation": {
-          "foreground": "#abb2bf"
-        },
         "preprocessor": {
           "foreground": "#c678dd"
         },
@@ -189,9 +186,6 @@
         },
         "operator": {
           "foreground": "#0184bc"
-        },
-        "punctuation": {
-          "foreground": "#383a42"
         },
         "preprocessor": {
           "foreground": "#a626a4"
@@ -305,9 +299,6 @@
         "operator": {
           "foreground": "#859900"
         },
-        "punctuation": {
-          "foreground": "#839496"
-        },
         "preprocessor": {
           "foreground": "#cb4b16"
         },
@@ -419,9 +410,6 @@
         },
         "operator": {
           "foreground": "#859900"
-        },
-        "punctuation": {
-          "foreground": "#657b83"
         },
         "preprocessor": {
           "foreground": "#cb4b16"

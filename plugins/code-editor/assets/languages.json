@@ -1172,10 +1172,6 @@
         "role": "operator"
       },
       {
-        "pattern": "[{}()\\[\\];,.]",
-        "role": "punctuation"
-      },
-      {
         "pattern": "\\b[A-Z][A-Za-z0-9_]*\\b",
         "role": "type"
       },

@@ -12,7 +12,7 @@
 namespace slotdeck::plugins::codeeditor {
 
 // The set covers every token type the protocol reports, so nothing a language server knows is collapsed into a role that loses it.
-enum class HighlightRole { Text, Keyword, ControlFlow, PrimitiveType, Type, Namespace, Enumeration, Constant, Function, Method, Macro, Parameter, Variable, Property, Number, String, Regexp, Comment, Operator, Punctuation, Preprocessor, Label, Decorator, Attribute, Heading, Emphasis, Strong, Link, Markup, CodeSpan };
+enum class HighlightRole { Text, Keyword, ControlFlow, PrimitiveType, Type, Namespace, Enumeration, Constant, Function, Method, Macro, Parameter, Variable, Property, Number, String, Regexp, Comment, Operator, Preprocessor, Label, Decorator, Attribute, Heading, Emphasis, Strong, Link, Markup, CodeSpan };
 
 [[nodiscard]] const QVector<HighlightRole>& highlightRoles();
 [[nodiscard]] QString highlightRoleIdentifier(HighlightRole role);

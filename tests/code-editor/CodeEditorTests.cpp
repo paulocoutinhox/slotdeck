@@ -20,6 +20,7 @@
 #include <QAction>
 #include <QCompleter>
 #include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QFileSystemModel>
 #include <QFontDatabase>
@@ -2430,7 +2431,8 @@ TEST(CodeColorSchemeTest, PaintsOneSourceLineInManyColoursRatherThanTwo) {
     const QString source = QStringLiteral("#include <vector>\nint Widget::count(int limit) const {\n    // counts\n    const int total = 42 + LIMIT;\n    return format(total, \"done\");\n}\n");
     const QSet<QRgb> colors = highlightedColors(QStringLiteral("main.cpp"), source, scheme);
 
-    EXPECT_GE(colors.size(), 8) << "the file is still painted in a handful of colours";
+    // Plain text carries no format of its own, because a range that repaints the colour already there is paid for on every line and shows nothing.
+    EXPECT_GE(colors.size(), 7) << "the file is still painted in a handful of colours";
     EXPECT_TRUE(colors.contains(scheme.color(HighlightRole::ControlFlow).rgb())) << "return does not read as control flow";
     EXPECT_TRUE(colors.contains(scheme.color(HighlightRole::PrimitiveType).rgb())) << "int does not read as a primitive type";
     EXPECT_TRUE(colors.contains(scheme.color(HighlightRole::Comment).rgb()));
