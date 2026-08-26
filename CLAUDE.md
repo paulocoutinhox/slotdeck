@@ -1570,6 +1570,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A plain text file is not painted as code, and a Markdown document keeps only the marks it declares itself.
 - [x] The monospace role resolves a family whose glyphs really share one advance, proven against every built-in theme.
 - [x] A code span and a fenced block carry that family while the prose around them does not, read back from the document rather than from a style sheet it never received.
+- [x] Every platform reaches the declared family, proven after Windows reported a resolved name where macOS reports the generic one.
 - [x] The terminal, the editor and the shared document open on one monospaced family, and a family the user chose still wins over it.
 
 ## Recorded pending work
