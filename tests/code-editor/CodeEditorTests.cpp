@@ -2121,6 +2121,57 @@ TEST(CodeDocumentTest, WritesTheEditThatArrivedWhileTheEarlierSaveWasStillInFlig
     EXPECT_EQ(QString::fromUtf8(stored.value()), QStringLiteral("later"));
 }
 
+TEST(CodeWorkspaceViewTest, SurvivesManyDocumentsOpenedEditedSavedAndClosedInOneWorkspace) {
+    filesystem::FileSystemService service;
+    test::TestPluginHost host;
+    host.useFileSystem(service);
+    QTemporaryDir root;
+    ASSERT_TRUE(root.isValid());
+    QStringList paths;
+    for (int index = 0; index < 30; ++index) {
+        const QString path = QDir(root.path()).filePath(QStringLiteral("source-%1.cpp").arg(index));
+        ASSERT_TRUE(test::awaitFuture(service.createFile(path)).hasValue());
+        ASSERT_TRUE(test::awaitFuture(service.writeFile(path, QByteArrayLiteral("int value = 0;\n"))).hasValue());
+        paths.append(path);
+    }
+
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    CodeWorkspaceView view({QStringLiteral("workspace"), root.path(), 0, true, now, now, {}}, {}, false, CodeEditorFont{}, TextCharset::Latin1, host);
+    auto* documents = view.findChild<ui::TabWidget*>(QStringLiteral("codeEditorDocuments"));
+    ASSERT_NE(documents, nullptr);
+
+    QSignalSpy openFailures(&view, &CodeWorkspaceView::operationFailed);
+    for (int round = 0; round < 3; ++round) {
+        for (const auto& path : paths) {
+            view.openFile(path);
+        }
+        ASSERT_EQ(openFailures.count(), 0) << openFailures.first().first().toString().toStdString();
+        // clang-format off
+        ASSERT_TRUE(test::waitUntil([&]() { return documents->count() == paths.size(); }));
+        // clang-format on
+        for (int index = 0; index < documents->count(); ++index) {
+            auto* document = qobject_cast<CodeDocument*>(documents->widget(index));
+            ASSERT_NE(document, nullptr);
+            document->editor().appendPlainText(QStringLiteral("int added = %1;").arg(round));
+        }
+        view.saveAll();
+        // clang-format off
+        ASSERT_TRUE(test::waitUntil([&]() { for (int index = 0; index < documents->count(); ++index) { if (qobject_cast<CodeDocument*>(documents->widget(index))->dirty()) { return false; } } return true; }));
+        // clang-format on
+        while (documents->count() > 0) {
+            documents->setCurrentIndex(0);
+            view.closeCurrentDocument();
+        }
+        QApplication::processEvents();
+    }
+
+    // Every edit of every round reached the file, so nothing was dropped by a save that raced a close.
+    const auto stored = test::awaitFuture(service.readFile(paths.first(), 4096));
+    ASSERT_TRUE(stored.hasValue());
+    EXPECT_TRUE(QString::fromUtf8(stored.value()).contains(QStringLiteral("int added = 2;")));
+    EXPECT_EQ(documents->count(), 0);
+}
+
 TEST(CodeWorkspaceViewTest, TracksExternalTreeChangesAndRejectsSymlinkEscape) {
     filesystem::FileSystemService service;
     test::TestPluginHost host;

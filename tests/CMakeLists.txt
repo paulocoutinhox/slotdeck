@@ -14,19 +14,26 @@ if(SLOTDECK_ENABLE_SANITIZERS)
     set(SLOTDECK_TEST_TIMEOUT 900)
 endif()
 
+set(SLOTDECK_TEST_INCLUDE_DIRECTORIES
+    ${googletest_SOURCE_DIR}/googletest/include
+    ${googletest_SOURCE_DIR}/googlemock/include
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_BINARY_DIR}/generated
+)
+
+# The entry point carries the fixture servers every suite starts, so it is compiled once and linked by all of them.
+qt_add_library(SlotDeckTestMain OBJECT TestMain.cpp)
+target_include_directories(SlotDeckTestMain BEFORE PRIVATE ${SLOTDECK_TEST_INCLUDE_DIRECTORIES})
+target_link_libraries(SlotDeckTestMain PUBLIC GTest::gtest GTest::gmock Qt6::Test Qt6::Widgets)
+slotdeck_set_warnings(SlotDeckTestMain)
+slotdeck_enable_coverage(SlotDeckTestMain)
+slotdeck_enable_sanitizers(SlotDeckTestMain)
+
 function(slotdeck_add_test_suite target)
-    qt_add_executable(${target} ${ARGN} TestMain.cpp)
-    target_include_directories(
-        ${target}
-        BEFORE
-        PRIVATE
-            ${googletest_SOURCE_DIR}/googletest/include
-            ${googletest_SOURCE_DIR}/googlemock/include
-            ${CMAKE_CURRENT_SOURCE_DIR}
-            ${PROJECT_SOURCE_DIR}/src
-            ${PROJECT_BINARY_DIR}/generated
-    )
-    target_link_libraries(${target} PRIVATE GTest::gtest GTest::gmock Qt6::Test)
+    qt_add_executable(${target} ${ARGN})
+    target_include_directories(${target} BEFORE PRIVATE ${SLOTDECK_TEST_INCLUDE_DIRECTORIES})
+    target_link_libraries(${target} PRIVATE SlotDeckTestMain GTest::gtest GTest::gmock Qt6::Test)
     slotdeck_set_warnings(${target})
     slotdeck_enable_coverage(${target})
     slotdeck_enable_sanitizers(${target})

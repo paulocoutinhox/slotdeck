@@ -51,6 +51,10 @@ bool CodeWorkspaceViewHelper::validEntryName(const QString& name) {
 }
 
 CodeWorkspaceView::CodeWorkspaceView(CodeWorkspaceState state, QVector<ResolvedLanguageServer> languageServers, bool wordWrap, CodeEditorFont font, TextCharset defaultCharset, PluginHost& host, QWidget* parent) : QWidget(parent), m_initialState(std::move(state)), m_defaultCharset(defaultCharset), m_host(host), m_fileModel(new QFileSystemModel(this)), m_tree(new QTreeView(this)), m_documents(new ui::TabWidget(host.theme(), this)), m_problems(new QTreeWidget(this)), m_references(new QTreeWidget(this)), m_symbols(new QTreeWidget(this)), m_symbolSearch(new QLineEdit(this)), m_bottomPanel(new ui::TabWidget(host.theme(), this)), m_availableLanguageServers(std::move(languageServers)), m_wordWrapEnabled(wordWrap), m_font(std::move(font)) {
+    // Containment compares canonical paths, so the root it compares against is resolved here rather than trusted from whoever opened the workspace.
+    if (const QString canonicalRoot = QFileInfo(m_initialState.rootPath).canonicalFilePath(); !canonicalRoot.isEmpty()) {
+        m_initialState.rootPath = canonicalRoot;
+    }
     m_fileModel->setFilter(QDir::AllDirs | QDir::Files | QDir::NoDotAndDotDot);
     m_fileModel->setReadOnly(true);
     m_fileModel->setRootPath(m_initialState.rootPath);

@@ -754,6 +754,49 @@ TEST(GhosttyTerminalAdapterTest, ReportsTheMouseAndTheFocusOnlyToAProgramThatAsk
     EXPECT_EQ(lost.value(), QByteArrayLiteral("\x1b[O"));
 }
 
+TEST(WorkspaceManagerTest, SurvivesManyTerminalsCreatedClosedAndMovedAcrossTabsAndLayouts) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    test::TestPluginHost host;
+    plugins::terminalplugin::TerminalWorkspaceRepository repository(host);
+    // clang-format off
+    terminalcore::PtyBackendFactory factory = []() { return std::unique_ptr<terminalcore::IPtyBackend>(std::make_unique<FakePtyBackend>()); };
+    // clang-format on
+    workspace::WorkspaceManager manager(repository, host, directory.path(), *terminalcore::terminalTheme(QStringLiteral("balanced")), std::move(factory));
+    ASSERT_TRUE(manager.initialize().hasValue());
+
+    const QStringList presets{QStringLiteral("single"), QStringLiteral("2-columns"), QStringLiteral("2-rows"), QStringLiteral("grid-4")};
+    for (int round = 0; round < 40; ++round) {
+        manager.createTab();
+        manager.changeLayout(presets.at(round % presets.size()));
+        QStringList created;
+        for (int index = 0; index < 4; ++index) {
+            const QString sessionId = manager.createTerminal(index);
+            if (!sessionId.isEmpty()) {
+                created.append(sessionId);
+            }
+        }
+        for (const auto& sessionId : created) {
+            manager.moveToShelf(sessionId);
+        }
+        for (const auto& sessionId : created) {
+            manager.assignToSlot(sessionId, 0);
+        }
+        for (const auto& sessionId : created) {
+            manager.closeTerminal(sessionId);
+        }
+        QApplication::processEvents();
+        manager.closeTab(manager.currentTabIndex());
+        QApplication::processEvents();
+    }
+
+    // Every round left the workspace consistent, so the reader still has exactly what the first tab opened with.
+    EXPECT_EQ(manager.rowCount(), 1);
+    EXPECT_EQ(manager.terminalCount(), 1);
+    EXPECT_FALSE(manager.currentFocusedSessionId().isEmpty());
+    EXPECT_EQ(manager.currentTabIndex(), 0);
+}
+
 TEST(WorkspaceManagerTest, ManagesTabsSessionsLayoutsAndInvalidOperations) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());

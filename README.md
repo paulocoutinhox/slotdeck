@@ -96,7 +96,6 @@ python3 make.py run --configuration Debug
 | --- | --- |
 | **all** | Check formatting, build and run the registered test suites |
 | **build** | Compile the selected configuration |
-| **clang-format** | Explicitly format first-party C and C++ sources with Clang-Format |
 | **clean** | Clean the selected build directory |
 | **configure** | Generate Ninja build files with CMake |
 | **coverage** | Generate HTML and Cobertura reports with full line and branch gates |
@@ -105,6 +104,7 @@ python3 make.py run --configuration Debug
 | **format** | Format first-party C and C++ sources |
 | **format-check** | Validate formatting without changing files |
 | **lint** | Run Cppcheck warning, performance and portability analysis |
+| **models** | Rewrite the AI model catalog from a LiteLLM checkout |
 | **package** | Create the native release package |
 | **reset-data** | Remove the application database and every plugin state |
 | **run** | Build and start the application |

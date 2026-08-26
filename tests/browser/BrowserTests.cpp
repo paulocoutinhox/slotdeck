@@ -124,6 +124,49 @@ TEST(BrowserPluginTest, RestoresMutatesAndPersistsTheCompleteTabSession) {
     EXPECT_EQ(plugin.updateTabTitle(plugin.tabs().first().id, {}).error().code, QStringLiteral("browser_tab_title_invalid"));
     EXPECT_EQ(plugin.setHomepage(QStringLiteral("invalid value")).error().code, QStringLiteral("browser_address_invalid"));
 }
+TEST(BrowserPluginTest, KeepsTabsAndBookmarksCompleteThroughManyRoundsOfMutation) {
+    auto host = BrowserTestsHelper::browserHost();
+    BrowserPlugin plugin;
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+
+    const auto firstGroup = plugin.createBookmarkGroup(QStringLiteral("First"));
+    ASSERT_TRUE(firstGroup.hasValue());
+    const auto secondGroup = plugin.createBookmarkGroup(QStringLiteral("Second"));
+    ASSERT_TRUE(secondGroup.hasValue());
+
+    for (int round = 0; round < 25; ++round) {
+        QStringList openedTabs;
+        for (int index = 0; index < 6; ++index) {
+            const auto created = plugin.createTab(QUrl(QStringLiteral("https://example.com/%1/%2").arg(round).arg(index)), index % 2 == 0);
+            ASSERT_TRUE(created.hasValue());
+            openedTabs.append(created.value());
+        }
+        ASSERT_TRUE(plugin.moveTab(static_cast<int>(plugin.tabs().size()) - 1, 0).hasValue());
+        ASSERT_TRUE(plugin.activateTab(openedTabs.first()).hasValue());
+
+        const auto bookmark = plugin.createBookmark(QStringLiteral("Entry %1").arg(round), QStringLiteral("https://example.com/%1").arg(round), round % 2 == 0 ? firstGroup.value() : secondGroup.value());
+        ASSERT_TRUE(bookmark.hasValue());
+
+        QVector<BrowserBookmarkPlacement> placements;
+        for (const auto& entry : plugin.bookmarks()) {
+            placements.prepend({entry.id, entry.groupId == firstGroup.value() ? secondGroup.value() : firstGroup.value()});
+        }
+        ASSERT_TRUE(plugin.applyBookmarkLayout({secondGroup.value(), firstGroup.value()}, placements).hasValue());
+
+        for (const auto& tabId : openedTabs) {
+            ASSERT_TRUE(plugin.closeTab(tabId).hasValue());
+        }
+        ASSERT_TRUE(plugin.removeBookmark(bookmark.value()).hasValue());
+    }
+
+    // Every round left the session exactly as it found it, so nothing was orphaned by a layout applied over a mutation.
+    EXPECT_EQ(plugin.tabs().size(), 1);
+    EXPECT_TRUE(plugin.tabs().first().active);
+    EXPECT_TRUE(plugin.bookmarks().isEmpty());
+    EXPECT_EQ(plugin.bookmarkGroups().size(), 2);
+    plugin.shutdown();
+}
+
 TEST(BrowserPluginTest, HandlesOpenRequestsAndReportsPersistenceFailures) {
     auto host = BrowserTestsHelper::browserHost();
     BrowserPlugin plugin;

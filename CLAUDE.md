@@ -623,7 +623,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A provider descriptor declares its identifier, translated title, wire protocol, published address, whether that address is configurable, the environment variable its credential officially uses, whether it requires an API key, the traits it declares for a user-defined model, the models it opens with, its retry budget, its stream idle timeout, its extra request headers, its query parameters and its parameter descriptors.
 - A provider that requires a credential names the environment variable that credential officially lives in, because a form that asks for a key without saying where it normally is makes the user look it up.
 - A credential field opens already referencing the variable the service documents, because that is where the key normally lives and the user only edits it when it does not.
-- A self-hosted service is the only one whose address the user owns, and that address is asked for only while that service is selected and is validated as an HTTP or HTTPS address.
+- Only a self-hosted service owns its own address, which is asked for while such a service is selected and is validated as an HTTP or HTTPS address.
 - Every other provider answers at the address its descriptor publishes, so the stored connection carries none.
 - The only wire protocols are the Anthropic native API and the OpenAI-compatible API, and every other provider differs from those two only by address and model list.
 - A model descriptor declares its identifier, display name, context window, maximum output and the traits it supports.
@@ -918,6 +918,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - File creation, directory creation, rename, move and confirmed permanent removal validate absolute targets and never overwrite an existing destination.
 - Workspace policy resolves canonical paths and rejects traversal or symbolic-link escape before any file is opened or created.
 - Path containment always compares against the forward slash that `QDir::cleanPath` produces so a workspace behaves identically on every platform.
+- The workspace resolves the root it compares against rather than trusting the form it was opened with, because containment compares canonical paths and a root reached through a symbolic link would refuse every file inside it.
 - A path answered by a language server is resolved back to the document the workspace has open, because the same file is named with another case and another drive letter case on Windows.
 - The workspace root itself cannot be renamed, moved or removed from the editor tree.
 - Text documents accept UTF-8, UTF-8 with a byte order mark, UTF-16 little endian and UTF-16 big endian files up to sixteen mebibytes, and reject binary, oversized, unavailable or invalidly encoded files explicitly.
@@ -1168,6 +1169,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - CTest discovers every GoogleTest case independently and a missing test suite is an error.
 - Test targets reuse the production libraries or object libraries instead of recompiling alternate
   implementations.
+- The entry point carrying the fixture servers is one object library every suite links, because a source belongs to one target in the test tree exactly as it does in the product.
+- A lifetime a single case cannot reach is covered by a stress case that repeats it, because an order the platform decides shows up in repetition and the sanitizers turn it into a report.
 - Production code receives external dependencies through explicit interfaces and factories when
   deterministic testing requires a controlled implementation.
 - Fakes model PTY and host boundaries without shell processes, user state or external services.
@@ -1451,7 +1454,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 345 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 350 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
@@ -1476,6 +1479,12 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Nothing destroys a socket notifier from inside the read that notifier is delivering.
 - [x] A completed plugin request leaves no guard behind on the context it was given.
 - [x] The restart after an import destroys nothing while the request that asked for it is still on the stack.
+- [x] A workspace opened through a symbolic link opens every file inside it.
+- [x] Many terminals created, shelved, reassigned and closed across tabs and layouts leave the workspace exactly as they found it.
+- [x] Many documents opened, edited, saved and closed in one workspace keep every edit and leave no document behind.
+- [x] Many tabs and bookmarks mutated in rounds keep the stored layout complete.
+- [x] A long sequence of agent turns and stops reaches a terminal state for every run.
+- [x] A server started and stopped many times leaves nothing behind.
 - [x] A full review with the sanitizers, Cppcheck, clang-tidy and hand inspection found no orphan translation key, no unused theme role or icon, no legacy marker and no plugin that clears its host before its asynchronous context.
 - [x] The language-server transport disconnects from the process it abandons, so a read already queued never reaches it without one.
 - [x] A request that was given its turn and stopped before hearing about it returns that turn, so a provider limited to one request at a time keeps admitting.

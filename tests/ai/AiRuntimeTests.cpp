@@ -265,6 +265,27 @@ TEST(AiMcpClientTest, ServesToolsAgainAfterItWasStoppedAndStartedOnceMore) {
     AiMcpClient::drainTransports();
 }
 
+TEST(AiMcpClientTest, LeavesNothingBehindThroughManyStartAndStopCycles) {
+    McpServerDescriptor fixture;
+    fixture.id = QStringLiteral("fixture");
+    fixture.command = QCoreApplication::applicationFilePath();
+    fixture.arguments = {QStringLiteral("--slotdeck-test-mcp")};
+    AiMcpClient client(fixture);
+    QSignalSpy toolsChanged(&client, &AiMcpClient::toolsChanged);
+
+    for (int cycle = 1; cycle <= 12; ++cycle) {
+        client.start();
+        // clang-format off
+        ASSERT_TRUE(test::waitUntil([&]() { return toolsChanged.count() == cycle; }));
+        // clang-format on
+        ASSERT_EQ(client.tools().size(), 1);
+        client.stop();
+        EXPECT_FALSE(client.ready());
+    }
+
+    AiMcpClient::drainTransports();
+}
+
 TEST(AiCommandRunnerTest, KeepsOnlyTheReadableTextOfACommandThatDrawsInTheTerminal) {
     QString pending;
     const QString coloured = QString::fromUtf8("\x1b[36mhelp\x1b[0m    Show this help\n");
@@ -1835,6 +1856,54 @@ TEST(AiPluginTest, KeepsTheAssistantTextOfEveryIterationInsteadOfOnlyTheLast) {
     // clang-format off
     ASSERT_TRUE(test::waitUntil([&]() { return plugin.runState(task.id) == TaskRunState::Idle; }));
     // clang-format on
+
+    const auto executions = test::awaitFuture(plugin.executions(task.id));
+    ASSERT_TRUE(executions.hasValue());
+    plugin.shutdown();
+}
+
+TEST(AiPluginTest, ReachesATerminalStateForEveryRunOfALongSequenceOfTurnsAndStops) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiAgent agent = AiTestsHelper::testAgent();
+    agent.maximumIterations = 6;
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {}, {AiTestsHelper::testConnection()}, {agent});
+
+    FakeChatClient* client = nullptr;
+    // clang-format off
+    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+
+    for (int round = 0; round < 20; ++round) {
+        client = nullptr;
+        ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+        // clang-format off
+        ASSERT_TRUE(test::waitUntil([&]() { return client != nullptr && client->sendCalls == 1; }));
+        // clang-format on
+
+        const int turns = round % 3 + 1;
+        for (int turn = 0; turn < turns; ++turn) {
+            const int expected = client->sendCalls + 1;
+            client->deliverToolCalls({{QStringLiteral("call_%1").arg(turn), QStringLiteral("list_directory"), QJsonObject{}}});
+            // clang-format off
+            ASSERT_TRUE(test::waitUntil([&]() { return client->sendCalls == expected; }));
+            // clang-format on
+        }
+
+        // A run stopped in the middle of a turn ends exactly like one that answered, so the card never stays busy.
+        if (round % 2 == 0) {
+            ASSERT_TRUE(test::awaitFuture(plugin.stopTask(task.id)).hasValue());
+        } else {
+            client->deliver(QStringLiteral("answer %1").arg(round), {}, QStringLiteral("stop"));
+        }
+        // clang-format off
+        ASSERT_TRUE(test::waitUntil([&]() { return plugin.runState(task.id) == TaskRunState::Idle; }));
+        // clang-format on
+    }
 
     const auto executions = test::awaitFuture(plugin.executions(task.id));
     ASSERT_TRUE(executions.hasValue());
