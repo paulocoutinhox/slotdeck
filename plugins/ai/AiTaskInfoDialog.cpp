@@ -19,7 +19,6 @@
 #include <QSignalBlocker>
 #include <QStackedWidget>
 #include <QTableWidget>
-#include <QTextBrowser>
 #include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -168,10 +167,8 @@ AiTaskInfoDialog::AiTaskInfoDialog(AiPlugin& plugin, PluginHost& host, const AiT
 
     m_outputPages = new QStackedWidget(tabs);
     m_outputPages->setObjectName(QStringLiteral("aiOutputPages"));
-    m_content = new QTextBrowser(m_outputPages);
+    m_content = new ui::MarkdownView(m_host.theme(), m_outputPages);
     m_content->setObjectName(QStringLiteral("aiExecutionContent"));
-    m_content->setOpenExternalLinks(true);
-    m_content->setFrameShape(QFrame::NoFrame);
     m_outputEmpty = ui::emptyStateLabel({}, m_outputPages);
     m_outputEmpty->setObjectName(QStringLiteral("aiOutputEmpty"));
     m_outputPages->addWidget(m_content);
@@ -294,7 +291,7 @@ void AiTaskInfoDialog::showExecution(int row) {
     }
 
     const TaskExecution& execution = m_executions.at(row);
-    m_content->setMarkdown(execution.content);
+    m_content->setDocumentMarkdown(execution.content);
 
     if (execution.content.isEmpty()) {
         showOutputPlaceholder(outputPlaceholder(execution));

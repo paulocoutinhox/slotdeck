@@ -20,7 +20,10 @@
 #include <QSpinBox>
 #include <QTableWidget>
 #include <QTableWidgetItem>
+#include <QTextBlock>
+#include <QTextCursor>
 #include <QTextDocument>
+#include <QTextFragment>
 #include <QTimer>
 #include <QToolButton>
 #include <QTreeWidget>
@@ -307,7 +310,39 @@ class ComponentsHelper final {
   public:
     static QString hardBreaks(const QString& text);
     static QString emojiFontFamily();
+    static void resolveCodeFamily(QTextDocument* document, const QString& family);
 };
+
+// The Markdown reader marks code with the generic monospace name, which no platform installs, so the family it stands for is written in its place.
+void ComponentsHelper::resolveCodeFamily(QTextDocument* document, const QString& family) {
+    static const QStringList generic{QStringLiteral("monospace")};
+    QVector<QPair<int, int>> spans;
+
+    for (QTextBlock block = document->begin(); block.isValid(); block = block.next()) {
+        for (auto entry = block.begin(); entry != block.end(); ++entry) {
+            const QTextFragment fragment = entry.fragment();
+
+            if (fragment.isValid() && fragment.charFormat().fontFamilies().toStringList() == generic) {
+                spans.append({fragment.position(), fragment.length()});
+            }
+        }
+    }
+
+    if (spans.isEmpty()) {
+        return;
+    }
+
+    QTextCharFormat resolved;
+    resolved.setFontFamilies({family});
+    resolved.setFontFixedPitch(true);
+    QTextCursor cursor(document);
+
+    for (const auto& span : spans) {
+        cursor.setPosition(span.first);
+        cursor.setPosition(span.first + span.second, QTextCursor::KeepAnchor);
+        cursor.mergeCharFormat(resolved);
+    }
+}
 
 // A newline inside a fenced block is already a line of code, so only the prose between them is broken.
 QString ComponentsHelper::hardBreaks(const QString& text) {
@@ -373,10 +408,12 @@ void MarkdownView::setInk(const QColor& ink) {
 
 void MarkdownView::setDocumentMarkdown(const QString& text) {
     setMarkdown(text);
+    ComponentsHelper::resolveCodeFamily(document(), m_theme.font(ThemeFont::Monospace).family());
 }
 
 void MarkdownView::setChatMarkdown(const QString& text) {
     setMarkdown(ComponentsHelper::hardBreaks(text));
+    ComponentsHelper::resolveCodeFamily(document(), m_theme.font(ThemeFont::Monospace).family());
 }
 
 void MarkdownView::fitTo(int available) {

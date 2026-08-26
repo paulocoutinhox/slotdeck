@@ -32,6 +32,8 @@ struct LanguageDefinition final {
     QString blockCommentStart;
     QString blockCommentEnd;
     QVector<HighlightPattern> patterns;
+    // Prose is not code, so a format that carries no expressions declares that the shared patterns do not apply to it.
+    bool sharedPatterns{true};
 };
 
 struct LanguageServerCandidate final {

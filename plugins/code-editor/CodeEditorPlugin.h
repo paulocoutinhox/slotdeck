@@ -77,6 +77,7 @@ class CodeEditorPlugin final : public QObject, public PluginInterface {
     QVector<CodeWorkspaceState> m_workspaces;
     QVector<CodeWorkspaceState> m_committedWorkspaces;
     CodeEditorSettings m_settings;
+    CodeColorScheme m_colorScheme;
     CodeEditorSettings m_committedSettings;
     quint64 m_settingsRevision{0};
     QVector<ResolvedLanguageServer> m_languageServers;

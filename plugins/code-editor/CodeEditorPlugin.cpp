@@ -68,6 +68,9 @@ utils::Result<void> CodeEditorPlugin::initialize(PluginHost& host) {
     if (const auto& catalog = LanguageRegistry::catalogError(); !catalog.hasValue()) {
         return catalog;
     }
+    if (const auto& schemes = CodeColorSchemeCatalog::catalogError(); !schemes.hasValue()) {
+        return schemes;
+    }
 
     m_host = &host;
     m_asyncContext = std::make_unique<QObject>();
@@ -87,6 +90,14 @@ utils::Result<void> CodeEditorPlugin::initialize(PluginHost& host) {
     }
 
     m_settings = m_repository->loadSettings();
+    const CodeColorScheme* selected = CodeColorSchemeCatalog::scheme(m_settings.colorSchemeId);
+
+    if (selected == nullptr) {
+        shutdown();
+        return utils::Result<void>::failure({"code_editor_scheme_unavailable", "The selected code colour scheme is unavailable", m_settings.colorSchemeId});
+    }
+
+    m_colorScheme = *selected;
     m_workspaces = state.value();
     m_committedWorkspaces = m_workspaces;
     m_committedSettings = m_settings;
@@ -295,18 +306,20 @@ TextCharset CodeEditorPlugin::defaultCharset() const {
 
 // A scheme the catalog does not declare is refused rather than normalised into another one.
 void CodeEditorPlugin::setColorScheme(const QString& schemeId) {
-    if (m_settings.colorSchemeId == schemeId || m_repository == nullptr || !CodeColorSchemeCatalog::exists(schemeId)) {
+    const CodeColorScheme* selected = CodeColorSchemeCatalog::scheme(schemeId);
+
+    if (m_settings.colorSchemeId == schemeId || m_repository == nullptr || selected == nullptr) {
         return;
     }
 
     m_settings.colorSchemeId = schemeId;
+    m_colorScheme = *selected;
     emit colorSchemeChanged();
     persistSettings();
 }
 
 const CodeColorScheme& CodeEditorPlugin::colorScheme() const {
-    const CodeColorScheme* selected = CodeColorSchemeCatalog::scheme(m_settings.colorSchemeId);
-    return selected != nullptr ? *selected : CodeColorSchemeCatalog::schemes().first();
+    return m_colorScheme;
 }
 
 void CodeEditorPlugin::setEditorFontFamily(const QString& family) {

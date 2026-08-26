@@ -1,5 +1,6 @@
 #include "CodeEditorWidget.h"
 
+#include "ui/Components.h"
 #include "ui/Theme.h"
 
 #include <QAbstractItemView>
@@ -49,7 +50,8 @@ QColor CodeEditorWidgetHelper::severityColor(const ui::Theme& theme, int severit
     return theme.color(ui::ThemeColor::TextMuted);
 }
 
-CodeEditorWidget::CodeEditorWidget(const ui::Theme& theme, QWidget* parent) : QPlainTextEdit(parent), m_lineNumberArea(new LineNumberArea(*this)), m_theme(theme) {
+CodeEditorWidget::CodeEditorWidget(const ui::Theme& theme, const CodeColorScheme& scheme, QWidget* parent) : QPlainTextEdit(parent), m_lineNumberArea(new LineNumberArea(*this)), m_theme(theme) {
+    setColorScheme(scheme);
     QFont editorFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
     editorFont.setFixedPitch(true);
     setFont(editorFont);
@@ -124,7 +126,8 @@ int CodeEditorWidget::indentWidth() const {
 }
 
 void CodeEditorWidget::setEditorFont(const QString& family, int pointSize) {
-    QFont editorFont = family.isEmpty() ? QFontDatabase::systemFont(QFontDatabase::FixedFont) : QFont(family);
+    const QString resolved = family.isEmpty() ? ui::defaultMonospacedFontFamily() : family;
+    QFont editorFont = resolved.isEmpty() ? QFontDatabase::systemFont(QFontDatabase::FixedFont) : QFont(resolved);
     editorFont.setFixedPitch(true);
     editorFont.setStyleHint(QFont::Monospace);
     editorFont.setPointSize(pointSize);

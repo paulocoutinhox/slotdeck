@@ -230,7 +230,8 @@
           "pattern": "^\\s*(?:[-*+]|\\d+\\.)\\s+",
           "role": "markup"
         }
-      ]
+      ],
+      "sharedPatterns": false
     },
     {
       "fileNames": [
@@ -648,7 +649,8 @@
         "txt"
       ],
       "id": "plaintext",
-      "name": "Plain Text"
+      "name": "Plain Text",
+      "sharedPatterns": false
     }
   ],
   "servers": [

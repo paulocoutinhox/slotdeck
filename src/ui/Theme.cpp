@@ -1,5 +1,7 @@
 #include "ui/Theme.h"
 
+#include "ui/Components.h"
+
 #include <QApplication>
 
 #include <algorithm>
@@ -153,6 +155,11 @@ QFont ThemeHelper::themeFont(ThemeFont role) {
     }
 
     if (role == ThemeFont::Monospace) {
+        // A style sheet reads the family as a name, so the role resolves one instead of leaving a hint the sheet discards.
+        if (const QString family = defaultMonospacedFontFamily(); !family.isEmpty()) {
+            font.setFamily(family);
+        }
+
         font.setStyleHint(QFont::Monospace);
         font.setFixedPitch(true);
     }

@@ -16,7 +16,6 @@
 #include <QRegularExpression>
 #include <QSpinBox>
 #include <QTableWidget>
-#include <QTextBrowser>
 #include <QToolButton>
 #include <QVBoxLayout>
 
@@ -182,9 +181,9 @@ void AiAgentDialog::showTags() {
         rows.append(QStringLiteral("`{{%1}}` — %2").arg(tag.name, m_host.translate(tag.descriptionKey)));
     }
 
-    auto* content = new QTextBrowser(dialog);
+    auto* content = new ui::MarkdownView(m_host.theme(), dialog);
     content->setObjectName(QStringLiteral("aiAgentTagsContent"));
-    content->setMarkdown(rows.join(QStringLiteral("\n\n")));
+    content->setDocumentMarkdown(rows.join(QStringLiteral("\n\n")));
     layout->addWidget(content, 1);
 
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, dialog);

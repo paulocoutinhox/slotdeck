@@ -22,6 +22,7 @@
 #include <QCoreApplication>
 #include <QFile>
 #include <QFileSystemModel>
+#include <QFontDatabase>
 #include <QImage>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -170,7 +171,7 @@ TEST(CodeWorkspaceViewTest, OpensTheFileALocationPointsAtAndPlacesTheCursorOnIts
 }
 
 TEST(CodeEditorWidgetTest, MarksEveryDiagnosticAndCompletesWithTheTextTheServerDeclared) {
-    CodeEditorWidget editor(ui::themeManager().theme());
+    CodeEditorWidget editor(ui::themeManager().theme(), CodeColorSchemeCatalog::schemes().first());
     editor.setPlainText(QStringLiteral("int value = 0;\nvalue = 1;\n"));
     editor.show();
 
@@ -2581,7 +2582,7 @@ TEST(CodeColorSchemeTest, PaintsTheSurfaceOfTheSchemeRatherThanTheOneTheSharedSh
     test::TestPluginHost host;
     QWidget container;
     container.setStyleSheet(ui::applicationStyleSheet(host.theme()));
-    auto* editor = new CodeEditorWidget(host.theme(), &container);
+    auto* editor = new CodeEditorWidget(host.theme(), CodeColorSchemeCatalog::schemes().first(), &container);
     editor->resize(200, 120);
 
     for (const auto& scheme : CodeColorSchemeCatalog::schemes()) {
@@ -2594,6 +2595,49 @@ TEST(CodeColorSchemeTest, PaintsTheSurfaceOfTheSchemeRatherThanTheOneTheSharedSh
         EXPECT_EQ(drawn.rgb(), scheme.surface.background.rgb()) << scheme.id.toStdString() << " is drawn on a surface it does not own";
         EXPECT_NE(drawn.rgb(), host.theme().color(ui::ThemeColor::Window).rgb()) << scheme.id.toStdString() << " still reads the application window colour";
     }
+}
+
+// Prose is not code, so a format that carries no expressions is not painted with the patterns that read them.
+TEST(CodeColorSchemeTest, LeavesProseAloneInsteadOfPaintingItAsCode) {
+    const CodeColorScheme& scheme = CodeColorSchemeCatalog::schemes().first();
+    const QString prose = QStringLiteral("Meeting notes: don't forget the 3 items (a, b, c).\nAsk Maria about the Q4 plan.");
+
+    EXPECT_TRUE(highlightedColors(QStringLiteral("notes.txt"), prose, scheme).isEmpty()) << "a plain text file is painted as if it were code";
+
+    const LanguageDefinition* plain = LanguageRegistry::languageForId(QStringLiteral("plaintext"));
+    ASSERT_NE(plain, nullptr);
+    EXPECT_FALSE(plain->sharedPatterns);
+
+    const LanguageDefinition* markdown = LanguageRegistry::languageForId(QStringLiteral("markdown"));
+    ASSERT_NE(markdown, nullptr);
+    EXPECT_FALSE(markdown->sharedPatterns);
+
+    // A document keeps the marks it declares itself, so Markdown still reads as Markdown.
+    const QSet<QRgb> document = highlightedColors(QStringLiteral("README.md"), QStringLiteral("# Title\n\nIt doesn't matter, all 3 of them. See `code` and **bold**."), scheme);
+    EXPECT_TRUE(document.contains(scheme.color(HighlightRole::Heading).rgb()));
+    EXPECT_TRUE(document.contains(scheme.color(HighlightRole::CodeSpan).rgb()));
+    EXPECT_TRUE(document.contains(scheme.color(HighlightRole::Strong).rgb()));
+    EXPECT_FALSE(document.contains(scheme.color(HighlightRole::Number).rgb())) << "a number written in prose is coloured as a literal";
+
+    // A language that really is code still takes them.
+    EXPECT_TRUE(LanguageRegistry::languageForPath(QStringLiteral("main.cpp")).sharedPatterns);
+}
+
+// A terminal and an editor are both monospaced content surfaces, so they open on one family rather than resolving it two ways.
+TEST(CodeColorSchemeTest, OpensOnTheSameMonospacedFamilyTheTerminalDoes) {
+    test::TestPluginHost host;
+    ASSERT_FALSE(ui::monospacedFontFamilies().isEmpty());
+    const QString declared = ui::defaultMonospacedFontFamily();
+    ASSERT_FALSE(declared.isEmpty());
+
+    CodeEditorWidget editor(host.theme(), CodeColorSchemeCatalog::schemes().first());
+    editor.setEditorFont(QString{}, defaultEditorFontSize);
+
+    EXPECT_EQ(editor.font().family(), declared) << "the editor opens on a family the terminal would not";
+    EXPECT_TRUE(QFontDatabase::isFixedPitch(editor.font().family()));
+
+    editor.setEditorFont(ui::monospacedFontFamilies().last(), defaultEditorFontSize);
+    EXPECT_EQ(editor.font().family(), ui::monospacedFontFamilies().last()) << "a chosen family no longer wins over the declared one";
 }
 
 } // namespace slotdeck::plugins::codeeditor

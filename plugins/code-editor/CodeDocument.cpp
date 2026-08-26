@@ -156,9 +156,8 @@ QString CodeDocumentHelper::lineEndingText(LineEnding ending) {
     Q_UNREACHABLE_RETURN(QStringLiteral("\n"));
 }
 
-CodeDocument::CodeDocument(const QString& path, const QString& rootPath, bool wordWrap, CodeEditorFont font, CodeColorScheme scheme, TextCharset defaultCharset, PluginHost& host, QWidget* parent) : QWidget(parent), m_path(QDir::cleanPath(path)), m_rootPath(QDir::cleanPath(rootPath)), m_defaultCharset(defaultCharset), m_host(host), m_editor(new CodeEditorWidget(host.theme(), this)), m_findBar(new ui::FindBar(host.theme(), CodeDocumentHelper::findBarLabels(host), this)), m_language(LanguageRegistry::languageForPath(m_path)), m_scheme(std::move(scheme)) {
+CodeDocument::CodeDocument(const QString& path, const QString& rootPath, bool wordWrap, CodeEditorFont font, CodeColorScheme scheme, TextCharset defaultCharset, PluginHost& host, QWidget* parent) : QWidget(parent), m_path(QDir::cleanPath(path)), m_rootPath(QDir::cleanPath(rootPath)), m_defaultCharset(defaultCharset), m_host(host), m_editor(new CodeEditorWidget(host.theme(), scheme, this)), m_findBar(new ui::FindBar(host.theme(), CodeDocumentHelper::findBarLabels(host), this)), m_language(LanguageRegistry::languageForPath(m_path)), m_scheme(std::move(scheme)) {
     m_editor->setEditorFont(font.family, font.size);
-    m_editor->setColorScheme(m_scheme);
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);

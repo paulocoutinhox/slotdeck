@@ -10,7 +10,6 @@
 class QLabel;
 class QTableWidget;
 class QPushButton;
-class QTextBrowser;
 class QTimer;
 class QStackedWidget;
 
@@ -54,7 +53,7 @@ class AiTaskInfoDialog final : public QDialog {
     QTableWidget* m_executionGrid{nullptr};
     QTableWidget* m_logGrid{nullptr};
     QStackedWidget* m_outputPages{nullptr};
-    QTextBrowser* m_content{nullptr};
+    ui::MarkdownView* m_content{nullptr};
     QLabel* m_outputEmpty{nullptr};
     quint64 m_logRevision{0};
 };

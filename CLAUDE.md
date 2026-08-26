@@ -440,6 +440,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Theme changes apply to current and future sessions.
 - Font choices contain only installed monospaced families.
 - A monospaced surface opens on the first family a declared preference names that is installed, because the first family the system happens to list is not a font anyone chose.
+- Every monospaced surface resolves that family through one accessor, so a terminal, an editor and a document never open on three different fonts.
+- The monospace font role resolves a real family rather than a style hint, because a style sheet reads the family as a name and a hint means nothing to it.
 - A terminal cell is the glyph advance rounded to the nearest pixel and its row is the line spacing the font declares, because every cell is positioned explicitly and a cell wider or taller than the font asks for reads as a gap after every glyph and under every line.
 - A platform without an installed monospaced family keeps the terminal on the monospace style hint instead of resolving an empty family.
 - A shell runs every line a plain paste delivers, so text is handed over between the markers whenever the program asked to receive it that way, and the confirmation warns about text that would run rather than about text that merely wraps.
@@ -790,6 +792,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The box is a painted shape in the colour the theme gives that side, so its corner stays correct at any size and follows the selected theme.
 - A message that follows one from the same writer repeats no avatar and keeps the room that avatar would take, so the boxes of one group share an edge.
 - Every message of every role is Markdown read through the shared document, covering headings, emphasis, lists, quotes, links, tables, inline code, fenced code in the monospace role and emoji.
+- The Markdown reader marks code with a generic family name no platform installs, so the shared document writes the family that name stands for over the runs it marked.
+- A style sheet declared for a document reaches what is parsed as markup and never what is read as Markdown, so a rule about code is applied to the document rather than declared for it.
 - A chat message is written with the return key, so a single newline is a line break and only the prose between fenced blocks is broken that way.
 - A box is as wide as the words it carries up to seventy percent of the surface, because a wall of text edge to edge is not a conversation.
 - One rule measures every box, so a turn of tool calls is as wide as the longest line it carries exactly like a message is, and a line that wraps is measured from its text rather than from the width one word needs.
@@ -997,6 +1001,9 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A role nothing produces is an unused value, so every declared role is reached by a pattern, by a keyword set or by the map a language server answers into.
 - The order a rule is applied in decides which one wins, so the catalog declares what runs before the keywords of a language and what runs after them rather than leaving that order to the code.
 - A keyword a language already declares is painted in the more specific role when it belongs to the declared control-flow or primitive-type set, so no language needs its keywords split by hand.
+- Prose is not code, so a format that carries no expressions declares that the shared patterns do not apply to it and keeps only the marks it declares itself.
+- A colour scheme catalog a plugin cannot read rejects that plugin during initialization, exactly as an unreadable language catalog does.
+- A widget that owns a content surface receives that surface when it is built, because a widget that only has one after a second call has a state nobody can draw.
 - The catalog covers the common languages of the trade, from C and C++, Python, TypeScript, Go and Rust to PHP, Ruby, C#, Kotlin, Swift, Dart, Lua, SQL, TOML, XML and the configuration formats around them, without language-specific plugins.
 - Two languages never claim one extension, because the first that claims it answers for it and the second would never be reached, and the catalog ends with plain text because that is what an unknown file falls to.
 - The name of a language is declared once, with the language it names in that catalog, because a second copy in the translation catalog drifts and presents a key where a name belongs.
@@ -1486,7 +1493,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 372 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 375 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
@@ -1560,6 +1567,10 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Every token type a language server reports keeps a colour of its own, and every declared role is produced by something.
 - [x] The surface of a scheme reaches the screen, proven by reading the pixel the editor drew under the shared style sheet.
 - [x] Every malformed colour scheme the catalog declares a refusal for is refused from text.
+- [x] A plain text file is not painted as code, and a Markdown document keeps only the marks it declares itself.
+- [x] The monospace role resolves a family whose glyphs really share one advance, proven against every built-in theme.
+- [x] A code span and a fenced block carry that family while the prose around them does not, read back from the document rather than from a style sheet it never received.
+- [x] The terminal, the editor and the shared document open on one monospaced family, and a family the user chose still wins over it.
 
 ## Recorded pending work
 

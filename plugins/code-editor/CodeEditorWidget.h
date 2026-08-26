@@ -22,7 +22,7 @@ class CodeEditorWidget final : public QPlainTextEdit {
     Q_OBJECT
 
   public:
-    explicit CodeEditorWidget(const ui::Theme& theme, QWidget* parent = nullptr);
+    CodeEditorWidget(const ui::Theme& theme, const CodeColorScheme& scheme, QWidget* parent = nullptr);
 
     void setEditorFont(const QString& family, int pointSize);
 

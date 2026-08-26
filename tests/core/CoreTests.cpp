@@ -33,6 +33,8 @@
 #include <QEvent>
 #include <QFile>
 #include <QFileInfo>
+#include <QFontDatabase>
+#include <QFontMetricsF>
 #include <QFormLayout>
 #include <QHeaderView>
 #include <QLabel>
@@ -52,6 +54,8 @@
 #include <QTabWidget>
 #include <QTableWidget>
 #include <QTemporaryDir>
+#include <QTextBlock>
+#include <QTextFragment>
 #include <QTimeZone>
 #include <QTimer>
 #include <QToolButton>
@@ -1244,9 +1248,32 @@ TEST(MarkdownViewTest, ReadsAChatMessageWithItsLineBreaksAndACompleteMarkdownDoc
     EXPECT_TRUE(view.toHtml().contains(QStringLiteral("https://example.com")));
     EXPECT_TRUE(view.toHtml().contains(QStringLiteral("<table")));
 
-    // Code carries the monospace family, so a fenced block never reads as prose.
-    view.setChatMarkdown(QStringLiteral("```\nint a = 1;\n```"));
-    EXPECT_TRUE(view.toHtml().contains(manager.theme().font(ui::ThemeFont::Monospace).family()));
+    // The Markdown reader marks code with a generic family no platform installs, so what a code run really carries is read back from the document.
+    view.setChatMarkdown(QStringLiteral("prose `span` prose\n\n```\nint a = 1;\n```"));
+    const QString monospace = manager.theme().font(ui::ThemeFont::Monospace).family();
+    int codeRuns = 0;
+
+    for (QTextBlock block = view.document()->begin(); block.isValid(); block = block.next()) {
+        for (auto entry = block.begin(); entry != block.end(); ++entry) {
+            const QTextFragment fragment = entry.fragment();
+
+            if (!fragment.isValid()) {
+                continue;
+            }
+
+            const QStringList families = fragment.charFormat().fontFamilies().toStringList();
+
+            if (fragment.text().contains(QStringLiteral("span")) || fragment.text().contains(QStringLiteral("int a"))) {
+                ++codeRuns;
+                EXPECT_EQ(families, QStringList{monospace}) << fragment.text().toStdString() << " does not carry the monospace family";
+                EXPECT_TRUE(QFontDatabase::isFixedPitch(families.value(0))) << fragment.text().toStdString() << " carries a family that is not monospaced";
+            } else {
+                EXPECT_FALSE(families.contains(monospace)) << "prose carries the monospace family";
+            }
+        }
+    }
+
+    EXPECT_EQ(codeRuns, 2) << "the document does not carry a code span and a fenced block";
 
     // The reading size is the one it was given, because a content surface owns its own.
     view.setContentFontSize(20);
@@ -2261,6 +2288,22 @@ TEST(ApplicationTest, KeepsEverythingAliveWhileTheRestartItWasAskedForIsStillOnT
 
     // The deferred call is bound to the application, so leaving this scope cancels it rather than starting a process.
     application.shutdown();
+}
+
+// A style sheet reads the family as a name and discards the hint, so the role has to resolve a family that really is monospaced.
+TEST(ThemeFontTests, ResolvesTheMonospaceRoleToAFamilyThatReallyIsMonospaced) {
+    ASSERT_FALSE(ui::monospacedFontFamilies().isEmpty());
+
+    const ui::ThemeCatalog catalog;
+
+    for (const auto& theme : catalog.themes()) {
+        const QFont monospace = theme->font(ui::ThemeFont::Monospace);
+        EXPECT_TRUE(QFontDatabase::isFixedPitch(monospace.family())) << theme->id().toStdString() << " resolves " << monospace.family().toStdString() << ", which is not a monospaced family";
+
+        const QFontMetricsF metrics{QFont(monospace.family())};
+        EXPECT_DOUBLE_EQ(metrics.horizontalAdvance(QLatin1Char('i')), metrics.horizontalAdvance(QLatin1Char('W'))) << theme->id().toStdString() << " resolves a family whose glyphs do not share one advance";
+        EXPECT_NE(monospace.family(), QApplication::font().family()) << theme->id().toStdString() << " leaves the monospace role on the interface family";
+    }
 }
 
 } // namespace slotdeck

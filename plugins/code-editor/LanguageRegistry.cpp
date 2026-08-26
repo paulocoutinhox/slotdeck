@@ -24,7 +24,7 @@ class LanguageRegistryHelper final {
 };
 
 LanguageDefinition LanguageRegistryHelper::plainText() {
-    return {QStringLiteral("plaintext"), QStringLiteral("Plain Text"), {}, {}, {}, {}, {}, {}, {}};
+    return {QStringLiteral("plaintext"), QStringLiteral("Plain Text"), {}, {}, {}, {}, {}, {}, {}, false};
 }
 
 // The catalog is data, so a language or a server is added by one entry in the file and never by interface code.
@@ -151,6 +151,11 @@ QVector<LanguageDefinition> LanguageRegistryHelper::createLanguages() {
         language.lineComment = entry.value(QStringLiteral("lineComment")).toString();
         language.blockCommentStart = entry.value(QStringLiteral("blockCommentStart")).toString();
         language.blockCommentEnd = entry.value(QStringLiteral("blockCommentEnd")).toString();
+        if (entry.contains(QStringLiteral("sharedPatterns"))) {
+            valid = valid && entry.value(QStringLiteral("sharedPatterns")).isBool();
+            language.sharedPatterns = entry.value(QStringLiteral("sharedPatterns")).toBool(true);
+        }
+
         if (entry.contains(QStringLiteral("keywords"))) {
             valid = valid && entry.value(QStringLiteral("keywords")).isString();
             language.keywords = entry.value(QStringLiteral("keywords")).toString().split(QLatin1Char(' '), Qt::SkipEmptyParts);

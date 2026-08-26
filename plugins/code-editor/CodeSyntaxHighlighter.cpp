@@ -53,8 +53,10 @@ QStringList CodeSyntaxHighlighterHelper::keywordsOutside(const QStringList& keyw
 CodeSyntaxHighlighter::CodeSyntaxHighlighter(QTextDocument* document, LanguageDefinition definition, const CodeColorScheme& scheme) : QSyntaxHighlighter(document), m_definition(std::move(definition)) {
     m_commentFormat = scheme.format(HighlightRole::Comment);
 
-    for (const auto& pattern : LanguageRegistry::patternsBeforeKeywords()) {
-        m_rules.append({QRegularExpression(pattern.pattern), scheme.format(pattern.role)});
+    if (m_definition.sharedPatterns) {
+        for (const auto& pattern : LanguageRegistry::patternsBeforeKeywords()) {
+            m_rules.append({QRegularExpression(pattern.pattern), scheme.format(pattern.role)});
+        }
     }
 
     const QStringList controlFlow = CodeSyntaxHighlighterHelper::keywordsIn(m_definition.keywords, LanguageRegistry::controlFlowKeywords());
@@ -68,8 +70,10 @@ CodeSyntaxHighlighter::CodeSyntaxHighlighter(QTextDocument* document, LanguageDe
         }
     }
 
-    for (const auto& pattern : LanguageRegistry::patternsAfterKeywords()) {
-        m_rules.append({QRegularExpression(pattern.pattern), scheme.format(pattern.role)});
+    if (m_definition.sharedPatterns) {
+        for (const auto& pattern : LanguageRegistry::patternsAfterKeywords()) {
+            m_rules.append({QRegularExpression(pattern.pattern), scheme.format(pattern.role)});
+        }
     }
 
     for (const auto& pattern : m_definition.patterns) {
