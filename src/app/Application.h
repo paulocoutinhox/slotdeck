@@ -34,10 +34,12 @@ class Application final : public QObject {
   protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
 
+  private slots:
+    void restartAfterImport();
+
   private:
     void applyLanguage(const QString& language);
     void applyTheme(const QString& themeId);
-    void restartAfterImport();
     void replaceProcess();
     [[nodiscard]] utils::Result<void> initializePlugins();
 

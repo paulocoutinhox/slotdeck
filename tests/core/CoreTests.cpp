@@ -2210,6 +2210,59 @@ TEST(PluginManagerIntegrationTest, HoldsEveryPluginToTheContractTheStandardState
     manager.unloadPlugins();
 }
 
+TEST(StateStoreTest, KeepsTheWriteAheadLogWithTheDatabaseItSetsAside) {
+#ifdef Q_OS_WIN
+    GTEST_SKIP() << "The platform does not refuse a read through file permissions";
+#else
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const QString databasePath = directory.filePath(QStringLiteral("slotdeck.sqlite3"));
+    QFile stored(databasePath);
+    ASSERT_TRUE(stored.open(QIODevice::WriteOnly));
+    ASSERT_GT(stored.write(QByteArrayLiteral("SQLite format 3")), 0);
+    stored.close();
+    QFile log(databasePath + QStringLiteral("-wal"));
+    ASSERT_TRUE(log.open(QIODevice::WriteOnly));
+    ASSERT_GT(log.write(QByteArrayLiteral("committed")), 0);
+    log.close();
+
+    // A database nobody may read is never opened, so the log beside it is still whatever was committed last.
+    ASSERT_TRUE(stored.setPermissions({}));
+    if (QFile(databasePath).open(QIODevice::ReadOnly)) {
+        ASSERT_TRUE(stored.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner));
+        GTEST_SKIP() << "The account reads a file it has no permission for";
+    }
+
+    persistence::StateStore store(databasePath);
+    const auto initialized = store.initialize();
+    ASSERT_TRUE(stored.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner));
+    ASSERT_TRUE(initialized.hasValue()) << initialized.error().code.toStdString();
+    ASSERT_FALSE(store.replacedDatabasePath().isEmpty());
+
+    QFile keptLog(store.replacedDatabasePath() + QStringLiteral("-wal"));
+    ASSERT_TRUE(keptLog.open(QIODevice::ReadOnly));
+    EXPECT_EQ(keptLog.readAll(), QByteArrayLiteral("committed"));
+    EXPECT_FALSE(QFileInfo::exists(databasePath + QStringLiteral("-wal-orphan")));
+#endif
+}
+
+TEST(ApplicationTest, KeepsEverythingAliveWhileTheRestartItWasAskedForIsStillOnTheStack) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    app::Application application(directory.path(), nullptr);
+    ASSERT_TRUE(application.initialize().hasValue());
+    ASSERT_TRUE(application.loadInterface().hasValue());
+    const qsizetype windowsBefore = QApplication::topLevelWidgets().size();
+    ASSERT_GT(windowsBefore, 0);
+
+    // The restart is asked for by a surface the teardown destroys, so nothing may be destroyed before that request returns.
+    ASSERT_TRUE(QMetaObject::invokeMethod(&application, "restartAfterImport", Qt::DirectConnection));
+    EXPECT_EQ(QApplication::topLevelWidgets().size(), windowsBefore);
+
+    // The deferred call is bound to the application, so leaving this scope cancels it rather than starting a process.
+    application.shutdown();
+}
+
 } // namespace slotdeck
 
 TEST(CoreTranslationsTest, SpellsEveryKeyInEveryLanguageTheSelectorOffers) {

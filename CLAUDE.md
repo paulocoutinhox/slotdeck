@@ -1222,6 +1222,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Time-dependent tests compare UTC values or bounded time ranges and do not depend on a fixed local
   timezone.
 - Test doubles remain in the test tree and no test-only behavior is compiled into production code.
+- A method connected to a signal is declared a slot, which is what it is, and that is the only reason a case may reach one that is private.
 - Every test owns and deterministically releases its files, sockets, threads, widgets and processes.
 - Tests must be independent, repeatable and valid in any execution order or parallel schedule.
 - AddressSanitizer and UndefinedBehaviorSanitizer execute the complete registered suite when the
@@ -1471,7 +1472,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 361 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 363 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
@@ -1511,6 +1512,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A client that outlives its transport asks it for nothing.
 - [x] A completed plugin request leaves no guard on its context, proven through a request a loaded plugin really makes.
 - [x] Every plugin honours the identifier, navigation, settings and schema contract the standard states of all of them.
+- [x] The restart after an import destroys nothing while the request that asked for it is on the stack, proven by the window still standing.
+- [x] A database nobody may read is set aside with the write-ahead log that belongs to it.
 - [x] A full review with the sanitizers, Cppcheck, clang-tidy and hand inspection found no orphan translation key, no unused theme role or icon, no legacy marker and no plugin that clears its host before its asynchronous context.
 - [x] The language-server transport disconnects from the process it abandons, so a read already queued never reaches it without one.
 - [x] A request that was given its turn and stopped before hearing about it returns that turn, so a provider limited to one request at a time keeps admitting.
