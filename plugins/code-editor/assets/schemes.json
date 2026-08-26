@@ -50,7 +50,8 @@
           "foreground": "#be5046"
         },
         "parameter": {
-          "foreground": "#d19a66"
+          "foreground": "#abb2bf",
+          "italic": true
         },
         "variable": {
           "foreground": "#e06c75"
@@ -164,7 +165,8 @@
           "foreground": "#b3403d"
         },
         "parameter": {
-          "foreground": "#986801"
+          "foreground": "#383a42",
+          "italic": true
         },
         "variable": {
           "foreground": "#e45649"
@@ -275,10 +277,11 @@
           "foreground": "#268bd2"
         },
         "macro": {
-          "foreground": "#cb4b16"
+          "foreground": "#d33682"
         },
         "parameter": {
-          "foreground": "#839496"
+          "foreground": "#839496",
+          "italic": true
         },
         "variable": {
           "foreground": "#268bd2"
@@ -389,10 +392,11 @@
           "foreground": "#268bd2"
         },
         "macro": {
-          "foreground": "#cb4b16"
+          "foreground": "#d33682"
         },
         "parameter": {
-          "foreground": "#657b83"
+          "foreground": "#657b83",
+          "italic": true
         },
         "variable": {
           "foreground": "#268bd2"

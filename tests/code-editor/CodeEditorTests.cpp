@@ -2450,13 +2450,18 @@ TEST(CodeColorSchemeTest, KeepsEveryTokenTypeAServerReportsApart) {
         ASSERT_TRUE(semantic.contains(type)) << type.toStdString();
     }
 
-    QSet<QRgb> colors;
+    for (const auto& current : CodeColorSchemeCatalog::schemes()) {
+        QSet<QString> readings;
 
-    for (const auto& type : {QStringLiteral("class"), QStringLiteral("parameter"), QStringLiteral("enumMember"), QStringLiteral("method"), QStringLiteral("macro")}) {
-        colors.insert(scheme.color(semantic.value(type)).rgb());
+        for (const auto& type : {QStringLiteral("class"), QStringLiteral("parameter"), QStringLiteral("enumMember"), QStringLiteral("method"), QStringLiteral("macro")}) {
+            const QTextCharFormat format = current.format(semantic.value(type));
+            readings.insert(QStringLiteral("%1/%2/%3").arg(format.foreground().color().name()).arg(format.fontWeight()).arg(format.fontItalic()));
+        }
+
+        EXPECT_EQ(readings.size(), 5) << current.id.toStdString() << " gives a class, a parameter, an enum member, a method and a macro fewer than five readings";
     }
 
-    EXPECT_GE(colors.size(), 4) << "a class, a parameter, an enum member, a method and a macro collapse into one colour";
+    EXPECT_NE(scheme.color(semantic.value(QStringLiteral("parameter"))).rgb(), scheme.color(semantic.value(QStringLiteral("enumMember"))).rgb());
 }
 
 TEST(CodeColorSchemeTest, PersistsTheSelectedSchemeAndRefusesOneNobodyDeclares) {
