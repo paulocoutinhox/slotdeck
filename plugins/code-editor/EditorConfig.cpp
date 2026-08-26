@@ -6,15 +6,19 @@
 #include <QtGlobal>
 
 #include <algorithm>
+#include <cstdlib>
 #include <optional>
 
 namespace slotdeck::plugins::codeeditor {
 
+constexpr int maximumBraceDepth = 16;
+constexpr qint64 maximumRangeValues = 4096;
+
 class EditorConfigHelper final {
   public:
     static QString escapedLiteral(QChar character);
-    static QString translateSegment(const QString& pattern, qsizetype& index, bool stopOnAlternation);
-    static QString translateBraces(const QString& pattern, qsizetype& index);
+    static QString translateSegment(const QString& pattern, qsizetype& index, bool stopOnAlternation, int depth);
+    static QString translateBraces(const QString& pattern, qsizetype& index, int depth);
     static bool declaresDirectory(const QString& pattern);
     static QRegularExpression sectionExpression(const QString& pattern);
     static QString significantLine(const QString& line);
@@ -33,7 +37,7 @@ QString EditorConfigHelper::escapedLiteral(QChar character) {
     return QRegularExpression::escape(QString(character));
 }
 
-QString EditorConfigHelper::translateSegment(const QString& pattern, qsizetype& index, bool stopOnAlternation) {
+QString EditorConfigHelper::translateSegment(const QString& pattern, qsizetype& index, bool stopOnAlternation, int depth) {
     QString expression;
 
     while (index < pattern.size()) {
@@ -44,7 +48,7 @@ QString EditorConfigHelper::translateSegment(const QString& pattern, qsizetype& 
 
         ++index;
         if (character == QLatin1Char('{')) {
-            expression += EditorConfigHelper::translateBraces(pattern, index);
+            expression += EditorConfigHelper::translateBraces(pattern, index, depth);
             continue;
         }
         if (character == QLatin1Char('\\') && index < pattern.size()) {
@@ -110,20 +114,27 @@ QString EditorConfigHelper::translateSegment(const QString& pattern, qsizetype& 
 }
 
 // Translates one EditorConfig brace expression into a regular expression alternation.
-QString EditorConfigHelper::translateBraces(const QString& pattern, qsizetype& index) {
+QString EditorConfigHelper::translateBraces(const QString& pattern, qsizetype& index, int depth) {
     const qsizetype start = index;
+
+    // A brace that fails to read rewinds and is spelled literally, so a run of them would re-read the tail once per brace.
+    if (depth >= maximumBraceDepth) {
+        return EditorConfigHelper::escapedLiteral(QLatin1Char('{'));
+    }
+
     QStringList alternatives;
-    QString current = EditorConfigHelper::translateSegment(pattern, index, true);
+    QString current = EditorConfigHelper::translateSegment(pattern, index, true, depth + 1);
 
     while (index < pattern.size() && pattern.at(index) == QLatin1Char(',')) {
         ++index;
         alternatives.append(current);
-        current = EditorConfigHelper::translateSegment(pattern, index, true);
+        current = EditorConfigHelper::translateSegment(pattern, index, true, depth + 1);
     }
 
+    // A brace that never closes is the literal text it spells, kept as it was already read so no caller reads that tail again.
     if (index >= pattern.size() || pattern.at(index) != QLatin1Char('}')) {
-        index = start;
-        return EditorConfigHelper::escapedLiteral(QLatin1Char('{'));
+        alternatives.append(current);
+        return EditorConfigHelper::escapedLiteral(QLatin1Char('{')) + alternatives.join(EditorConfigHelper::escapedLiteral(QLatin1Char(',')));
     }
 
     ++index;
@@ -135,7 +146,7 @@ QString EditorConfigHelper::translateBraces(const QString& pattern, qsizetype& i
         bool highValid = false;
         const int low = separator > 0 ? range.first(separator).toInt(&lowValid) : 0;
         const int high = separator > 0 ? range.mid(separator + 2).toInt(&highValid) : 0;
-        if (lowValid && highValid) {
+        if (lowValid && highValid && std::abs(static_cast<qint64>(std::max(low, high)) - static_cast<qint64>(std::min(low, high))) < maximumRangeValues) {
             QStringList numbers;
             for (int value = std::min(low, high); value <= std::max(low, high); ++value) {
                 numbers.append(QRegularExpression::escape(QString::number(value)));
@@ -184,7 +195,7 @@ QRegularExpression EditorConfigHelper::sectionExpression(const QString& pattern)
     }
 
     qsizetype index = 0;
-    const QString expression = EditorConfigHelper::translateSegment(normalized, index, false);
+    const QString expression = EditorConfigHelper::translateSegment(normalized, index, false, 0);
     return QRegularExpression(QStringLiteral("\\A%1(?:%2)\\z").arg(anyDirectory ? QStringLiteral("(?:.*/)?") : QString{}, expression));
 }
 

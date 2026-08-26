@@ -231,6 +231,41 @@ TEST(WebServerInstanceTest, KeepsServingThroughManyConnectionsIncludingOnesThatL
     server.stop();
 }
 
+TEST(WebServerInstanceTest, AnswersEveryHostileRequestAndKeepsServing) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    WebServerTestsHelper::writeFile(directory.filePath(QStringLiteral("index.html")), QByteArrayLiteral("content"));
+    plugins::webserver::WebServerInstance server;
+    ASSERT_TRUE(server.start(directory.path(), QStringLiteral("127.0.0.1"), 0));
+
+    const QList<QByteArray> hostile{
+        QByteArray{}, QByteArrayLiteral("\r\n\r\n"), QByteArrayLiteral("GET\r\n\r\n"), QByteArrayLiteral("GET /\r\n\r\n"), QByteArrayLiteral("GET / HTTP/9.9\r\n\r\n"), QByteArrayLiteral("get / http/1.1\r\n\r\n"), QByteArrayLiteral("GET ../../etc/passwd HTTP/1.1\r\n\r\n"), QByteArrayLiteral("GET /../../etc/passwd HTTP/1.1\r\n\r\n"), QByteArrayLiteral("GET /%2e%2e%2f HTTP/1.1\r\n\r\n"), QByteArrayLiteral("GET / HTTP/1.1\r\nHost:\r\n\r\n"), QByteArray("GET /\0x HTTP/1.1\r\n\r\n", 20), QByteArray("\0\0\0\0\r\n\r\n", 8), QByteArray::fromHex("c328c328c328") + QByteArrayLiteral("\r\n\r\n"), QByteArrayLiteral("GET ") + QByteArray(8192, 'a') + QByteArrayLiteral(" HTTP/1.1\r\n\r\n"), QByteArrayLiteral("GET / HTTP/1.1\r\n") + QByteArray(8192, 'h') + QByteArrayLiteral("\r\n\r\n"),
+    };
+
+    for (const auto& request : hostile) {
+        WebServerTestsHelper::request(server, request);
+        ASSERT_TRUE(server.running()) << request.left(40).toStdString();
+    }
+
+    // Pseudo-random requests are seeded, so a failure here reproduces exactly.
+    quint32 seed = 0xfeed4321;
+    for (int round = 0; round < 60; ++round) {
+        QByteArray request;
+        const int length = static_cast<int>(seed % 200) + 1;
+        for (int index = 0; index < length; ++index) {
+            seed = seed * 1664525U + 1013904223U;
+            request.append(static_cast<char>((seed >> 16) & 0xFF));
+        }
+        request.append(QByteArrayLiteral("\r\n\r\n"));
+        WebServerTestsHelper::request(server, request);
+        ASSERT_TRUE(server.running());
+    }
+
+    const QByteArray served = WebServerTestsHelper::request(server, QByteArrayLiteral("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n"));
+    EXPECT_TRUE(served.startsWith(QByteArrayLiteral("HTTP/1.1 200 OK")));
+    server.stop();
+}
+
 TEST(WebServerInstanceTest, RestartsOnAnotherPortAndRejectsOccupiedPorts) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());

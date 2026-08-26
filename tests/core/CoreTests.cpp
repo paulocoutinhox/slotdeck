@@ -2052,6 +2052,51 @@ void CoreTestsHelper::answerNextConfirmation(bool confirmed) {
     });
     // clang-format on
 }
+TEST(SettingsReaderTest, LeavesEveryDeclaredDefaultStandingForAnyHostileDocument) {
+    const QList<QByteArray> hostile{
+        QByteArrayLiteral("{}"), QByteArrayLiteral("[]"), QByteArrayLiteral("null"), QByteArrayLiteral("{\"flag\": null}"), QByteArrayLiteral("{\"flag\": \"true\"}"), QByteArrayLiteral("{\"flag\": 1}"), QByteArrayLiteral("{\"count\": \"12\"}"), QByteArrayLiteral("{\"count\": 1.5}"), QByteArrayLiteral("{\"count\": 1e309}"), QByteArrayLiteral("{\"count\": -9223372036854775808}"), QByteArrayLiteral("{\"name\": 12}"), QByteArrayLiteral("{\"name\": []}"), QByteArrayLiteral("{\"entries\": {}}"), QByteArrayLiteral("{\"entries\": [1, \"two\", null, {}]}"), QByteArrayLiteral("{\"nested\": []}"),
+    };
+
+    for (const auto& document : hostile) {
+        const QJsonObject object = QJsonDocument::fromJson(document).object();
+        plugins::SettingsReader reader(object);
+        bool flag = true;
+        int count = 7;
+        QString name = QStringLiteral("declared");
+        QJsonObject nested{{QStringLiteral("kept"), true}};
+        QVector<QJsonObject> entries{QJsonObject{{QStringLiteral("kept"), true}}};
+        reader.readBool(QStringLiteral("flag"), flag);
+        reader.readInteger(QStringLiteral("count"), count);
+        reader.readText(QStringLiteral("name"), name);
+        reader.readObject(QStringLiteral("nested"), nested);
+        reader.readObjectList(QStringLiteral("entries"), entries);
+
+        // A value the owner cannot use leaves the declared default exactly as it was.
+        const bool usableFlag = object.value(QStringLiteral("flag")).isBool();
+        const bool usableCount = object.value(QStringLiteral("count")).isDouble() && object.value(QStringLiteral("count")).toDouble() == std::floor(object.value(QStringLiteral("count")).toDouble());
+        const bool usableName = object.value(QStringLiteral("name")).isString();
+        EXPECT_TRUE(usableFlag || flag) << document.toStdString();
+        EXPECT_TRUE(usableCount || count == 7) << document.toStdString();
+        EXPECT_TRUE(usableName || name == QStringLiteral("declared")) << document.toStdString();
+        EXPECT_TRUE(object.value(QStringLiteral("nested")).isObject() || nested.value(QStringLiteral("kept")).toBool()) << document.toStdString();
+    }
+
+    // A deeply nested document is read without reaching past what it carries.
+    QByteArray deep;
+    for (int level = 0; level < 4000; ++level) {
+        deep.append(QByteArrayLiteral("{\"nested\":"));
+    }
+    deep.append(QByteArrayLiteral("1"));
+    for (int level = 0; level < 4000; ++level) {
+        deep.append(QByteArrayLiteral("}"));
+    }
+    const QJsonObject nestedDocument = QJsonDocument::fromJson(deep).object();
+    plugins::SettingsReader nestedReader(nestedDocument);
+    QJsonObject value;
+    nestedReader.readObject(QStringLiteral("nested"), value);
+    SUCCEED();
+}
+
 } // namespace slotdeck
 
 TEST(CoreTranslationsTest, SpellsEveryKeyInEveryLanguageTheSelectorOffers) {

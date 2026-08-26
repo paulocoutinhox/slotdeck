@@ -2222,9 +2222,39 @@ TEST(CodeWorkspaceViewTest, TracksExternalTreeChangesAndRejectsSymlinkEscape) {
     EXPECT_EQ(error.first().first().toString(), QStringLiteral("code-editor.error.path-outside"));
 }
 
-} // namespace slotdeck::plugins::codeeditor
-
 TEST(CodeEditorTranslationsTest, SpellsEveryKeyInEveryLanguageTheSelectorOffers) {
     slotdeck::plugins::codeeditor::CodeEditorPlugin plugin;
     slotdeck::test::expectCompleteCatalog(QStringLiteral("code-editor"), plugin.translations());
 }
+
+TEST(EditorConfigTest, AnswersEveryHostileDocumentInsteadOfReadingPastIt) {
+    const QStringList hostile{
+        QString{}, QStringLiteral("["), QStringLiteral("[*"), QStringLiteral("[*]"), QStringLiteral("[{"), QStringLiteral("[{a"), QStringLiteral("[{a,"), QStringLiteral("[a-"), QStringLiteral("[!"), QStringLiteral("[/]"), QStringLiteral("[**"), QStringLiteral("[{1..}]"), QStringLiteral("[{..2}]"), QStringLiteral("[{99999999999999999999..99999999999999999999}]"), QStringLiteral("[{1..999999999}]"), QStringLiteral("[") + QString(4096, QLatin1Char('*')) + QStringLiteral("]\nindent_size = 4"), QStringLiteral("[") + QString(200, QLatin1Char('{')) + QStringLiteral("]\nindent_size = 4"), QString(200, QLatin1Char('{')), QStringLiteral("root"), QStringLiteral("root ="), QStringLiteral("= value"), QStringLiteral("indent_size ="), QStringLiteral("indent_size = notanumber"), QStringLiteral("indent_size = 99999999999999999999"), QStringLiteral("indent_size = -1"), QStringLiteral("[*]\nindent_style"), QStringLiteral("[*]\n\n\n[*]\n"), QString::fromUtf8("[*]\ncharset = \xC3\x28"),
+
+    };
+
+    for (const auto& text : hostile) {
+        const QVector<EditorConfigFile> files{{QStringLiteral("/workspace"), text}};
+        const auto properties = resolveEditorConfig(QStringLiteral("/workspace/source.cpp"), files);
+        EXPECT_GE(resolvedIndentWidth(properties), 0) << text.toStdString();
+        EXPECT_FALSE(editorConfigSectionMatches(text, QStringLiteral("/workspace"), QStringLiteral("/workspace/source.cpp")) && text.isEmpty());
+    }
+
+    // Pseudo-random documents are seeded, so a failure here reproduces exactly.
+    quint32 seed = 0x5eed1234;
+    for (int round = 0; round < 400; ++round) {
+        QString text;
+        const int length = static_cast<int>(seed % 120) + 1;
+        for (int index = 0; index < length; ++index) {
+            seed = seed * 1664525U + 1013904223U;
+            static const QString alphabet = QStringLiteral("[]{}*?!,.-=\n abc019_/\\");
+            text.append(alphabet.at(static_cast<int>(seed >> 16) % alphabet.size()));
+        }
+        const QVector<EditorConfigFile> files{{QStringLiteral("/workspace"), text}};
+        const auto properties = resolveEditorConfig(QStringLiteral("/workspace/source.cpp"), files);
+        EXPECT_GE(resolvedIndentWidth(properties), 0);
+        std::ignore = editorConfigSectionMatches(text, QStringLiteral("/workspace"), QStringLiteral("/workspace/source.cpp"));
+    }
+}
+
+} // namespace slotdeck::plugins::codeeditor

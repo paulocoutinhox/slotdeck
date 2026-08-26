@@ -1935,4 +1935,34 @@ TEST(AiChatClientTest, PacesTwoRequestsOfOneProviderThroughTheSharedGate) {
     EXPECT_LE(waits.first(), 400);
 }
 
+TEST(AiHttpChatClientTest, EndsEveryHostileStreamWithExactlyOneTerminalEvent) {
+    const QList<QByteArray> hostile{
+        QByteArray{}, QByteArrayLiteral("data:"), QByteArrayLiteral("data: "), QByteArrayLiteral("data: {"), QByteArrayLiteral("data: {}\n\n"), QByteArrayLiteral("data: [DONE]\n\n"), QByteArrayLiteral("data: not json at all\n\n"), QByteArrayLiteral("event: message\ndata: {\"type\":\"unknown\"}\n\n"), QByteArrayLiteral("data: {\"type\":\"content_block_delta\"}\n\n"), QByteArrayLiteral("data: {\"choices\":[]}\n\n"), QByteArrayLiteral("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{}]}}]}\n\n"), QByteArray::fromHex("c328c328") + QByteArrayLiteral("\n\n"), QByteArray("data: {\0}\n\n", 11), QByteArrayLiteral("data: ") + QByteArray(200000, 'a') + QByteArrayLiteral("\n\n"), QByteArrayLiteral("data: {\"choices\":[{\"delta\":{\"content\":\"") + QByteArray(100000, 'x') + QByteArrayLiteral("\"}}]}\n\n"),
+    };
+
+    for (const auto& stream : hostile) {
+        RecordedStreamServer server(stream);
+        ASSERT_TRUE(server.listen());
+
+        const ProviderDescriptor* provider = findProvider(QStringLiteral("openai"));
+        ASSERT_NE(provider, nullptr);
+        const QString model = QStringLiteral("gpt-4o-mini");
+        const ModelConnection connection{provider->id, model, {}, QStringLiteral("sk-test"), {}, defaultParameters(*provider, model), {}};
+
+        AiRequestGate gate;
+        AiHttpChatClient client(gate);
+        int terminalEvents = 0;
+        // clang-format off
+        QObject::connect(&client, &AiChatClient::finished, &client, [&terminalEvents](const QString&, const QVector<ToolCall>&, ChatUsage, const QString&) { ++terminalEvents; });
+        QObject::connect(&client, &AiChatClient::failed, &client, [&terminalEvents](const utils::Error&) { ++terminalEvents; });
+        client.send({connection, server.address(), QJsonArray{QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QStringLiteral("hello")}}}, {}}, [](const QString& key) { return key; });
+        ASSERT_TRUE(test::waitUntil([&]() { return terminalEvents > 0; })) << stream.left(40).toStdString();
+        // clang-format on
+
+        // Exactly one terminal event is emitted per request, whatever the service sent.
+        QCoreApplication::processEvents();
+        EXPECT_EQ(terminalEvents, 1) << stream.left(40).toStdString();
+    }
+}
+
 } // namespace slotdeck::plugins::ai

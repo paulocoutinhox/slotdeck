@@ -960,6 +960,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A property set to `unset` clears what a file above declared rather than being ignored, because undoing an inherited value is what that value is for.
 - An indent size that follows the tab width is resolved once every file has been read, so the two are written in either order.
 - A brace expression spelling neither an alternation nor a numeric range is the literal text it spells, so a file really named that way is the one it matches.
+- A brace that never closes keeps what was already read of it rather than rewinding, because a run of them would otherwise read the same tail once per brace and never finish.
+- A brace nests only as deep as the bound the code enforces and a numeric range spans only as many values, because both are reached from a file the workspace decided the contents of.
 - The only character sets accepted are the ones the editor can write back, so `latin1` is reported by name instead of being applied.
 - A document remembers the line ending and the byte order mark the file already carried, and a rule declared by EditorConfig is the only thing that changes either of them, so opening and saving a file never rewrites bytes nobody asked to change.
 - Saving applies the resolved trailing whitespace, final newline, line ending and byte order mark rules before the atomic write.
@@ -1209,6 +1211,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Persistence tests cover schema versions, migrations, transaction rollback, malformed values, duplicate identities, query failures and round trips.
 - Security-sensitive path and protocol tests cover traversal, symlink escape, invalid encoding,
   malformed requests and configured resource limits.
+- Every parser that reads bytes somebody else decided is fed hostile input from a seeded generator, so it is proven to answer rather than to read past what it was given or never return.
 - Time-dependent tests compare UTC values or bounded time ranges and do not depend on a fixed local
   timezone.
 - Test doubles remain in the test tree and no test-only behavior is compiled into production code.
@@ -1461,7 +1464,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 352 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 356 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
@@ -1494,6 +1497,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A server started and stopped many times leaves nothing behind.
 - [x] A long run of connections, including ones that leave without speaking, keeps the web server answering.
 - [x] Many overlapping settings saves commit what reached storage, which is what the next start reads back.
+- [x] An EditorConfig section that never closes its brace is read once instead of costing the whole tail per brace.
+- [x] The web server, the provider stream and the settings reader answer every hostile input a seeded generator produces.
 - [x] A full review with the sanitizers, Cppcheck, clang-tidy and hand inspection found no orphan translation key, no unused theme role or icon, no legacy marker and no plugin that clears its host before its asynchronous context.
 - [x] The language-server transport disconnects from the process it abandons, so a read already queued never reaches it without one.
 - [x] A request that was given its turn and stopped before hearing about it returns that turn, so a provider limited to one request at a time keeps admitting.
