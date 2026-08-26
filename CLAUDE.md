@@ -933,6 +933,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - An encoding the editor cannot write back, such as UTF-32 or UTF-7, is refused with its name instead of being opened as text or reported as binary.
 - A file is written back in the encoding and the mark it arrived in, so opening it never rewrites bytes nobody asked to change.
 - Saves use atomic replacement and content revisions so an older asynchronous completion cannot mark newer edits as clean.
+- A platform that refuses to replace a file another process is holding fails that save explicitly and leaves the document dirty, because a write nobody confirmed must never read as one that landed.
 - Clean documents reload after an external edit and dirty documents preserve their buffer while reporting a translated conflict.
 - What the file now says is judged once its bytes are decoded rather than when they were read, so the reader can type while a large file is being read without the reload replacing what was typed.
 - A save asked for while one is still being written runs after it instead of being dropped, because an edit the reader saved must reach the file.
@@ -1204,6 +1205,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The asynchronous wait budget scales with the toolchain so an instrumented build waits longer for the same condition instead of relaxing the assertion.
 - A wait whose condition is many operations carries a budget measured by that count rather than the default one condition gets, because a case sitting at the edge of its budget fails whenever the machine is busy and teaches nobody anything.
 - A case that waits for work to finish reports what the work said when it failed, so a real failure is never read as slowness.
+- A case asserts what the product guarantees rather than what a platform usually does, so a save the platform refuses is answered the way the reader answers it instead of failing the case.
 - The registered case timeout scales with the same toolchain and always stays above that wait budget, so an expired condition fails its assertion instead of killing the process.
 - A case chains many of those conditions and the registered timeout covers the whole case, so that timeout stays far above the per-condition budget and only a stuck process is killed.
 - The discovery of a suite has its own timeout, because a suite that links Qt WebEngine needs seconds to answer the listing on a cold runner and the default of five seconds fails the whole run.

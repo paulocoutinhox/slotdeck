@@ -2137,8 +2137,9 @@ TEST(CodeDocumentTest, WritesTheEditThatArrivedWhileTheEarlierSaveWasStillInFlig
 }
 
 TEST(CodeWorkspaceViewTest, SurvivesManyDocumentsOpenedEditedSavedAndClosedInOneWorkspace) {
-    // Thirty documents reach one serialized worker, so this wait is measured by what it asks for rather than by the default one condition gets.
-    constexpr int savingBudgetMilliseconds = 120000;
+    // Thirty documents reach one serialized worker, so the wait is measured by what it asks for and a refused replace is answered the way a reader answers it.
+    constexpr int savingBudgetMilliseconds = 30000;
+    constexpr int savingAttempts = 4;
     filesystem::FileSystemService service;
     test::TestPluginHost host;
     host.useFileSystem(service);
@@ -2176,10 +2177,20 @@ TEST(CodeWorkspaceViewTest, SurvivesManyDocumentsOpenedEditedSavedAndClosedInOne
             ASSERT_NE(document, nullptr);
             document->editor().appendPlainText(QStringLiteral("int added = %1;").arg(round));
         }
-        view.saveAll();
         // clang-format off
-        ASSERT_TRUE(test::waitUntil([&]() { for (int index = 0; index < documents->count(); ++index) { if (qobject_cast<CodeDocument*>(documents->widget(index))->dirty()) { return false; } } return true; }, savingBudgetMilliseconds)) << "round " << round << " left documents dirty, reported: " << failures.join(QStringLiteral(" | ")).toStdString();
+        const auto everyDocumentIsClean = [&]() { for (int index = 0; index < documents->count(); ++index) { if (qobject_cast<CodeDocument*>(documents->widget(index))->dirty()) { return false; } } return true; };
         // clang-format on
+
+        // A platform may refuse to replace a file another process is holding, and such a save reports and leaves the document dirty on purpose, so the reader saves again.
+        bool saved = false;
+        for (int attempt = 0; attempt < savingAttempts && !saved; ++attempt) {
+            failures.clear();
+            view.saveAll();
+            saved = test::waitUntil(everyDocumentIsClean, savingBudgetMilliseconds);
+            ASSERT_TRUE(saved || !failures.isEmpty()) << "round " << round << " left documents dirty with nothing reported";
+        }
+
+        ASSERT_TRUE(saved) << "round " << round << " never saved, reported: " << failures.join(QStringLiteral(" | ")).toStdString();
         while (documents->count() > 0) {
             documents->setCurrentIndex(0);
             view.closeCurrentDocument();
