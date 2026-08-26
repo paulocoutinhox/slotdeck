@@ -74,8 +74,22 @@ struct EditorLimits final {
     int bottomPanelInitialHeight{0};
 };
 
+// Everything the catalog declares, read once from one parse of its text.
+struct LanguageCatalog final {
+    QVector<LanguageDefinition> languages;
+    QVector<HighlightPattern> beforeKeywords;
+    QVector<HighlightPattern> afterKeywords;
+    QStringList controlFlowKeywords;
+    QStringList primitiveTypeKeywords;
+    QMap<QString, HighlightRole> semanticRoles;
+    EditorLimits limits;
+    QVector<LanguageServerDefinition> servers;
+};
+
 class LanguageRegistry final {
   public:
+    // The catalog is parsed from the text of the file rather than from its path, so every rejection it declares is exercised by a test.
+    [[nodiscard]] static LanguageCatalog parse(const QByteArray& text, utils::Result<void>& outcome);
     [[nodiscard]] static const QVector<LanguageDefinition>& languages();
     // The catalog is read once, so the plugin asks here whether the file it was built from was well formed.
     [[nodiscard]] static const utils::Result<void>& catalogError();

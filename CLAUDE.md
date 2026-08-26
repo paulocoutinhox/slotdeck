@@ -1010,6 +1010,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Two languages never claim one extension, because the first that claims it answers for it and the second would never be reached, and the catalog ends with plain text because that is what an unknown file falls to.
 - The name of a language is declared once, with the language it names in that catalog, because a second copy in the translation catalog drifts and presents a key where a name belongs.
 - A catalog that is unavailable, malformed, claims an extension twice or names a language no entry declares rejects the complete plugin.
+- The language catalog is parsed once from the text of its file rather than from its path, so it is read one time at startup and every rejection it declares is exercised by a test.
+- What a catalog validates is checked against what that same parse produced rather than through the accessor it is building, because a static initializer that reaches its own accessor ends the process.
 - What the editor may be tuned with lives in that file as well, covering the reading bounds, the debounce intervals, the restart budget and the surfaces it opens with, and every one of them is refused outside the range that keeps it sane.
 - The caps that protect the process from a payload someone else decided the size of stay in the code that enforces them, because a limit that exists to keep the application alive is not a preference.
 - Language-server discovery resolves explicit executable and argument pairs so alternative servers never inherit incompatible command-line parameters.
@@ -1495,7 +1497,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 376 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 377 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
@@ -1575,6 +1577,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Every platform reaches the declared family, proven after Windows reported a resolved name where macOS reports the generic one.
 - [x] Plain text carries no format range of its own, measured as forty percent of the ranges a source line used to carry for no visible difference.
 - [x] A line dense enough to cost more than its colours keeps its text and loses them, while the longest line this project really writes keeps every colour it had.
+- [x] Every malformed language catalog the code declares a refusal for is refused from text, covering eighteen shapes across the languages, the servers, the highlighting and the limits.
 - [x] The terminal, the editor and the shared document open on one monospaced family, and a family the user chose still wins over it.
 
 ## Recorded pending work

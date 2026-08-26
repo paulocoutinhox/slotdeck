@@ -2672,4 +2672,79 @@ TEST(CodeColorSchemeTest, BoundsWhatOneLineMayBeDecoratedWith) {
     EXPECT_EQ(rangesOf(QStringLiteral("value ").repeated(LanguageRegistry::limits().maximumHighlightedLineLength)), 0);
 }
 
+// Every rejection the language catalog declares is reached from text, because a branch nothing exercises is a branch nobody knows works.
+TEST(LanguageRegistryTest, RefusesEveryMalformedCatalogItDeclaresARefusalFor) {
+    QFile file(QStringLiteral(":/slotdeck/code-editor/assets/languages.json"));
+    ASSERT_TRUE(file.open(QIODevice::ReadOnly));
+    const QByteArray text = file.readAll();
+    utils::Result<void> sound = utils::Result<void>::success();
+    ASSERT_FALSE(LanguageRegistry::parse(text, sound).languages.isEmpty());
+    ASSERT_TRUE(sound.hasValue());
+
+    const QJsonObject original = QJsonDocument::fromJson(text).object();
+    const auto rebuild = [&original](const QString& key, const QJsonValue& value) {
+        QJsonObject catalog = original;
+        catalog.insert(key, value);
+        return QJsonDocument(catalog).toJson();
+    };
+    const auto rebuildHighlighting = [&original](const QString& key, const QJsonValue& value) {
+        QJsonObject highlighting = original.value(QStringLiteral("highlighting")).toObject();
+        highlighting.insert(key, value);
+        QJsonObject catalog = original;
+        catalog.insert(QStringLiteral("highlighting"), highlighting);
+        return QJsonDocument(catalog).toJson();
+    };
+    const QJsonObject sample = original.value(QStringLiteral("languages")).toArray().first().toObject();
+
+    QVector<QPair<QString, QByteArray>> malformed;
+    malformed.append({QStringLiteral("not a document"), QByteArrayLiteral("{ this is not json")});
+    malformed.append({QStringLiteral("no languages array"), rebuild(QStringLiteral("languages"), 7)});
+    malformed.append({QStringLiteral("no servers array"), rebuild(QStringLiteral("servers"), 7)});
+    malformed.append({QStringLiteral("no shared patterns"), rebuildHighlighting(QStringLiteral("beforeKeywords"), QJsonArray{})});
+    malformed.append({QStringLiteral("a pattern that is not one"), rebuildHighlighting(QStringLiteral("afterKeywords"), QJsonArray{QJsonObject{{QStringLiteral("pattern"), 7}, {QStringLiteral("role"), QStringLiteral("number")}}})});
+    malformed.append({QStringLiteral("a pattern naming an unknown role"), rebuildHighlighting(QStringLiteral("afterKeywords"), QJsonArray{QJsonObject{{QStringLiteral("pattern"), QStringLiteral("a")}, {QStringLiteral("role"), QStringLiteral("nobodyDeclaresThis")}}})});
+    malformed.append({QStringLiteral("no control flow keywords"), rebuildHighlighting(QStringLiteral("controlFlow"), QJsonArray{})});
+    malformed.append({QStringLiteral("a keyword that is not text"), rebuildHighlighting(QStringLiteral("primitiveTypes"), QJsonArray{7})});
+    malformed.append({QStringLiteral("no semantic token"), rebuildHighlighting(QStringLiteral("semantic"), QJsonObject{})});
+    malformed.append({QStringLiteral("a semantic token naming an unknown role"), rebuildHighlighting(QStringLiteral("semantic"), QJsonObject{{QStringLiteral("keyword"), QStringLiteral("nobodyDeclaresThis")}})});
+
+    QJsonObject namelessLanguage = sample;
+    namelessLanguage.insert(QStringLiteral("name"), QString{});
+    malformed.append({QStringLiteral("a language without a name"), rebuild(QStringLiteral("languages"), QJsonArray{namelessLanguage})});
+
+    QJsonObject halfComment = sample;
+    halfComment.insert(QStringLiteral("blockCommentStart"), QStringLiteral("/*"));
+    halfComment.remove(QStringLiteral("blockCommentEnd"));
+    malformed.append({QStringLiteral("a block comment that never ends"), rebuild(QStringLiteral("languages"), QJsonArray{halfComment})});
+
+    QJsonObject wrongPatterns = sample;
+    wrongPatterns.insert(QStringLiteral("sharedPatterns"), QStringLiteral("yes"));
+    malformed.append({QStringLiteral("a shared pattern flag of the wrong type"), rebuild(QStringLiteral("languages"), QJsonArray{wrongPatterns})});
+
+    malformed.append({QStringLiteral("two languages claiming one extension"), rebuild(QStringLiteral("languages"), QJsonArray{sample, sample})});
+    malformed.append({QStringLiteral("a catalog not ending in plain text"), rebuild(QStringLiteral("languages"), QJsonArray{sample})});
+    malformed.append({QStringLiteral("a server naming no language"), rebuild(QStringLiteral("servers"), QJsonArray{QJsonObject{{QStringLiteral("languageId"), QStringLiteral("nobodyDeclaresThis")}, {QStringLiteral("candidates"), QJsonArray{QJsonObject{{QStringLiteral("executableName"), QStringLiteral("x")}}}}}})});
+
+    QJsonObject outOfRange = original.value(QStringLiteral("limits")).toObject();
+    outOfRange.insert(QStringLiteral("maximumHighlightedMatchesPerLine"), 1);
+    malformed.append({QStringLiteral("a limit outside the range that keeps it sane"), rebuild(QStringLiteral("limits"), outOfRange)});
+
+    QJsonObject missingLimit = original.value(QStringLiteral("limits")).toObject();
+    missingLimit.remove(QStringLiteral("maximumFileBytes"));
+    malformed.append({QStringLiteral("a limit nobody declares"), rebuild(QStringLiteral("limits"), missingLimit)});
+
+    QJsonObject shortPanel = original.value(QStringLiteral("limits")).toObject();
+    shortPanel.insert(QStringLiteral("bottomPanelInitialHeight"), 40);
+    shortPanel.insert(QStringLiteral("bottomPanelMinimumHeight"), 400);
+    malformed.append({QStringLiteral("a panel opening shorter than its minimum"), rebuild(QStringLiteral("limits"), shortPanel)});
+
+    for (const auto& shape : malformed) {
+        utils::Result<void> rejected = utils::Result<void>::success();
+        const LanguageCatalog parsed = LanguageRegistry::parse(shape.second, rejected);
+        Q_UNUSED(parsed);
+        ASSERT_FALSE(rejected.hasValue()) << shape.first.toStdString() << " was accepted";
+        EXPECT_EQ(rejected.error().code, std::string{"code_editor_catalog_invalid"}) << shape.first.toStdString();
+    }
+}
+
 } // namespace slotdeck::plugins::codeeditor

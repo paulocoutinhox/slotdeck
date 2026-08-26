@@ -15,9 +15,12 @@ namespace slotdeck::plugins::codeeditor {
 class LanguageRegistryHelper final {
   public:
     static LanguageDefinition plainText();
-    static QJsonObject readCatalog(utils::Result<void>& outcome);
-    static QVector<LanguageDefinition> createLanguages();
-    static QVector<LanguageServerDefinition> createLanguageServers();
+    static QVector<LanguageDefinition> createLanguages(const QJsonObject& catalog, utils::Result<void>& outcome);
+    static QVector<LanguageServerDefinition> createLanguageServers(const QJsonObject& catalog, const QVector<LanguageDefinition>& languages, utils::Result<void>& outcome);
+    static QVector<HighlightPattern> sharedPatterns(const QJsonObject& catalog, const QString& key, utils::Result<void>& outcome);
+    static QStringList sharedKeywords(const QJsonObject& catalog, const QString& key, utils::Result<void>& outcome);
+    static QMap<QString, HighlightRole> createSemanticRoles(const QJsonObject& catalog, utils::Result<void>& outcome);
+    static EditorLimits createLimits(const QJsonObject& catalog, utils::Result<void>& outcome);
     static QStringList textList(const QJsonObject& entry, const QString& key, bool& valid);
     static std::optional<HighlightRole> roleFromIdentifier(const QString& identifier);
     static QVector<HighlightPattern> patternList(const QJsonArray& entries, bool& valid);
@@ -27,24 +30,28 @@ LanguageDefinition LanguageRegistryHelper::plainText() {
     return {QStringLiteral("plaintext"), QStringLiteral("Plain Text"), {}, {}, {}, {}, {}, {}, {}, false};
 }
 
-// The catalog is data, so a language or a server is added by one entry in the file and never by interface code.
-QJsonObject LanguageRegistryHelper::readCatalog(utils::Result<void>& outcome) {
-    QFile file(QStringLiteral(":/slotdeck/code-editor/assets/languages.json"));
+QVector<HighlightPattern> LanguageRegistryHelper::sharedPatterns(const QJsonObject& catalog, const QString& key, utils::Result<void>& outcome) {
+    bool valid = true;
+    QVector<HighlightPattern> values = patternList(catalog.value(QStringLiteral("highlighting")).toObject().value(key).toArray(), valid);
 
-    if (!file.open(QIODevice::ReadOnly)) {
-        outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The language catalog is unavailable", {}});
+    if (!valid || values.isEmpty()) {
+        outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The catalog highlighting patterns are invalid", key});
         return {};
     }
 
-    QJsonParseError error;
-    const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &error);
+    return values;
+}
 
-    if (error.error != QJsonParseError::NoError || !document.isObject() || !document.object().value(QStringLiteral("languages")).isArray() || !document.object().value(QStringLiteral("servers")).isArray()) {
-        outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The language catalog is not a catalog", error.errorString()});
+QStringList LanguageRegistryHelper::sharedKeywords(const QJsonObject& catalog, const QString& key, utils::Result<void>& outcome) {
+    bool valid = true;
+    const QStringList declared = textList(catalog.value(QStringLiteral("highlighting")).toObject(), key, valid);
+
+    if (!valid || declared.isEmpty()) {
+        outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The catalog highlighting keywords are invalid", key});
         return {};
     }
 
-    return document.object();
+    return declared;
 }
 
 QStringList LanguageRegistryHelper::textList(const QJsonObject& entry, const QString& key, bool& valid) {
@@ -128,14 +135,7 @@ QVector<HighlightPattern> LanguageRegistryHelper::patternList(const QJsonArray& 
     return patterns;
 }
 
-QVector<LanguageDefinition> LanguageRegistryHelper::createLanguages() {
-    utils::Result<void>& outcome = LanguageRegistry::mutableCatalogError();
-    const QJsonObject catalog = readCatalog(outcome);
-
-    if (!outcome.hasValue()) {
-        return {plainText()};
-    }
-
+QVector<LanguageDefinition> LanguageRegistryHelper::createLanguages(const QJsonObject& catalog, utils::Result<void>& outcome) {
     QVector<LanguageDefinition> languages;
     QStringList claimed;
 
@@ -184,14 +184,7 @@ QVector<LanguageDefinition> LanguageRegistryHelper::createLanguages() {
     return languages;
 }
 
-QVector<LanguageServerDefinition> LanguageRegistryHelper::createLanguageServers() {
-    utils::Result<void>& outcome = LanguageRegistry::mutableCatalogError();
-    const QJsonObject catalog = readCatalog(outcome);
-
-    if (!outcome.hasValue()) {
-        return {};
-    }
-
+QVector<LanguageServerDefinition> LanguageRegistryHelper::createLanguageServers(const QJsonObject& catalog, const QVector<LanguageDefinition>& languages, utils::Result<void>& outcome) {
     QVector<LanguageServerDefinition> servers;
 
     for (const auto& value : catalog.value(QStringLiteral("servers")).toArray()) {
@@ -207,7 +200,17 @@ QVector<LanguageServerDefinition> LanguageRegistryHelper::createLanguageServers(
             valid = valid && !candidate.executableName.isEmpty();
             definition.candidates.append(candidate);
         }
-        if (!valid || definition.candidates.isEmpty() || LanguageRegistry::languageForId(definition.languageId) == nullptr) {
+        const auto declaresLanguage = [&languages, &definition]() {
+            for (const auto& language : languages) {
+                if (language.id == definition.languageId) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        if (!valid || definition.candidates.isEmpty() || !declaresLanguage()) {
             outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "A catalog language server is invalid", definition.languageId});
             return {};
         }
@@ -217,6 +220,8 @@ QVector<LanguageServerDefinition> LanguageRegistryHelper::createLanguageServers(
     return servers;
 }
 
+[[nodiscard]] const LanguageCatalog& parsedCatalog();
+
 utils::Result<void>& LanguageRegistry::mutableCatalogError() {
     static utils::Result<void> outcome = utils::Result<void>::success();
     return outcome;
@@ -224,148 +229,135 @@ utils::Result<void>& LanguageRegistry::mutableCatalogError() {
 
 // Both lists are read from the same file, so asking for the outcome builds whichever of them has not been built yet.
 const utils::Result<void>& LanguageRegistry::catalogError() {
-    static const bool built = [] { return !languages().isEmpty() && languageServers().size() >= 0 && !patternsBeforeKeywords().isEmpty() && !patternsAfterKeywords().isEmpty() && !controlFlowKeywords().isEmpty() && !primitiveTypeKeywords().isEmpty() && !semanticRoles().isEmpty() && limits().maximumFileBytes > 0; }();
+    static const bool built = [] { return !parsedCatalog().languages.isEmpty(); }();
     Q_UNUSED(built);
     return mutableCatalogError();
 }
 
-const QVector<HighlightPattern>& LanguageRegistry::patternsBeforeKeywords() {
-    static const QVector<HighlightPattern> patterns = [] {
-        utils::Result<void>& outcome = mutableCatalogError();
-        const QJsonObject catalog = LanguageRegistryHelper::readCatalog(outcome);
-        bool valid = true;
-        QVector<HighlightPattern> values = LanguageRegistryHelper::patternList(catalog.value(QStringLiteral("highlighting")).toObject().value(QStringLiteral("beforeKeywords")).toArray(), valid);
+QMap<QString, HighlightRole> LanguageRegistryHelper::createSemanticRoles(const QJsonObject& catalog, utils::Result<void>& outcome) {
+    const QJsonObject declared = catalog.value(QStringLiteral("highlighting")).toObject().value(QStringLiteral("semantic")).toObject();
+    QMap<QString, HighlightRole> values;
 
-        if (!valid || values.isEmpty()) {
-            outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The catalog highlighting patterns are invalid", QStringLiteral("beforeKeywords")});
-            return QVector<HighlightPattern>{};
+    for (auto entry = declared.constBegin(); entry != declared.constEnd(); ++entry) {
+        const auto role = LanguageRegistryHelper::roleFromIdentifier(entry.value().toString());
+        if (!role.has_value()) {
+            outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "A catalog semantic token declares an unknown role", entry.key()});
+            return {};
+        }
+        values.insert(entry.key(), *role);
+    }
+
+    if (values.isEmpty()) {
+        outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The catalog declares no semantic token", {}});
+    }
+
+    return values;
+}
+
+EditorLimits LanguageRegistryHelper::createLimits(const QJsonObject& catalog, utils::Result<void>& outcome) {
+    const QJsonObject declared = catalog.value(QStringLiteral("limits")).toObject();
+    EditorLimits limits;
+    bool valid = true;
+    const auto read = [&declared, &valid](const QString& key, int minimum, int maximum) {
+        const QJsonValue value = declared.value(key);
+
+        if (!value.isDouble() || value.toInteger() < minimum || value.toInteger() > maximum) {
+            valid = false;
+            return 0LL;
         }
 
-        return values;
+        return value.toInteger();
+    };
+
+    limits.maximumFileBytes = read(QStringLiteral("maximumFileBytes"), 1024, 64 * 1024 * 1024);
+    limits.maximumHighlightedLineLength = static_cast<int>(read(QStringLiteral("maximumHighlightedLineLength"), 80, 100000));
+    limits.maximumHighlightedMatchesPerLine = static_cast<int>(read(QStringLiteral("maximumHighlightedMatchesPerLine"), 32, 100000));
+    limits.maximumSemanticTokenLines = static_cast<int>(read(QStringLiteral("maximumSemanticTokenLines"), 100, 1000000));
+    limits.maximumSearchMatches = static_cast<int>(read(QStringLiteral("maximumSearchMatches"), 100, 1000000));
+    limits.partialRepaintDivisor = static_cast<int>(read(QStringLiteral("partialRepaintDivisor"), 1, 100));
+    limits.changeDebounceMs = static_cast<int>(read(QStringLiteral("changeDebounceMs"), 10, 5000));
+    limits.analysisDebounceMs = static_cast<int>(read(QStringLiteral("analysisDebounceMs"), 10, 5000));
+    limits.highlightDebounceMs = static_cast<int>(read(QStringLiteral("highlightDebounceMs"), 10, 5000));
+    limits.externalChangeDebounceMs = static_cast<int>(read(QStringLiteral("externalChangeDebounceMs"), 10, 5000));
+    limits.maximumRestarts = static_cast<int>(read(QStringLiteral("maximumRestarts"), 0, 100));
+    limits.restartWindowMs = static_cast<int>(read(QStringLiteral("restartWindowMs"), 1000, 3600000));
+    limits.initializeTimeoutMs = static_cast<int>(read(QStringLiteral("initializeTimeoutMs"), 1000, 600000));
+    limits.maximumReferences = static_cast<int>(read(QStringLiteral("maximumReferences"), 10, 100000));
+    limits.maximumWorkspaceFiles = static_cast<int>(read(QStringLiteral("maximumWorkspaceFiles"), 100, 1000000));
+    limits.maximumProblems = static_cast<int>(read(QStringLiteral("maximumProblems"), 10, 100000));
+    limits.bottomPanelMinimumHeight = static_cast<int>(read(QStringLiteral("bottomPanelMinimumHeight"), 40, 2000));
+    limits.bottomPanelInitialHeight = static_cast<int>(read(QStringLiteral("bottomPanelInitialHeight"), 40, 2000));
+
+    if (!valid || limits.bottomPanelInitialHeight < limits.bottomPanelMinimumHeight) {
+        outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The catalog limits are invalid", {}});
+        return EditorLimits{};
+    }
+
+    return limits;
+}
+
+LanguageCatalog LanguageRegistry::parse(const QByteArray& text, utils::Result<void>& outcome) {
+    QJsonParseError error;
+    const QJsonDocument document = QJsonDocument::fromJson(text, &error);
+
+    if (error.error != QJsonParseError::NoError || !document.isObject() || !document.object().value(QStringLiteral("languages")).isArray() || !document.object().value(QStringLiteral("servers")).isArray()) {
+        outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The language catalog is not a catalog", error.errorString()});
+        return {};
+    }
+
+    const QJsonObject root = document.object();
+    LanguageCatalog catalog;
+    catalog.languages = LanguageRegistryHelper::createLanguages(root, outcome);
+    catalog.servers = LanguageRegistryHelper::createLanguageServers(root, catalog.languages, outcome);
+    catalog.beforeKeywords = LanguageRegistryHelper::sharedPatterns(root, QStringLiteral("beforeKeywords"), outcome);
+    catalog.afterKeywords = LanguageRegistryHelper::sharedPatterns(root, QStringLiteral("afterKeywords"), outcome);
+    catalog.controlFlowKeywords = LanguageRegistryHelper::sharedKeywords(root, QStringLiteral("controlFlow"), outcome);
+    catalog.primitiveTypeKeywords = LanguageRegistryHelper::sharedKeywords(root, QStringLiteral("primitiveTypes"), outcome);
+    catalog.semanticRoles = LanguageRegistryHelper::createSemanticRoles(root, outcome);
+    catalog.limits = LanguageRegistryHelper::createLimits(root, outcome);
+    return catalog;
+}
+
+// The catalog is data, so a language, a server or a tunable is added by one entry in the file and never by interface code.
+const LanguageCatalog& parsedCatalog() {
+    // clang-format off
+    static const LanguageCatalog value = [] {
+        utils::Result<void>& outcome = LanguageRegistry::mutableCatalogError();
+        QFile file(QStringLiteral(":/slotdeck/code-editor/assets/languages.json"));
+
+        if (!file.open(QIODevice::ReadOnly)) {
+            outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The language catalog is unavailable", {}});
+            return LanguageCatalog{};
+        }
+
+        return LanguageRegistry::parse(file.readAll(), outcome);
     }();
-    return patterns;
+    // clang-format on
+    return value;
+}
+
+const QVector<HighlightPattern>& LanguageRegistry::patternsBeforeKeywords() {
+    return parsedCatalog().beforeKeywords;
 }
 
 const QVector<HighlightPattern>& LanguageRegistry::patternsAfterKeywords() {
-    static const QVector<HighlightPattern> patterns = [] {
-        utils::Result<void>& outcome = mutableCatalogError();
-        const QJsonObject catalog = LanguageRegistryHelper::readCatalog(outcome);
-        bool valid = true;
-        QVector<HighlightPattern> values = LanguageRegistryHelper::patternList(catalog.value(QStringLiteral("highlighting")).toObject().value(QStringLiteral("afterKeywords")).toArray(), valid);
-
-        if (!valid || values.isEmpty()) {
-            outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The catalog highlighting patterns are invalid", QStringLiteral("afterKeywords")});
-            return QVector<HighlightPattern>{};
-        }
-
-        return values;
-    }();
-    return patterns;
+    return parsedCatalog().afterKeywords;
 }
 
 const QStringList& LanguageRegistry::controlFlowKeywords() {
-    static const QStringList values = [] {
-        utils::Result<void>& outcome = mutableCatalogError();
-        const QJsonObject catalog = LanguageRegistryHelper::readCatalog(outcome);
-        bool valid = true;
-        const QStringList declared = LanguageRegistryHelper::textList(catalog.value(QStringLiteral("highlighting")).toObject(), QStringLiteral("controlFlow"), valid);
-
-        if (!valid || declared.isEmpty()) {
-            outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The catalog highlighting keywords are invalid", QStringLiteral("controlFlow")});
-            return QStringList{};
-        }
-
-        return declared;
-    }();
-    return values;
+    return parsedCatalog().controlFlowKeywords;
 }
 
 const QStringList& LanguageRegistry::primitiveTypeKeywords() {
-    static const QStringList values = [] {
-        utils::Result<void>& outcome = mutableCatalogError();
-        const QJsonObject catalog = LanguageRegistryHelper::readCatalog(outcome);
-        bool valid = true;
-        const QStringList declared = LanguageRegistryHelper::textList(catalog.value(QStringLiteral("highlighting")).toObject(), QStringLiteral("primitiveTypes"), valid);
-
-        if (!valid || declared.isEmpty()) {
-            outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The catalog highlighting keywords are invalid", QStringLiteral("primitiveTypes")});
-            return QStringList{};
-        }
-
-        return declared;
-    }();
-    return values;
+    return parsedCatalog().primitiveTypeKeywords;
 }
 
 const QMap<QString, HighlightRole>& LanguageRegistry::semanticRoles() {
-    static const QMap<QString, HighlightRole> roles = [] {
-        utils::Result<void>& outcome = mutableCatalogError();
-        const QJsonObject catalog = LanguageRegistryHelper::readCatalog(outcome);
-        const QJsonObject declared = catalog.value(QStringLiteral("highlighting")).toObject().value(QStringLiteral("semantic")).toObject();
-        QMap<QString, HighlightRole> values;
-
-        for (auto entry = declared.constBegin(); entry != declared.constEnd(); ++entry) {
-            const auto role = LanguageRegistryHelper::roleFromIdentifier(entry.value().toString());
-            if (!role.has_value()) {
-                outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "A catalog semantic token declares an unknown role", entry.key()});
-                return QMap<QString, HighlightRole>{};
-            }
-            values.insert(entry.key(), *role);
-        }
-
-        if (values.isEmpty()) {
-            outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The catalog declares no semantic token", {}});
-        }
-
-        return values;
-    }();
-    return roles;
+    return parsedCatalog().semanticRoles;
 }
 
 const EditorLimits& LanguageRegistry::limits() {
-    static const EditorLimits values = [] {
-        utils::Result<void>& outcome = mutableCatalogError();
-        const QJsonObject declared = LanguageRegistryHelper::readCatalog(outcome).value(QStringLiteral("limits")).toObject();
-        EditorLimits limits;
-        bool valid = true;
-        const auto read = [&declared, &valid](const QString& key, int minimum, int maximum) {
-            const QJsonValue value = declared.value(key);
-
-            if (!value.isDouble() || value.toInteger() < minimum || value.toInteger() > maximum) {
-                valid = false;
-                return 0LL;
-            }
-
-            return value.toInteger();
-        };
-
-        limits.maximumFileBytes = read(QStringLiteral("maximumFileBytes"), 1024, 64 * 1024 * 1024);
-        limits.maximumHighlightedLineLength = static_cast<int>(read(QStringLiteral("maximumHighlightedLineLength"), 80, 100000));
-        limits.maximumHighlightedMatchesPerLine = static_cast<int>(read(QStringLiteral("maximumHighlightedMatchesPerLine"), 32, 100000));
-        limits.maximumSemanticTokenLines = static_cast<int>(read(QStringLiteral("maximumSemanticTokenLines"), 100, 1000000));
-        limits.maximumSearchMatches = static_cast<int>(read(QStringLiteral("maximumSearchMatches"), 100, 1000000));
-        limits.partialRepaintDivisor = static_cast<int>(read(QStringLiteral("partialRepaintDivisor"), 1, 100));
-        limits.changeDebounceMs = static_cast<int>(read(QStringLiteral("changeDebounceMs"), 10, 5000));
-        limits.analysisDebounceMs = static_cast<int>(read(QStringLiteral("analysisDebounceMs"), 10, 5000));
-        limits.highlightDebounceMs = static_cast<int>(read(QStringLiteral("highlightDebounceMs"), 10, 5000));
-        limits.externalChangeDebounceMs = static_cast<int>(read(QStringLiteral("externalChangeDebounceMs"), 10, 5000));
-        limits.maximumRestarts = static_cast<int>(read(QStringLiteral("maximumRestarts"), 0, 100));
-        limits.restartWindowMs = static_cast<int>(read(QStringLiteral("restartWindowMs"), 1000, 3600000));
-        limits.initializeTimeoutMs = static_cast<int>(read(QStringLiteral("initializeTimeoutMs"), 1000, 600000));
-        limits.maximumReferences = static_cast<int>(read(QStringLiteral("maximumReferences"), 10, 100000));
-        limits.maximumWorkspaceFiles = static_cast<int>(read(QStringLiteral("maximumWorkspaceFiles"), 100, 1000000));
-        limits.maximumProblems = static_cast<int>(read(QStringLiteral("maximumProblems"), 10, 100000));
-        limits.bottomPanelMinimumHeight = static_cast<int>(read(QStringLiteral("bottomPanelMinimumHeight"), 40, 2000));
-        limits.bottomPanelInitialHeight = static_cast<int>(read(QStringLiteral("bottomPanelInitialHeight"), 40, 2000));
-
-        if (!valid || limits.bottomPanelInitialHeight < limits.bottomPanelMinimumHeight) {
-            outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The catalog limits are invalid", {}});
-            return EditorLimits{};
-        }
-
-        return limits;
-    }();
-    return values;
+    return parsedCatalog().limits;
 }
 
 const LanguageDefinition* LanguageRegistry::languageForId(const QString& languageId) {
@@ -379,13 +371,11 @@ const LanguageDefinition* LanguageRegistry::languageForId(const QString& languag
 }
 
 const QVector<LanguageDefinition>& LanguageRegistry::languages() {
-    static const QVector<LanguageDefinition> values = LanguageRegistryHelper::createLanguages();
-    return values;
+    return parsedCatalog().languages;
 }
 
 const QVector<LanguageServerDefinition>& LanguageRegistry::languageServers() {
-    static const QVector<LanguageServerDefinition> values = LanguageRegistryHelper::createLanguageServers();
-    return values;
+    return parsedCatalog().servers;
 }
 
 const LanguageDefinition& LanguageRegistry::languageForPath(const QString& path) {
