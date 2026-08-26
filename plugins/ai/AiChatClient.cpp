@@ -12,6 +12,8 @@
 
 namespace slotdeck::plugins::ai {
 
+constexpr int maximumFieldDepth = 16;
+
 constexpr qsizetype maximumStreamBufferBytes = 1 << 20;
 constexpr qsizetype maximumContentCharacters = 1 << 22;
 constexpr qsizetype maximumFailureBodyBytes = 1 << 16;
@@ -61,6 +63,11 @@ void AiChatClientHelper::removeAtPath(QJsonObject& target, const QStringList& se
 
 void AiChatClientHelper::applyField(QJsonObject& body, const QString& field, const QJsonValue& value) {
     const QStringList segments = field.split(QLatin1Char('.'));
+
+    // A wire field names a handful of levels, so a path deeper than the bound reaches nothing rather than one frame per segment.
+    if (segments.size() > maximumFieldDepth) {
+        return;
+    }
 
     if (value.isNull()) {
         removeAtPath(body, segments);

@@ -2257,4 +2257,66 @@ TEST(EditorConfigTest, AnswersEveryHostileDocumentInsteadOfReadingPastIt) {
     }
 }
 
+TEST(LanguageServerClientTest, AnswersEveryMalformedFrameInsteadOfReadingPastIt) {
+    QTemporaryDir root;
+    ASSERT_TRUE(root.isValid());
+    const QString path = QDir(root.path()).filePath(QStringLiteral("main.cpp"));
+
+    // Each shape is one way a server can frame a message wrongly, and every one must end in an answer.
+    for (int shape = 0; shape <= 11; ++shape) {
+        LanguageServerClient client({QStringLiteral("cpp"), QCoreApplication::applicationFilePath(), {QStringLiteral("--slotdeck-test-lsp-malformed"), QString::number(shape)}}, root.path());
+        int answers = 0;
+        // clang-format off
+        QObject::connect(&client, &LanguageServerClient::serverError, &client, [&answers](const QString&) { ++answers; });
+        QObject::connect(&client, &LanguageServerClient::serverLog, &client, [&answers](const QString&) { ++answers; });
+        QObject::connect(&client, &LanguageServerClient::stopped, &client, [&answers]() { ++answers; });
+        // clang-format on
+
+        client.openDocument(path, QStringLiteral("int main() {}"), QStringLiteral("cpp"));
+        client.start();
+        // clang-format off
+        ASSERT_TRUE(test::waitUntil([&]() { return answers > 0; }, 30000)) << "shape " << shape;
+        // clang-format on
+        EXPECT_FALSE(client.ready()) << "shape " << shape;
+        client.stop();
+    }
+
+    LanguageServerClient::drainTransports();
+}
+
+TEST(LanguageServerClientTest, StopsReadingAnOutlineNestedDeeperThanItDeclares) {
+    QTemporaryDir root;
+    ASSERT_TRUE(root.isValid());
+    const QString path = QDir(root.path()).filePath(QStringLiteral("main.cpp"));
+    LanguageServerClient client({QStringLiteral("cpp"), QCoreApplication::applicationFilePath(), {QStringLiteral("--slotdeck-test-lsp-deep-outline")}}, root.path());
+    QVector<DocumentSymbolNode> outline;
+    bool answered = false;
+    // clang-format off
+    QObject::connect(&client, &LanguageServerClient::documentSymbolsReady, &client, [&](const QString&, const QVector<DocumentSymbolNode>& symbols) { outline = symbols; answered = true; });
+    // clang-format on
+
+    client.openDocument(path, QStringLiteral("int main() {}"), QStringLiteral("cpp"));
+    client.start();
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return client.ready(); }, 30000));
+    // clang-format on
+    client.requestDocumentSymbols(path);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return answered; }, 30000));
+    // clang-format on
+
+    // An outline nests as deep as the server says, so what is read of it costs the depth this project declares.
+    int depth = 0;
+    const QVector<DocumentSymbolNode>* level = &outline;
+    while (!level->isEmpty()) {
+        ++depth;
+        level = &level->first().children;
+    }
+    EXPECT_GT(depth, 0);
+    EXPECT_LE(depth, 64);
+
+    client.stop();
+    LanguageServerClient::drainTransports();
+}
+
 } // namespace slotdeck::plugins::codeeditor

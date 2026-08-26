@@ -2185,4 +2185,30 @@ TEST(AiTaskRepositoryTest, RejectsAnIssueAddressThatIsNotAWebAddress) {
     EXPECT_TRUE(test::awaitFuture(repository.saveTask(task)).hasValue());
 }
 
+TEST(AiMcpClientTest, AnswersEveryMalformedLineInsteadOfReadingPastIt) {
+    // Each shape is one way a server can write a line wrongly, and every one must end with the client answering.
+    for (int shape = 0; shape <= 7; ++shape) {
+        McpServerDescriptor fixture;
+        fixture.id = QStringLiteral("fixture");
+        fixture.command = QCoreApplication::applicationFilePath();
+        fixture.arguments = {QStringLiteral("--slotdeck-test-mcp-malformed"), QString::number(shape)};
+
+        AiMcpClient client(fixture);
+        int answers = 0;
+        // clang-format off
+        QObject::connect(&client, &AiMcpClient::failed, &client, [&answers](const utils::Error&) { ++answers; });
+        QObject::connect(&client, &AiMcpClient::initialized, &client, [&answers]() { ++answers; });
+        // clang-format on
+
+        client.start();
+        // clang-format off
+        ASSERT_TRUE(test::waitUntil([&]() { return answers > 0; }, 30000)) << "shape " << shape;
+        // clang-format on
+        EXPECT_FALSE(client.ready()) << "shape " << shape;
+        client.stop();
+    }
+
+    AiMcpClient::drainTransports();
+}
+
 } // namespace slotdeck::plugins::ai

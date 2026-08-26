@@ -15,6 +15,7 @@
 #endif
 
 #include <chrono>
+#include <cstdlib>
 #include <iostream>
 #include <string>
 #include <string_view>
@@ -22,7 +23,7 @@
 
 QString languageServerDocumentUri;
 
-enum class LanguageServerFixture { Normal, InvalidProtocol, Crashing, Silent, SlowStart };
+enum class LanguageServerFixture { Normal, InvalidProtocol, Crashing, Silent, SlowStart, Malformed, DeepOutline };
 
 class TestMainHelper final {
   public:
@@ -30,7 +31,10 @@ class TestMainHelper final {
     static void sendLanguageServerMessage(const QJsonObject& message);
     static void sendLanguageServerDiagnostic(const QString& message);
     static int runMcpServerFixture();
-    static int runLanguageServerFixture(LanguageServerFixture mode);
+    static int runLanguageServerFixture(LanguageServerFixture mode, int shape = 0);
+    static int argumentValue(int argc, char** argv, std::string_view expected);
+    static void writeMalformedLanguageServerFrame(int shape);
+    static void writeMalformedMcpLine(int shape);
 };
 
 bool TestMainHelper::hasArgument(int argc, char** argv, std::string_view expected) {
@@ -41,6 +45,95 @@ bool TestMainHelper::hasArgument(int argc, char** argv, std::string_view expecte
     }
 
     return false;
+}
+
+int TestMainHelper::argumentValue(int argc, char** argv, std::string_view expected) {
+    for (int index = 1; index + 1 < argc; ++index) {
+        if (argv[index] == expected) {
+            return std::atoi(argv[index + 1]);
+        }
+    }
+
+    return 0;
+}
+
+// Every shape is one way a server can frame a message wrongly, written on purpose so the transport is proven against it.
+void TestMainHelper::writeMalformedLanguageServerFrame(int shape) {
+    const QByteArray body = QByteArrayLiteral(R"({"jsonrpc":"2.0","method":"window/logMessage","params":{"type":3,"message":"framed"}})");
+    switch (shape) {
+    case 0:
+        std::cout << "\r\n\r\n";
+        break;
+    case 1:
+        std::cout << "Content-Length: 12\r\nContent-Length: 12\r\n\r\n";
+        std::cout.write(body.constData(), 12);
+        break;
+    case 2:
+        std::cout << "Content-Length: notanumber\r\n\r\n";
+        break;
+    case 3:
+        std::cout << "Content-Length: -5\r\n\r\n";
+        break;
+    case 4:
+        std::cout << "Content-Length: 99999999999\r\n\r\n";
+        break;
+    case 5:
+        std::cout << "Content-Length: " << body.size() + 4096 << "\r\n\r\n";
+        std::cout.write(body.constData(), body.size());
+        break;
+    case 6:
+        std::cout << "Content-Length: 4\r\n\r\n";
+        std::cout.write(body.constData(), body.size());
+        break;
+    case 7:
+        std::cout << "Content-Length: 7\r\n\r\nnotjson";
+        break;
+    case 8:
+        std::cout << "Content-Length: 2\r\n\r\n[]";
+        break;
+    case 9:
+        std::cout << "Content-Length: 21\r\n\r\n{\"jsonrpc\":\"1.0\",\"a\":1}";
+        break;
+    case 10:
+        std::cout << "Content-Length: 4\r\n\r\n";
+        std::cout.write("\0\0\0\0", 4);
+        break;
+    default:
+        std::cout << std::string(70000, 'h') << "\r\n\r\n";
+        break;
+    }
+    std::cout.flush();
+}
+
+void TestMainHelper::writeMalformedMcpLine(int shape) {
+    switch (shape) {
+    case 0:
+        std::cout << "\n";
+        break;
+    case 1:
+        std::cout << "not json at all\n";
+        break;
+    case 2:
+        std::cout << "[]\n";
+        break;
+    case 3:
+        std::cout << "{}\n";
+        break;
+    case 4:
+        std::cout << R"({"jsonrpc":"1.0","id":1,"result":{}})" << "\n";
+        break;
+    case 5:
+        std::cout << R"({"jsonrpc":"2.0","id":9999,"result":{}})" << "\n";
+        break;
+    case 6:
+        std::cout.write("\0\0\0\0", 4);
+        std::cout << "\n";
+        break;
+    default:
+        std::cout << std::string(2000000, 'x') << "\n";
+        break;
+    }
+    std::cout.flush();
 }
 
 void TestMainHelper::sendLanguageServerMessage(const QJsonObject& message) {
@@ -106,7 +199,7 @@ int TestMainHelper::runMcpServerFixture() {
     return 0;
 }
 
-int TestMainHelper::runLanguageServerFixture(LanguageServerFixture mode) {
+int TestMainHelper::runLanguageServerFixture(LanguageServerFixture mode, int shape) {
 #ifdef Q_OS_WIN
     _setmode(_fileno(stdin), _O_BINARY);
     _setmode(_fileno(stdout), _O_BINARY);
@@ -136,6 +229,11 @@ int TestMainHelper::runLanguageServerFixture(LanguageServerFixture mode) {
             continue;
         }
         if (method == QStringLiteral("initialize")) {
+            if (mode == LanguageServerFixture::Malformed) {
+                TestMainHelper::writeMalformedLanguageServerFrame(shape);
+                continue;
+            }
+
             if (mode == LanguageServerFixture::Silent) {
                 continue;
             }
@@ -169,6 +267,16 @@ int TestMainHelper::runLanguageServerFixture(LanguageServerFixture mode) {
             const QJsonObject range{{QStringLiteral("start"), QJsonObject{{QStringLiteral("line"), 3}, {QStringLiteral("character"), 1}}}, {QStringLiteral("end"), QJsonObject{{QStringLiteral("line"), 3}, {QStringLiteral("character"), 5}}}};
             TestMainHelper::sendLanguageServerMessage({{QStringLiteral("jsonrpc"), QStringLiteral("2.0")}, {QStringLiteral("id"), message.value(QStringLiteral("id"))}, {QStringLiteral("result"), QJsonArray{QJsonObject{{QStringLiteral("uri"), languageServerDocumentUri}, {QStringLiteral("range"), range}}}}});
         } else if (method == QStringLiteral("textDocument/documentSymbol")) {
+            if (mode == LanguageServerFixture::DeepOutline) {
+                const QJsonObject range{{QStringLiteral("start"), QJsonObject{{QStringLiteral("line"), 0}, {QStringLiteral("character"), 0}}}, {QStringLiteral("end"), QJsonObject{{QStringLiteral("line"), 0}, {QStringLiteral("character"), 1}}}};
+                QJsonObject nested{{QStringLiteral("name"), QStringLiteral("leaf")}, {QStringLiteral("kind"), 13}, {QStringLiteral("range"), range}, {QStringLiteral("selectionRange"), range}};
+                for (int level = 0; level < 400; ++level) {
+                    nested = QJsonObject{{QStringLiteral("name"), QStringLiteral("level")}, {QStringLiteral("kind"), 12}, {QStringLiteral("range"), range}, {QStringLiteral("selectionRange"), range}, {QStringLiteral("children"), QJsonArray{nested}}};
+                }
+                TestMainHelper::sendLanguageServerMessage({{QStringLiteral("jsonrpc"), QStringLiteral("2.0")}, {QStringLiteral("id"), message.value(QStringLiteral("id"))}, {QStringLiteral("result"), QJsonArray{nested}}});
+                continue;
+            }
+
             const QJsonObject range{{QStringLiteral("start"), QJsonObject{{QStringLiteral("line"), 0}, {QStringLiteral("character"), 4}}}, {QStringLiteral("end"), QJsonObject{{QStringLiteral("line"), 0}, {QStringLiteral("character"), 8}}}};
             const QJsonObject child{{QStringLiteral("name"), QStringLiteral("value")}, {QStringLiteral("kind"), 13}, {QStringLiteral("range"), range}, {QStringLiteral("selectionRange"), range}};
             TestMainHelper::sendLanguageServerMessage({{QStringLiteral("jsonrpc"), QStringLiteral("2.0")}, {QStringLiteral("id"), message.value(QStringLiteral("id"))}, {QStringLiteral("result"), QJsonArray{QJsonObject{{QStringLiteral("name"), QStringLiteral("main")}, {QStringLiteral("detail"), QStringLiteral("int ()")}, {QStringLiteral("kind"), 12}, {QStringLiteral("range"), range}, {QStringLiteral("selectionRange"), range}, {QStringLiteral("children"), QJsonArray{child}}}}}});
@@ -240,6 +348,17 @@ int main(int argc, char** argv) {
     }
     if (TestMainHelper::hasArgument(argc, argv, "--slotdeck-test-lsp-slow-start")) {
         return TestMainHelper::runLanguageServerFixture(LanguageServerFixture::SlowStart);
+    }
+    if (TestMainHelper::hasArgument(argc, argv, "--slotdeck-test-lsp-deep-outline")) {
+        return TestMainHelper::runLanguageServerFixture(LanguageServerFixture::DeepOutline);
+    }
+    if (TestMainHelper::hasArgument(argc, argv, "--slotdeck-test-lsp-malformed")) {
+        return TestMainHelper::runLanguageServerFixture(LanguageServerFixture::Malformed, TestMainHelper::argumentValue(argc, argv, "--slotdeck-test-lsp-malformed"));
+    }
+    if (TestMainHelper::hasArgument(argc, argv, "--slotdeck-test-mcp-malformed")) {
+        TestMainHelper::writeMalformedMcpLine(TestMainHelper::argumentValue(argc, argv, "--slotdeck-test-mcp-malformed"));
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+        return 0;
     }
 
     if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM")) {

@@ -770,6 +770,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The summary request carries no tools and its own output budget, and a summary that fails is reported as a warning while the run continues with the fitted conversation.
 - A compaction and its summary are recorded in the execution log, so a run that compacted says so instead of silently forgetting.
 - A tool result travels straight into the model context, so it is truncated with an explicit notice rather than allowed to fill the window.
+- A content block and a dotted wire field nest only as deep as the code declares, because whoever wrote them decides that depth.
 - The Anthropic API carries the instructions in its own field, so the system message is lifted out of the conversation for that protocol.
 - Each protocol declares the shape it demands, and every request satisfies it before it leaves, including the turn that follows a compaction, because the summary joins the conversation as a turn of its own and can land beside a turn of the same role.
 - The Anthropic API refuses a repeated role, so two consecutive turns of one role are joined into the single turn it expects, keeping the content blocks each one carried.
@@ -995,6 +996,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The process, the framing and the JSON of a language server live on a thread of their own, so a payload of any size is never read, parsed or written where the interface runs, and the client sees only messages already built.
 - That thread is asked to end and releases itself when it does, because closing a workspace must not wait for a child process to exit.
 - The language-server client validates header bounds, content lengths, JSON, JSON-RPC versions and bounded payload sizes before dispatch.
+- An outline nests only as deep as this project declares, because the server decides that depth and reading it costs one frame per level.
+- A client asks its transport for nothing once that transport is gone, because the thread that owns it ends before the client does.
 - Language-server initialization, document synchronization, diagnostics, completion, definition, hover, configuration requests, dynamic capability registration, workspace-folder requests, shutdown and exit follow the current Language Server Protocol contract.
 - A message carrying a method is a server request or notification and only a message without one answers a request the client sent, because a server numbers its own requests and would otherwise be read as our response.
 - The capabilities the initialize result declares decide what the client is allowed to send, so synchronization, save notifications, completion, definition and hover leave only for a server that offers them.
@@ -1212,6 +1215,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Security-sensitive path and protocol tests cover traversal, symlink escape, invalid encoding,
   malformed requests and configured resource limits.
 - Every parser that reads bytes somebody else decided is fed hostile input from a seeded generator, so it is proven to answer rather than to read past what it was given or never return.
+- A recursion whose depth comes from input carries a bound the code declares, because a stack is a resource the input must not choose the size of.
 - Time-dependent tests compare UTC values or bounded time ranges and do not depend on a fixed local
   timezone.
 - Test doubles remain in the test tree and no test-only behavior is compiled into production code.
@@ -1464,7 +1468,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 356 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 359 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
@@ -1499,6 +1503,9 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Many overlapping settings saves commit what reached storage, which is what the next start reads back.
 - [x] An EditorConfig section that never closes its brace is read once instead of costing the whole tail per brace.
 - [x] The web server, the provider stream and the settings reader answer every hostile input a seeded generator produces.
+- [x] Both framing transports answer every malformed frame a fixture writes on purpose instead of reading past it.
+- [x] An outline nested deeper than the declared bound is read to that bound rather than to the depth the server chose.
+- [x] A client that outlives its transport asks it for nothing.
 - [x] A full review with the sanitizers, Cppcheck, clang-tidy and hand inspection found no orphan translation key, no unused theme role or icon, no legacy marker and no plugin that clears its host before its asynchronous context.
 - [x] The language-server transport disconnects from the process it abandons, so a read already queued never reaches it without one.
 - [x] A request that was given its turn and stopped before hearing about it returns that turn, so a provider limited to one request at a time keeps admitting.

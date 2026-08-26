@@ -16,6 +16,7 @@
 namespace slotdeck::plugins::codeeditor {
 
 constexpr int transportDrainTimeoutMs = 5000;
+constexpr int maximumSymbolDepth = 64;
 
 class LanguageServerClientHelper final {
   public:
@@ -27,7 +28,7 @@ class LanguageServerClientHelper final {
     static QString symbolQueryMethod(SymbolQueryKind kind);
     static SourceLocation locationOf(const QJsonObject& entry);
     static QVector<SourceLocation> locationsOf(const QJsonValue& result);
-    static QVector<DocumentSymbolNode> symbolNodes(const QJsonArray& items);
+    static QVector<DocumentSymbolNode> symbolNodes(const QJsonArray& items, int depth);
     static QVector<LanguageDiagnostic> diagnosticsOf(const QString& path, const QJsonArray& items);
 };
 
@@ -112,8 +113,13 @@ QVector<SourceLocation> LanguageServerClientHelper::locationsOf(const QJsonValue
 }
 
 // A server answers either the nested document symbols or the flat symbol information, and both describe the same outline.
-QVector<DocumentSymbolNode> LanguageServerClientHelper::symbolNodes(const QJsonArray& items) {
+QVector<DocumentSymbolNode> LanguageServerClientHelper::symbolNodes(const QJsonArray& items, int depth) {
     QVector<DocumentSymbolNode> nodes;
+
+    // An outline nests as deep as the server says, so the depth it may reach is ours to declare rather than its.
+    if (depth >= maximumSymbolDepth) {
+        return nodes;
+    }
 
     for (const auto& entry : items) {
         const QJsonObject item = entry.toObject();
@@ -122,7 +128,7 @@ QVector<DocumentSymbolNode> LanguageServerClientHelper::symbolNodes(const QJsonA
             continue;
         }
         const SourceLocation location = locationOf(item.contains(QStringLiteral("selectionRange")) ? QJsonObject{{QStringLiteral("range"), item.value(QStringLiteral("selectionRange"))}} : item);
-        nodes.append({name, item.value(QStringLiteral("detail")).toString(), item.value(QStringLiteral("kind")).toInt(), location.line, location.character, symbolNodes(item.value(QStringLiteral("children")).toArray())});
+        nodes.append({name, item.value(QStringLiteral("detail")).toString(), item.value(QStringLiteral("kind")).toInt(), location.line, location.character, symbolNodes(item.value(QStringLiteral("children")).toArray(), depth + 1)});
     }
 
     return nodes;
@@ -187,8 +193,8 @@ LanguageServerClient::LanguageServerClient(ResolvedLanguageServer server, QStrin
     connect(m_transport, &LanguageServerTransport::startFailed, this, [this](const QString& message) { if (!m_stopping) { emit serverError(message); } });
     connect(m_transport, &LanguageServerTransport::protocolFailed, this, [this](const QString& message) { emit serverError(message); m_stopping = true; });
     connect(m_transport, &LanguageServerTransport::exited, this, [this](int exitCode) { m_running = false; processFinished(exitCode); });
-    connect(&m_stopTimer, &QTimer::timeout, this, [this]() { QMetaObject::invokeMethod(m_transport, "kill", Qt::QueuedConnection); });
-    connect(&m_initializeTimer, &QTimer::timeout, this, [this]() { emit serverLog(QStringLiteral("The language server did not answer initialization")); QMetaObject::invokeMethod(m_transport, "kill", Qt::QueuedConnection); });
+    connect(&m_stopTimer, &QTimer::timeout, this, [this]() { callTransport("kill"); });
+    connect(&m_initializeTimer, &QTimer::timeout, this, [this]() { emit serverLog(QStringLiteral("The language server did not answer initialization")); callTransport("kill"); });
     // clang-format on
     m_transportThread->start();
 }
@@ -196,12 +202,19 @@ LanguageServerClient::LanguageServerClient(ResolvedLanguageServer server, QStrin
 // The thread is asked to end and releases itself when it does, because the interface never waits for a child process to exit.
 // Everything this object receives is disconnected by its own destruction, so the transport of another thread is never touched from here.
 LanguageServerClient::~LanguageServerClient() {
-    QMetaObject::invokeMethod(m_transport, "shutdown", Qt::QueuedConnection);
+    callTransport("shutdown");
+}
+
+// The transport is gone once its thread has ended, so nothing it is asked to do reaches an object that is no longer there.
+void LanguageServerClient::callTransport(const char* method) {
+    if (m_transport != nullptr) {
+        QMetaObject::invokeMethod(m_transport, method, Qt::QueuedConnection);
+    }
 }
 
 void LanguageServerClient::start() {
     if (!m_running && !m_stopping) {
-        QMetaObject::invokeMethod(m_transport, "start", Qt::QueuedConnection);
+        callTransport("start");
     }
 }
 
@@ -466,7 +479,7 @@ void LanguageServerClient::stop() {
     m_stopTimer.start();
 
     if (!m_ready) {
-        QMetaObject::invokeMethod(m_transport, "requestTermination", Qt::QueuedConnection);
+        callTransport("requestTermination");
         return;
     }
 
@@ -674,12 +687,12 @@ void LanguageServerClient::handleShutdownResponse(const QJsonObject& message) {
 
     if (message.contains(QStringLiteral("result"))) {
         sendNotification(QStringLiteral("exit"), {});
-        QMetaObject::invokeMethod(m_transport, "requestTermination", Qt::QueuedConnection);
+        callTransport("requestTermination");
         return;
     }
 
     emit serverLog(message.value(QStringLiteral("error")).toObject().value(QStringLiteral("message")).toString(QStringLiteral("The language server rejected shutdown")));
-    QMetaObject::invokeMethod(m_transport, "requestTermination", Qt::QueuedConnection);
+    callTransport("requestTermination");
 }
 
 void LanguageServerClient::handleInitializeResponse(const QJsonObject& message) {
@@ -792,7 +805,7 @@ void LanguageServerClient::handleHighlightResponse(int requestId, const QJsonObj
 
 void LanguageServerClient::handleDocumentSymbolResponse(int requestId, const QJsonObject& message) {
     const QString path = m_documentSymbolRequests.take(requestId);
-    emit documentSymbolsReady(path, LanguageServerClientHelper::symbolNodes(message.value(QStringLiteral("result")).toArray()));
+    emit documentSymbolsReady(path, LanguageServerClientHelper::symbolNodes(message.value(QStringLiteral("result")).toArray(), 0));
 }
 
 void LanguageServerClient::handleWorkspaceSymbolResponse(int requestId, const QJsonObject& message) {
@@ -911,6 +924,10 @@ void LanguageServerClient::trackedRequest(const QString& method, const QJsonObje
 }
 
 void LanguageServerClient::send(const QJsonObject& message) {
+    if (m_transport == nullptr) {
+        return;
+    }
+
     QMetaObject::invokeMethod(m_transport, "send", Qt::QueuedConnection, Q_ARG(QJsonObject, message));
 }
 

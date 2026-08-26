@@ -8,6 +8,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QObject>
+#include <QPointer>
 #include <QSet>
 #include <QStringList>
 #include <QThread>
@@ -202,6 +203,7 @@ class LanguageServerClient final : public QObject {
     void applyCapabilities(const QJsonObject& capabilities);
     void send(const QJsonObject& message);
     void sendResponse(const QJsonValue& id, const QJsonValue& result);
+    void callTransport(const char* method);
     void sendErrorResponse(const QJsonValue& id, int code, const QString& message);
     void sendNotification(const QString& method, const QJsonObject& parameters);
     int sendRequest(const QString& method, const QJsonObject& parameters);
@@ -219,7 +221,7 @@ class LanguageServerClient final : public QObject {
     ResolvedLanguageServer m_server;
     QString m_rootPath;
     QThread* m_transportThread{nullptr};
-    LanguageServerTransport* m_transport{nullptr};
+    QPointer<LanguageServerTransport> m_transport;
     bool m_running{false};
     QTimer m_stopTimer;
     QTimer m_initializeTimer;

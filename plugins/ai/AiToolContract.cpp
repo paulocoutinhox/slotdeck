@@ -11,6 +11,8 @@
 
 namespace slotdeck::plugins::ai {
 
+constexpr int maximumBlockDepth = 64;
+
 constexpr qsizetype maximumReportedArgumentCharacters = 2000;
 
 class AiToolContractHelper final {
@@ -22,7 +24,7 @@ class AiToolContractHelper final {
     static qint64 messageTokens(const QJsonObject& message);
     static bool answersToolCalls(const QJsonObject& message);
     static QString prunedText(const QString& text);
-    static QJsonObject prunedBlock(const QJsonObject& block, bool& changed);
+    static QJsonObject prunedBlock(const QJsonObject& block, bool& changed, int depth);
     static QJsonObject prunedToolResult(const QJsonObject& message, bool& changed);
     static bool matchesDeclaredType(const QString& declared, const QJsonValue& value);
 };
@@ -94,7 +96,12 @@ QString AiToolContractHelper::prunedText(const QString& text) {
 }
 
 // A result that carries an image holds its text in its own blocks, so only text is shortened and everything else is left exactly as it was.
-QJsonObject AiToolContractHelper::prunedBlock(const QJsonObject& block, bool& changed) {
+QJsonObject AiToolContractHelper::prunedBlock(const QJsonObject& block, bool& changed, int depth) {
+    // A block nests as deep as whoever wrote it says, so the depth it may reach is ours to declare rather than theirs.
+    if (depth >= maximumBlockDepth) {
+        return block;
+    }
+
     QJsonObject shortened = block;
 
     if (block.value(QStringLiteral("content")).isString()) {
@@ -116,7 +123,7 @@ QJsonObject AiToolContractHelper::prunedBlock(const QJsonObject& block, bool& ch
     if (block.value(QStringLiteral("content")).isArray()) {
         QJsonArray carried;
         for (const auto& value : block.value(QStringLiteral("content")).toArray()) {
-            carried.append(prunedBlock(value.toObject(), changed));
+            carried.append(prunedBlock(value.toObject(), changed, depth + 1));
         }
         shortened.insert(QStringLiteral("content"), carried);
     }
@@ -138,7 +145,7 @@ QJsonObject AiToolContractHelper::prunedToolResult(const QJsonObject& message, b
     QJsonArray blocks;
 
     for (const auto& value : message.value(QStringLiteral("content")).toArray()) {
-        blocks.append(prunedBlock(value.toObject(), changed));
+        blocks.append(prunedBlock(value.toObject(), changed, 0));
     }
 
     pruned.insert(QStringLiteral("content"), blocks);
