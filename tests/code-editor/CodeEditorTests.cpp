@@ -2156,13 +2156,16 @@ TEST(CodeWorkspaceViewTest, SurvivesManyDocumentsOpenedEditedSavedAndClosedInOne
     auto* documents = view.findChild<ui::TabWidget*>(QStringLiteral("codeEditorDocuments"));
     ASSERT_NE(documents, nullptr);
 
-    QSignalSpy openFailures(&view, &CodeWorkspaceView::operationFailed);
+    QStringList failures;
+    // clang-format off
+    QObject::connect(&view, &CodeWorkspaceView::operationFailed, &view, [&failures](const QString& message) { failures.append(message); });
+    // clang-format on
 
     for (int round = 0; round < 3; ++round) {
         for (const auto& path : paths) {
             view.openFile(path);
         }
-        ASSERT_EQ(openFailures.count(), 0) << openFailures.first().first().toString().toStdString();
+        ASSERT_TRUE(failures.isEmpty()) << failures.join(QStringLiteral(" | ")).toStdString();
         // clang-format off
         ASSERT_TRUE(test::waitUntil([&]() { return documents->count() == paths.size(); }));
         // clang-format on
@@ -2173,7 +2176,7 @@ TEST(CodeWorkspaceViewTest, SurvivesManyDocumentsOpenedEditedSavedAndClosedInOne
         }
         view.saveAll();
         // clang-format off
-        ASSERT_TRUE(test::waitUntil([&]() { for (int index = 0; index < documents->count(); ++index) { if (qobject_cast<CodeDocument*>(documents->widget(index))->dirty()) { return false; } } return true; }));
+        ASSERT_TRUE(test::waitUntil([&]() { for (int index = 0; index < documents->count(); ++index) { if (qobject_cast<CodeDocument*>(documents->widget(index))->dirty()) { return false; } } return true; })) << "round " << round << " left documents dirty, reported: " << failures.join(QStringLiteral(" | ")).toStdString();
         // clang-format on
         while (documents->count() > 0) {
             documents->setCurrentIndex(0);
