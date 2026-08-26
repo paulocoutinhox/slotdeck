@@ -57,7 +57,7 @@ QWidget* DonatePlugin::createSettingsSection(const QString&, const QString&, QWi
 }
 
 void DonatePlugin::handleRequest(const QString&, const QString& topic, const QJsonObject&, PluginReply reply) {
-    reply(utils::Result<QJsonObject>::failure({"donate_request_unknown", "The Donate plugin does not handle this request", topic}));
+    reply(unhandledTopic(topic));
 }
 
 void DonatePlugin::handleEvent(const QString&, const QString&, const QJsonObject&) {}

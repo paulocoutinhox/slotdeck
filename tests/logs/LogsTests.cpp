@@ -32,7 +32,7 @@ TEST(LogsPluginTest, ValidatesPaginationClearingAndMessages) {
     // clang-format off
     const auto captureReply = [&replied](utils::Result<QJsonObject> result) {
         replied = true;
-        EXPECT_EQ(result.error().code, QStringLiteral("logs_request_invalid"));
+        EXPECT_EQ(result.error().code, QStringLiteral("plugin_message_topic_unknown"));
     };
     // clang-format on
     plugin.handleRequest(QStringLiteral("terminal"), QStringLiteral("invalid"), {}, captureReply);

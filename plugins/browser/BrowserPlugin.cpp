@@ -139,7 +139,7 @@ QWidget* BrowserPlugin::createSettingsSection(const QString& groupId, const QStr
 
 void BrowserPlugin::handleRequest(const QString&, const QString& topic, const QJsonObject& payload, PluginReply reply) {
     if (topic != QStringLiteral("browser.open") || !hasExactKeys(payload, {QStringLiteral("url")}) || !payload.value(QStringLiteral("url")).isString()) {
-        reply(utils::Result<QJsonObject>::failure({"browser_request_invalid", "The Browser request is invalid", topic}));
+        reply(unhandledTopic(topic));
         return;
     }
 

@@ -232,7 +232,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Plugin shutdown cancels every pending request before any plugin library starts shutting down.
 - Request callbacks and their captured plugin code are released while the owning library is still loaded.
 - Invalid senders, targets and empty topics produce asynchronous errors.
-- A target explicitly rejects every request topic it does not implement.
+- A target explicitly rejects every request topic it does not implement, and the shared `slotdeck::plugins::unhandledTopic` contract is the only implementation of that answer, so eight plugins report one condition by one name.
 - Events identify sender, topic and JSON object payload and are delivered asynchronously.
 - Events broadcast to every other initialized plugin.
 - Receivers ignore events from unrelated senders and topics because events are broadcast.
@@ -240,6 +240,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Unknown fields, missing fields, wrong types, duplicate identities and invalid references reject a
   consumed message.
 - The shared `slotdeck::plugins::hasExactKeys` contract is the only implementation of the exact-field payload check.
+- A parse that validates in steps keeps the first reason it refused for, because a later step writing over it tells the reader about something other than what they hit first.
 - Topics are namespaced by the defining plugin, such as `terminal.workspace.snapshot`.
 - The core publishes its own broadcast events under the `slotdeck` namespace through the same contract and never impersonates a plugin sender.
 - Payloads contain values only and never pointers, QObject addresses or C++ implementation types.
@@ -1578,6 +1579,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Plain text carries no format range of its own, measured as forty percent of the ranges a source line used to carry for no visible difference.
 - [x] A line dense enough to cost more than its colours keeps its text and loses them, while the longest line this project really writes keeps every colour it had.
 - [x] Every malformed language catalog the code declares a refusal for is refused from text, covering eighteen shapes across the languages, the servers, the highlighting and the limits.
+- [x] A catalog wrong in more than one way is refused for the reason its reader hits first.
+- [x] Every one of the eight plugins answers a topic it does not implement by the one shared name, asked through its own interface rather than sampled.
 - [x] The terminal, the editor and the shared document open on one monospaced family, and a family the user chose still wins over it.
 
 ## Recorded pending work

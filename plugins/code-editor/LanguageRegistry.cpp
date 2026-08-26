@@ -15,6 +15,7 @@ namespace slotdeck::plugins::codeeditor {
 class LanguageRegistryHelper final {
   public:
     static LanguageDefinition plainText();
+    static void reject(utils::Result<void>& outcome, const QString& message, const QString& detail);
     static QVector<LanguageDefinition> createLanguages(const QJsonObject& catalog, utils::Result<void>& outcome);
     static QVector<LanguageServerDefinition> createLanguageServers(const QJsonObject& catalog, const QVector<LanguageDefinition>& languages, utils::Result<void>& outcome);
     static QVector<HighlightPattern> sharedPatterns(const QJsonObject& catalog, const QString& key, utils::Result<void>& outcome);
@@ -30,12 +31,19 @@ LanguageDefinition LanguageRegistryHelper::plainText() {
     return {QStringLiteral("plaintext"), QStringLiteral("Plain Text"), {}, {}, {}, {}, {}, {}, {}, false};
 }
 
+// The first reason a catalog is refused is the one the reader hits first, so a later step does not write over it.
+void LanguageRegistryHelper::reject(utils::Result<void>& outcome, const QString& message, const QString& detail) {
+    if (outcome.hasValue()) {
+        outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", message, detail});
+    }
+}
+
 QVector<HighlightPattern> LanguageRegistryHelper::sharedPatterns(const QJsonObject& catalog, const QString& key, utils::Result<void>& outcome) {
     bool valid = true;
     QVector<HighlightPattern> values = patternList(catalog.value(QStringLiteral("highlighting")).toObject().value(key).toArray(), valid);
 
     if (!valid || values.isEmpty()) {
-        outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The catalog highlighting patterns are invalid", key});
+        reject(outcome, QStringLiteral("The catalog highlighting patterns are invalid"), key);
         return {};
     }
 
@@ -47,7 +55,7 @@ QStringList LanguageRegistryHelper::sharedKeywords(const QJsonObject& catalog, c
     const QStringList declared = textList(catalog.value(QStringLiteral("highlighting")).toObject(), key, valid);
 
     if (!valid || declared.isEmpty()) {
-        outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The catalog highlighting keywords are invalid", key});
+        reject(outcome, QStringLiteral("The catalog highlighting keywords are invalid"), key);
         return {};
     }
 
@@ -161,14 +169,14 @@ QVector<LanguageDefinition> LanguageRegistryHelper::createLanguages(const QJsonO
             language.keywords = entry.value(QStringLiteral("keywords")).toString().split(QLatin1Char(' '), Qt::SkipEmptyParts);
         }
         if (!valid || language.id.isEmpty() || language.name.isEmpty() || language.blockCommentStart.isEmpty() != language.blockCommentEnd.isEmpty()) {
-            outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "A catalog language is invalid", language.id});
+            reject(outcome, QStringLiteral("A catalog language is invalid"), language.id);
             return {plainText()};
         }
 
         // The first language claiming an extension is the one that answers for it, so a second claim would never be reached.
         for (const auto& extension : language.extensions) {
             if (claimed.contains(extension, Qt::CaseInsensitive)) {
-                outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "Two catalog languages claim one extension", extension});
+                reject(outcome, QStringLiteral("Two catalog languages claim one extension"), extension);
                 return {plainText()};
             }
             claimed.append(extension);
@@ -177,7 +185,7 @@ QVector<LanguageDefinition> LanguageRegistryHelper::createLanguages(const QJsonO
     }
 
     if (languages.isEmpty() || languages.last().id != QStringLiteral("plaintext")) {
-        outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The language catalog does not end with plain text", {}});
+        reject(outcome, QStringLiteral("The language catalog does not end with plain text"), {});
         return {plainText()};
     }
 
@@ -211,7 +219,7 @@ QVector<LanguageServerDefinition> LanguageRegistryHelper::createLanguageServers(
         };
 
         if (!valid || definition.candidates.isEmpty() || !declaresLanguage()) {
-            outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "A catalog language server is invalid", definition.languageId});
+            reject(outcome, QStringLiteral("A catalog language server is invalid"), definition.languageId);
             return {};
         }
         servers.append(definition);
@@ -241,14 +249,14 @@ QMap<QString, HighlightRole> LanguageRegistryHelper::createSemanticRoles(const Q
     for (auto entry = declared.constBegin(); entry != declared.constEnd(); ++entry) {
         const auto role = LanguageRegistryHelper::roleFromIdentifier(entry.value().toString());
         if (!role.has_value()) {
-            outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "A catalog semantic token declares an unknown role", entry.key()});
+            reject(outcome, QStringLiteral("A catalog semantic token declares an unknown role"), entry.key());
             return {};
         }
         values.insert(entry.key(), *role);
     }
 
     if (values.isEmpty()) {
-        outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The catalog declares no semantic token", {}});
+        reject(outcome, QStringLiteral("The catalog declares no semantic token"), {});
     }
 
     return values;
@@ -289,7 +297,7 @@ EditorLimits LanguageRegistryHelper::createLimits(const QJsonObject& catalog, ut
     limits.bottomPanelInitialHeight = static_cast<int>(read(QStringLiteral("bottomPanelInitialHeight"), 40, 2000));
 
     if (!valid || limits.bottomPanelInitialHeight < limits.bottomPanelMinimumHeight) {
-        outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The catalog limits are invalid", {}});
+        reject(outcome, QStringLiteral("The catalog limits are invalid"), {});
         return EditorLimits{};
     }
 
@@ -301,7 +309,7 @@ LanguageCatalog LanguageRegistry::parse(const QByteArray& text, utils::Result<vo
     const QJsonDocument document = QJsonDocument::fromJson(text, &error);
 
     if (error.error != QJsonParseError::NoError || !document.isObject() || !document.object().value(QStringLiteral("languages")).isArray() || !document.object().value(QStringLiteral("servers")).isArray()) {
-        outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The language catalog is not a catalog", error.errorString()});
+        LanguageRegistryHelper::reject(outcome, QStringLiteral("The language catalog is not a catalog"), error.errorString());
         return {};
     }
 
@@ -326,7 +334,7 @@ const LanguageCatalog& parsedCatalog() {
         QFile file(QStringLiteral(":/slotdeck/code-editor/assets/languages.json"));
 
         if (!file.open(QIODevice::ReadOnly)) {
-            outcome = utils::Result<void>::failure({"code_editor_catalog_invalid", "The language catalog is unavailable", {}});
+            LanguageRegistryHelper::reject(outcome, QStringLiteral("The language catalog is unavailable"), {});
             return LanguageCatalog{};
         }
 

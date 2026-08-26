@@ -200,7 +200,7 @@ TEST(AiPluginTest, PublishesCompleteMetadataAndRejectsUnknownRequests) {
     plugin.handleRequest(QStringLiteral("test"), QStringLiteral("ai.unknown"), {}, [&response](utils::Result<QJsonObject> result) { response = std::move(result); });
     // clang-format on
     ASSERT_TRUE(response.has_value());
-    EXPECT_EQ(response->error().code, QStringLiteral("ai_tasks_request_invalid"));
+    EXPECT_EQ(response->error().code, QStringLiteral("plugin_message_topic_unknown"));
     plugin.shutdown();
 }
 

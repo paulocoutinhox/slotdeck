@@ -172,7 +172,7 @@ TEST(SystemInformationPluginTest, PublishesCompleteMetadataAndRejectsInvalidLife
     plugin.handleRequest(QStringLiteral("test"), QStringLiteral("unknown"), {}, [&response](utils::Result<QJsonObject> result) { response = std::move(result); });
     // clang-format on
     ASSERT_TRUE(response.has_value());
-    EXPECT_EQ(response->error().code, QStringLiteral("system_information_request_unknown"));
+    EXPECT_EQ(response->error().code, QStringLiteral("plugin_message_topic_unknown"));
     plugin.handleEvent(QStringLiteral("test"), QStringLiteral("event"), {});
     plugin.shutdown();
     EXPECT_EQ(plugin.createNavigationView(QStringLiteral("overview"), nullptr), nullptr);

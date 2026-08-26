@@ -207,7 +207,7 @@ TEST(BrowserPluginTest, HandlesOpenRequestsAndReportsPersistenceFailures) {
     plugin.handleRequest(QStringLiteral("sample"), QStringLiteral("unknown"), {}, [&reply](utils::Result<QJsonObject> result) { reply = std::move(result); });
     // clang-format on
     ASSERT_TRUE(reply.has_value());
-    EXPECT_EQ(reply->error().code, QStringLiteral("browser_request_invalid"));
+    EXPECT_EQ(reply->error().code, QStringLiteral("plugin_message_topic_unknown"));
 }
 TEST(BrowserPluginTest, CancelsPendingPersistenceCallbacksDuringShutdown) {
     auto host = BrowserTestsHelper::browserHost();

@@ -250,7 +250,7 @@ void CodeEditorPlugin::handleRequest(const QString&, const QString& topic, const
         return;
     }
 
-    reply(utils::Result<QJsonObject>::failure({"code_editor_request_invalid", "The Code Editor request is invalid", topic}));
+    reply(unhandledTopic(topic));
 }
 
 void CodeEditorPlugin::handleEvent(const QString&, const QString& topic, const QJsonObject& payload) {

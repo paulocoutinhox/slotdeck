@@ -2745,6 +2745,18 @@ TEST(LanguageRegistryTest, RefusesEveryMalformedCatalogItDeclaresARefusalFor) {
         ASSERT_FALSE(rejected.hasValue()) << shape.first.toStdString() << " was accepted";
         EXPECT_EQ(rejected.error().code, std::string{"code_editor_catalog_invalid"}) << shape.first.toStdString();
     }
+
+    // A catalog wrong in more than one way is refused for the reason its reader hits first, rather than for whichever step ran last.
+    QJsonObject brokenTwice = original;
+    brokenTwice.insert(QStringLiteral("languages"), QJsonArray{});
+    QJsonObject highlighting = original.value(QStringLiteral("highlighting")).toObject();
+    highlighting.insert(QStringLiteral("controlFlow"), QJsonArray{});
+    brokenTwice.insert(QStringLiteral("highlighting"), highlighting);
+    utils::Result<void> first = utils::Result<void>::success();
+    const LanguageCatalog twice = LanguageRegistry::parse(QJsonDocument(brokenTwice).toJson(), first);
+    Q_UNUSED(twice);
+    ASSERT_FALSE(first.hasValue());
+    EXPECT_TRUE(first.error().message.contains(QStringLiteral("plain text"))) << "the reported reason is " << first.error().message.toStdString();
 }
 
 } // namespace slotdeck::plugins::codeeditor

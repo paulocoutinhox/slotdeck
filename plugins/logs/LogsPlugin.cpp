@@ -311,7 +311,7 @@ void LogsPlugin::handleRequest(const QString&, const QString& topic, const QJson
         return;
     }
 
-    reply(utils::Result<QJsonObject>::failure({"logs_request_invalid", "The Logs request is invalid", topic}));
+    reply(unhandledTopic(topic));
 }
 
 void LogsPlugin::handleEvent(const QString& senderPluginId, const QString& topic, const QJsonObject& payload) {

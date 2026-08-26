@@ -187,6 +187,11 @@ inline bool hasExactKeys(const QJsonObject& object, const QSet<QString>& expecte
     return actual == expected;
 }
 
+// Every plugin answers a request it does not implement, so the one condition carries the one code.
+inline utils::Result<QJsonObject> unhandledTopic(const QString& topic) {
+    return utils::Result<QJsonObject>::failure({"plugin_message_topic_unknown", "The plugin does not handle this request topic", topic});
+}
+
 // The core broadcasts this topic so every surface steps its own content font size.
 inline constexpr auto contentFontStepTopic = "slotdeck.appearance.font-step";
 

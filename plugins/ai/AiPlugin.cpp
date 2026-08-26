@@ -366,7 +366,7 @@ void AiPlugin::handleRequest(const QString&, const QString& topic, const QJsonOb
         return;
     }
 
-    reply(utils::Result<QJsonObject>::failure({"ai_tasks_request_invalid", "The AI request is invalid", topic}));
+    reply(unhandledTopic(topic));
 }
 
 // The chat is a content surface, so it answers the zoom the shell broadcasts like every other one.

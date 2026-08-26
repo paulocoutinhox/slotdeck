@@ -213,7 +213,7 @@ void TerminalPlugin::handleRequest(const QString&, const QString& topic, const Q
         return;
     }
 
-    reply(utils::Result<QJsonObject>::failure({"plugin_message_topic_unknown", "The Terminal plugin does not handle this topic", topic}));
+    reply(unhandledTopic(topic));
 }
 
 void TerminalPlugin::handleEvent(const QString&, const QString& topic, const QJsonObject& payload) {

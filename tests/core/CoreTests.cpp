@@ -2227,6 +2227,32 @@ TEST(PluginManagerIntegrationTest, HoldsEveryPluginToTheContractTheStandardState
         }
     }
 
+    // One condition carries one code, so every plugin answers a topic it does not implement by the same name.
+    // Qt hands back the instance the manager already loaded, so every plugin can be asked here.
+    int asked = 0;
+    const QDir applicationDirectory(QCoreApplication::applicationDirPath());
+
+    for (const auto& candidate : {QStringLiteral("plugins"), QStringLiteral("../PlugIns")}) {
+        for (const auto& entry : QDir(applicationDirectory.filePath(candidate)).entryInfoList(QDir::Files)) {
+            QPluginLoader loader(entry.absoluteFilePath());
+            auto* plugin = qobject_cast<plugins::PluginInterface*>(loader.instance());
+
+            if (plugin == nullptr) {
+                continue;
+            }
+
+            ++asked;
+            QString reported;
+            // clang-format off
+            const auto record = [&reported](const utils::Result<QJsonObject>& result) { reported = result.hasValue() ? QStringLiteral("answered") : result.error().code; };
+            // clang-format on
+            plugin->handleRequest(QStringLiteral("logs"), QStringLiteral("nobody.declares.this"), {}, record);
+            EXPECT_EQ(reported, QStringLiteral("plugin_message_topic_unknown")) << plugin->id().toStdString() << " reports an unknown topic by a name of its own";
+        }
+    }
+
+    EXPECT_EQ(asked, owners.size()) << "a plugin was never asked how it answers a topic it does not implement";
+
     // Every plugin that declares a schema declares version one and owns the tables carrying its own prefix.
     const auto versions = manager.databaseSchemaVersions();
     for (auto version = versions.constBegin(); version != versions.constEnd(); ++version) {

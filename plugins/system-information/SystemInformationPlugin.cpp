@@ -75,7 +75,7 @@ QWidget* SystemInformationPlugin::createSettingsSection(const QString&, const QS
 }
 
 void SystemInformationPlugin::handleRequest(const QString&, const QString& topic, const QJsonObject&, PluginReply reply) {
-    reply(utils::Result<QJsonObject>::failure({"system_information_request_unknown", "The System Information plugin does not handle this request", topic}));
+    reply(unhandledTopic(topic));
 }
 
 void SystemInformationPlugin::handleEvent(const QString&, const QString&, const QJsonObject&) {}

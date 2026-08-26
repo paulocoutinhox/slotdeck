@@ -246,7 +246,7 @@ void WebServerPlugin::handleRequest(const QString&, const QString& topic, const 
         return;
     }
 
-    reply(utils::Result<QJsonObject>::failure({"plugin_message_topic_unknown", "The Web Server plugin does not handle this topic", topic}));
+    reply(unhandledTopic(topic));
 }
 
 // One folder is served by one configuration, so asking again for a folder already configured opens the form of that server instead of a second one for the same root.
