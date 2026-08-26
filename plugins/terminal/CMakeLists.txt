@@ -1,9 +1,11 @@
-set(TERMINAL_PLUGIN_SOURCES
+qt_add_library(
+    SlotDeckTerminalObjects
+    OBJECT
     TerminalPlugin.cpp
     TerminalPlugin.h
-    TerminalTranslations.h
     TerminalSettingsStore.cpp
     TerminalSettingsStore.h
+    TerminalTranslations.h
     TerminalView.cpp
     TerminalView.h
     TerminalWorkspaceRepository.cpp
@@ -23,8 +25,6 @@ set(TERMINAL_PLUGIN_SOURCES
     workspace/WorkspaceManager.cpp
     workspace/WorkspaceManager.h
 )
-
-qt_add_library(SlotDeckTerminalObjects OBJECT ${TERMINAL_PLUGIN_SOURCES})
 target_include_directories(
     SlotDeckTerminalObjects
     PUBLIC

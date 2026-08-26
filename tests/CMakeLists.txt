@@ -139,16 +139,16 @@ slotdeck_add_test_suite(
     SlotDeckDonateTests
     donate/DonateTests.cpp
 )
-target_link_libraries(SlotDeckDonateTests PRIVATE DonatePluginObjects SlotDeckCore)
+target_link_libraries(SlotDeckDonateTests PRIVATE SlotDeckDonateObjects SlotDeckCore)
 
 slotdeck_add_test_suite(
     SlotDeckBrowserTests
     browser/BrowserTests.cpp
 )
-target_link_libraries(SlotDeckBrowserTests PRIVATE BrowserPluginObjects SlotDeckCore)
+target_link_libraries(SlotDeckBrowserTests PRIVATE SlotDeckBrowserObjects SlotDeckCore)
 
 slotdeck_add_test_suite(
     SlotDeckCodeEditorTests
     code-editor/CodeEditorTests.cpp
 )
-target_link_libraries(SlotDeckCodeEditorTests PRIVATE CodeEditorPluginObjects SlotDeckCore)
+target_link_libraries(SlotDeckCodeEditorTests PRIVATE SlotDeckCodeEditorObjects SlotDeckCore)

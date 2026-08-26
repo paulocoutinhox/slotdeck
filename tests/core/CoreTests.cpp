@@ -1713,7 +1713,7 @@ TEST(ConfigurationTransferTest, RejectsReadableDatabasesWithCorruptedCoreState) 
 TEST(ApplicationTest, ValidatesStartupLockInterfaceLifecycleAndRecovery) {
     app::Application invalid(QString{}, nullptr);
     EXPECT_EQ(invalid.loadInterface().error().code, QStringLiteral("application_not_initialized"));
-    EXPECT_EQ(invalid.initialize().error().code, QStringLiteral("data_directory_failed"));
+    EXPECT_EQ(invalid.initialize().error().code, QStringLiteral("application_data_directory_failed"));
 
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());
@@ -1823,9 +1823,9 @@ TEST(PluginManagerIntegrationTest, DiscoversInitializesAndBuildsThePluginDrivenI
     ASSERT_TRUE(manager.setLocale(settings.language()).hasValue());
     const auto loadResult = manager.loadPlugins();
     ASSERT_TRUE(loadResult.hasValue()) << loadResult.error().code.toStdString() << " " << loadResult.error().detail.toStdString();
-    EXPECT_EQ(manager.loadPlugins().error().code, QStringLiteral("plugins_already_loaded"));
+    EXPECT_EQ(manager.loadPlugins().error().code, QStringLiteral("plugin_already_loaded"));
     ASSERT_TRUE(manager.initialize(directory.path(), store, databaseExecutor).hasValue());
-    EXPECT_EQ(manager.initialize(directory.path(), store, databaseExecutor).error().code, QStringLiteral("plugins_already_initialized"));
+    EXPECT_EQ(manager.initialize(directory.path(), store, databaseExecutor).error().code, QStringLiteral("plugin_already_initialized"));
     EXPECT_EQ(store.pluginSchemaVersion(QStringLiteral("logs")).value(), 1);
     EXPECT_EQ(store.pluginSchemaVersion(QStringLiteral("ai")).value(), 1);
     EXPECT_EQ(store.pluginSchemaVersion(QStringLiteral("terminal")).value(), 1);

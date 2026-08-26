@@ -191,7 +191,7 @@ utils::Result<void> PosixPtyBackend::start(const ShellProfile& profile, const QS
         return utils::Result<void>::failure({"shell_not_executable", "The selected shell is not executable", profile.executable});
     }
     if (!QFileInfo(workingDirectory).isDir()) {
-        return utils::Result<void>::failure({"cwd_not_found", "The working directory does not exist", workingDirectory});
+        return utils::Result<void>::failure({"terminal_working_directory_missing", "The working directory does not exist", workingDirectory});
     }
     if (!validTerminalGrid(columns, rows)) {
         return utils::Result<void>::failure({"pty_size_invalid", "The pseudo-terminal dimensions are invalid", QStringLiteral("%1x%2").arg(columns).arg(rows)});

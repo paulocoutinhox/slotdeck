@@ -1286,7 +1286,7 @@ TEST(TerminalWorkspaceRepositoryTest, RoundTripsACompleteStrictWorkspace) {
 TEST(TerminalWorkspaceRepositoryTest, RejectsStorageErrorsMissingStateAndInvalidWrites) {
     test::TestPluginHost host;
     plugins::terminalplugin::TerminalWorkspaceRepository repository(host);
-    EXPECT_EQ(repository.loadLastOpened().error().code, QStringLiteral("workspace_not_found"));
+    EXPECT_EQ(repository.loadLastOpened().error().code, QStringLiteral("terminal_workspace_not_found"));
 
     host.queryError = utils::Error{QStringLiteral("read_failed"), QStringLiteral("Read failed"), {}};
     EXPECT_EQ(repository.loadLastOpened().error().code, QStringLiteral("read_failed"));

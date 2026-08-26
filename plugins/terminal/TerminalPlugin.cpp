@@ -92,7 +92,7 @@ utils::Result<void> TerminalPlugin::initialize(PluginHost& host) {
 
     const QString historyPath = QDir(host.applicationDataPath()).filePath(QStringLiteral("history"));
     if (!QDir().mkpath(historyPath)) {
-        m_host = nullptr;
+        shutdown();
         return utils::Result<void>::failure({"terminal_history_unavailable", "The terminal history directory is unavailable", historyPath});
     }
 

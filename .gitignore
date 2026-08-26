@@ -37,6 +37,7 @@ __pycache__/
 
 .DS_Store
 Thumbs.db
+aqtinstall.log
 
 # reference material kept out of the product
 /temp/

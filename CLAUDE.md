@@ -41,6 +41,8 @@ Newer explicit product requirements take precedence when they intentionally repl
   feature identifiers.
 - Build and packaging configuration may name bundled targets because it assembles the product.
 - Each plugin is a Qt shared library implementing `PluginInterface` through Qt plugin metadata.
+- Every plugin compiles its sources into one `SlotDeck<Name>Objects` library that the shared `SlotDeck<Name>Plugin` and its test suite link, so the eight build files differ only where a plugin really needs something the others do not.
+- A plugin releases whatever it already took before it returns a failure from initialization, rather than depending on the host to release it.
 - Each plugin declares a stable lowercase identifier containing letters, numbers and hyphens.
 - Each plugin declares dependencies by identifier.
 - The host validates dependencies before initialization and rejects missing dependencies or cycles.
@@ -322,6 +324,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Foreign keys are enabled and the database uses WAL journaling, a bounded busy timeout and normal synchronous durability.
 - Every database operation returns an explicit structured result and storage failures never become empty state or default preferences.
 - A structured error carries a stable code, the diagnostic message and the detail that names what it happened to, and nothing else, because a field no decision consults is dead weight on every failure in the project.
+- An error code is prefixed by the subject it is about, and one condition carries one code, so two implementations of the same interface report the same failure by the same name.
 - A value the interface already shows is rolled back when its write fails, and the run that produced it stops, because a memory that disagrees with storage is a lie the next start discovers.
 - The clean marker becomes false during startup and true only after orderly shutdown.
 - Each plugin owns the tables bearing its identifier prefix and never reads or mutates another plugin's tables.
@@ -1119,7 +1122,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - All code, identifiers, error text and code comments are written in English.
 - A member variable carries the `m_` prefix and no identifier begins or ends with an underscore.
 - A value object holding configuration is named `<Owner>Settings`, a type that only loads and saves it is named `<Owner>SettingsStore`, a type that persists the entities of a plugin is named `<Owner>Repository` and carries the settings document of that plugin, and a settings surface is named `<Owner>SettingsView`.
-- The conversion between a settings document and its value object is named `settingsFromDocument` and `settingsDocument` in every owner.
+- The conversion between a settings document and its value object is named `settingsFromDocument` and `settingsDocument` in every owner that has such a value object, and an owner holding a single stored value needs none.
 - Descriptive names make routine comments unnecessary.
 - Every comment is a complete sentence starting with a capital letter and ending with a period.
 - A sentence that must start with an identifier written in lowercase keeps its exact spelling, and the sentence is preferably rewritten so that identifier is not at the start.

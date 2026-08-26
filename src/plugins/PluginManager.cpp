@@ -234,12 +234,12 @@ utils::Result<void> PluginManager::loadPlugins() {
         return utils::Result<void>::failure(m_coreCatalogError.value());
     }
     if (!m_loaders.empty()) {
-        return utils::Result<void>::failure({"plugins_already_loaded", "The bundled plugins are already loaded", {}});
+        return utils::Result<void>::failure({"plugin_already_loaded", "The bundled plugins are already loaded", {}});
     }
 
     const QStringList paths = PluginManagerHelper::pluginPaths();
     if (paths.isEmpty()) {
-        return utils::Result<void>::failure({"plugins_not_found", "No application plugins were found", PluginManagerHelper::pluginDirectoryPath()});
+        return utils::Result<void>::failure({"plugin_directory_not_found", "No application plugins were found", PluginManagerHelper::pluginDirectoryPath()});
     }
 
     for (const auto& path : paths) {
@@ -272,7 +272,7 @@ utils::Result<void> PluginManager::loadPlugins() {
 
 utils::Result<void> PluginManager::initialize(QString applicationDataPath, persistence::StateStore& stateStore, persistence::DatabaseExecutor& databaseExecutor) {
     if (m_initialized) {
-        return utils::Result<void>::failure({"plugins_already_initialized", "The plugins are already initialized", {}});
+        return utils::Result<void>::failure({"plugin_already_initialized", "The plugins are already initialized", {}});
     }
 
     if (applicationDataPath.isEmpty()) {

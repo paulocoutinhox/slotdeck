@@ -245,7 +245,7 @@ utils::Result<domain::Workspace> TerminalWorkspaceRepository::loadLastOpened() c
         return utils::Result<domain::Workspace>::failure(rows.error());
     }
     if (rows.value().isEmpty()) {
-        return utils::Result<domain::Workspace>::failure({"workspace_not_found", "No saved workspace exists", {}});
+        return utils::Result<domain::Workspace>::failure({"terminal_workspace_not_found", "No saved workspace exists", {}});
     }
     if (rows.value().size() != 1) {
         return TerminalWorkspaceRepositoryHelper::failure(QStringLiteral("The workspace query returned an invalid number of rows"));

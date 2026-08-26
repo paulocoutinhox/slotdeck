@@ -38,6 +38,8 @@ class AiTaskRepositoryHelper final {
     static utils::Result<ProviderRateLimit> rateLimitFromDocument(const QJsonObject& document);
     static utils::Result<ModelConnection> connectionFromDocument(const QJsonObject& document);
     static utils::Result<McpServerDescriptor> mcpServerFromDocument(const QJsonObject& document);
+    static AiSettings settingsFromDocument(const QJsonObject& document);
+    static QJsonObject settingsDocument(const AiSettings& settings);
     static utils::Result<QVector<TaskExecution>> parseExecutions(const persistence::DatabaseRows& rows);
     static utils::Result<QVector<ExecutionLogEntry>> parseExecutionLogs(const persistence::DatabaseRows& rows);
     static utils::Result<QVector<ConversationMessage>> parseConversation(const persistence::DatabaseRows& rows);
@@ -261,7 +263,7 @@ QString AiTaskRepositoryHelper::entryName(const QString& key, int index) {
 
 // The complete configuration of the plugin is one document, so a provider, a service or a server added later needs no schema.
 // Every value the document does not carry, and every entry it carries in a shape this plugin cannot use, is simply the declared default.
-AiSettings AiTaskRepository::settings() const {
+AiSettings AiTaskRepositoryHelper::settingsFromDocument(const QJsonObject& document) {
     AiSettings settings;
     QVector<QJsonObject> connectionDocuments;
     QVector<QJsonObject> serverDocuments;
@@ -270,7 +272,7 @@ AiSettings AiTaskRepository::settings() const {
     QJsonObject executionDocument;
     QJsonObject searchDocument;
     QJsonObject speechDocument;
-    plugins::SettingsReader reader(m_host.settings());
+    plugins::SettingsReader reader(document);
     reader.readText(QStringLiteral("defaultConnectionKey"), settings.defaultConnectionKey);
     reader.readObjectList(QStringLiteral("connections"), connectionDocuments);
     reader.readObjectList(QStringLiteral("mcpServers"), serverDocuments);
@@ -326,7 +328,7 @@ AiSettings AiTaskRepository::settings() const {
     return settings;
 }
 
-QFuture<utils::Result<void>> AiTaskRepository::saveSettings(const AiSettings& settings) {
+QJsonObject AiTaskRepositoryHelper::settingsDocument(const AiSettings& settings) {
     QJsonArray connections;
     for (const auto& connection : settings.connections) {
         connections.append(AiTaskRepositoryHelper::connectionDocument(connection));
@@ -347,7 +349,15 @@ QFuture<utils::Result<void>> AiTaskRepository::saveSettings(const AiSettings& se
     const QJsonObject execution{{QStringLiteral("maximumIterations"), settings.execution.maximumIterations}, {QStringLiteral("commandTimeoutSeconds"), settings.execution.commandTimeoutSeconds}, {QStringLiteral("parallelExecutions"), settings.execution.parallelExecutions}, {QStringLiteral("chatFontSize"), settings.execution.chatFontSize}};
     const QJsonObject search{{QStringLiteral("provider"), searchProviderIdentifier(settings.search.provider)}, {QStringLiteral("instanceUrl"), settings.search.instanceUrl}, {QStringLiteral("apiKey"), settings.search.apiKey}};
     const QJsonObject speech{{QStringLiteral("provider"), speechProviderIdentifier(settings.speech.provider)}, {QStringLiteral("voiceId"), settings.speech.voiceId}, {QStringLiteral("apiKey"), settings.speech.apiKey}};
-    return m_host.saveSettings({{QStringLiteral("connections"), connections}, {QStringLiteral("defaultConnectionKey"), settings.defaultConnectionKey}, {QStringLiteral("execution"), execution}, {QStringLiteral("search"), search}, {QStringLiteral("speech"), speech}, {QStringLiteral("mcpServers"), servers}, {QStringLiteral("rateLimits"), rateLimits}, {QStringLiteral("agents"), agents}});
+    return {{QStringLiteral("connections"), connections}, {QStringLiteral("defaultConnectionKey"), settings.defaultConnectionKey}, {QStringLiteral("execution"), execution}, {QStringLiteral("search"), search}, {QStringLiteral("speech"), speech}, {QStringLiteral("mcpServers"), servers}, {QStringLiteral("rateLimits"), rateLimits}, {QStringLiteral("agents"), agents}};
+}
+
+AiSettings AiTaskRepository::settings() const {
+    return AiTaskRepositoryHelper::settingsFromDocument(m_host.settings());
+}
+
+QFuture<utils::Result<void>> AiTaskRepository::saveSettings(const AiSettings& settings) {
+    return m_host.saveSettings(AiTaskRepositoryHelper::settingsDocument(settings));
 }
 
 utils::Result<QVector<AiWorkspace>> AiTaskRepository::workspaces() const {

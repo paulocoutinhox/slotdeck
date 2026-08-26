@@ -232,7 +232,7 @@ utils::Result<void> MainWindow::createInterface(const QString& preferredModeId) 
         delete central;
         resetInterfacePointers();
         m_views.clear();
-        return utils::Result<void>::failure({"settings_view_failed", "The settings interface could not be created", {}});
+        return utils::Result<void>::failure({"plugin_settings_view_failed", "The settings interface could not be created", {}});
     }
     m_contentStack->addWidget(settingsView);
     m_views.insert(settingsMode, settingsView);

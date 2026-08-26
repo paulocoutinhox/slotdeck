@@ -205,7 +205,7 @@ SystemInformationView::SystemInformationView(SystemInformationPlugin& plugin, Pl
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
 
-    auto* header = new ui::PageHeader(m_host.theme(), m_host.translate(QStringLiteral("system-information.view.title")), this);
+    auto* header = new ui::PageHeader(m_host.theme(), m_host.translate(QStringLiteral("system-information.plugin.title")), this);
     m_updated = new QLabel(header);
     m_updated->setObjectName(QStringLiteral("systemInformationUpdated"));
     m_refresh = new QPushButton(ui::icon(ui::IconName::Refresh, m_host.theme()), m_host.translate(QStringLiteral("system-information.view.refresh")), header);

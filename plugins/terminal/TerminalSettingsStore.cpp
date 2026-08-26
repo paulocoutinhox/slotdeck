@@ -11,8 +11,32 @@ namespace slotdeck::plugins::terminalplugin {
 
 class TerminalSettingsStoreHelper final {
   public:
+    static TerminalSettings settingsFromDocument(const QJsonObject& document, const QString& declaredFontFamily);
     static QJsonObject settingsDocument(const TerminalSettings& settings);
 };
+
+TerminalSettings TerminalSettingsStoreHelper::settingsFromDocument(const QJsonObject& document, const QString& declaredFontFamily) {
+    TerminalSettings settings;
+    settings.fontFamily = declaredFontFamily;
+    const TerminalSettings declared = settings;
+    plugins::SettingsReader reader(document);
+    reader.readText(QStringLiteral("fontFamily"), settings.fontFamily);
+    reader.readInteger(QStringLiteral("fontSize"), settings.fontSize);
+    reader.readText(QStringLiteral("themeId"), settings.themeId);
+    reader.readBool(QStringLiteral("confirmMultilinePaste"), settings.confirmMultilinePaste);
+    reader.readBool(QStringLiteral("allowClipboardWrite"), settings.allowClipboardWrite);
+
+    if (!ui::monospacedFontFamilies().contains(settings.fontFamily)) {
+        settings.fontFamily = declared.fontFamily;
+    }
+    if (!ui::validContentFontSize(settings.fontSize)) {
+        settings.fontSize = declared.fontSize;
+    }
+    if (!terminalcore::terminalThemeExists(settings.themeId)) {
+        settings.themeId = declared.themeId;
+    }
+    return settings;
+}
 
 QJsonObject TerminalSettingsStoreHelper::settingsDocument(const TerminalSettings& settings) {
     return {{QStringLiteral("fontFamily"), settings.fontFamily}, {QStringLiteral("fontSize"), settings.fontSize}, {QStringLiteral("themeId"), settings.themeId}, {QStringLiteral("confirmMultilinePaste"), settings.confirmMultilinePaste}, {QStringLiteral("allowClipboardWrite"), settings.allowClipboardWrite}};
@@ -26,27 +50,7 @@ utils::Result<void> TerminalSettingsStore::initialize() {
         return utils::Result<void>::failure({"terminal_fonts_unavailable", "No monospaced terminal font is installed", {}});
     }
 
-    TerminalSettings loaded;
-    loaded.fontFamily = families.first();
-    const TerminalSettings declared = loaded;
-    plugins::SettingsReader reader(m_host.settings());
-    reader.readText(QStringLiteral("fontFamily"), loaded.fontFamily);
-    reader.readInteger(QStringLiteral("fontSize"), loaded.fontSize);
-    reader.readText(QStringLiteral("themeId"), loaded.themeId);
-    reader.readBool(QStringLiteral("confirmMultilinePaste"), loaded.confirmMultilinePaste);
-    reader.readBool(QStringLiteral("allowClipboardWrite"), loaded.allowClipboardWrite);
-
-    if (!families.contains(loaded.fontFamily)) {
-        loaded.fontFamily = declared.fontFamily;
-    }
-    if (!ui::validContentFontSize(loaded.fontSize)) {
-        loaded.fontSize = declared.fontSize;
-    }
-    if (!terminalcore::terminalThemeExists(loaded.themeId)) {
-        loaded.themeId = declared.themeId;
-    }
-
-    m_settings = std::move(loaded);
+    m_settings = TerminalSettingsStoreHelper::settingsFromDocument(m_host.settings(), families.first());
     m_committedSettings = m_settings;
     return utils::Result<void>::success();
 }

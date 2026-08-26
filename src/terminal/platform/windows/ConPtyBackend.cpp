@@ -3,6 +3,7 @@
 #include "terminal/TerminalDimensions.h"
 
 #include <QDir>
+#include <QFileInfo>
 
 #include <Windows.h>
 
@@ -88,6 +89,12 @@ ConPtyBackend::~ConPtyBackend() {
 utils::Result<void> ConPtyBackend::start(const ShellProfile& profile, const QString& workingDirectory, const QString&, int columns, int rows) {
     if (running()) {
         return utils::Result<void>::failure({"conpty_already_running", "The terminal process is already running", {}});
+    }
+    if (!QFileInfo(profile.executable).isExecutable()) {
+        return utils::Result<void>::failure({"shell_not_executable", "The selected shell is not executable", profile.executable});
+    }
+    if (!QFileInfo(workingDirectory).isDir()) {
+        return utils::Result<void>::failure({"terminal_working_directory_missing", "The working directory does not exist", workingDirectory});
     }
     if (!validTerminalGrid(columns, rows)) {
         return utils::Result<void>::failure({"conpty_size_invalid", "The pseudo-console dimensions are invalid", QStringLiteral("%1x%2").arg(columns).arg(rows)});

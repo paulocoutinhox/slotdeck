@@ -146,7 +146,7 @@ utils::Result<void> WorkspaceManager::initialize() {
     const auto loaded = m_repository.loadLastOpened();
     if (loaded.hasValue()) {
         m_workspace = loaded.value();
-    } else if (loaded.error().code == QStringLiteral("workspace_not_found")) {
+    } else if (loaded.error().code == QStringLiteral("terminal_workspace_not_found")) {
         m_workspace = createDefaultWorkspace();
         const auto saved = m_repository.saveInitial(m_workspace);
         if (!saved.hasValue()) {

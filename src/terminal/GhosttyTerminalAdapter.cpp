@@ -337,13 +337,13 @@ utils::Result<QByteArray> GhosttyTerminalAdapter::encodeKey(const QKeyEvent& eve
         return utils::Result<QByteArray>::success(QByteArray(stackBuffer.data(), static_cast<qsizetype>(outputSize)));
     }
     if (result != GHOSTTY_OUT_OF_SPACE) {
-        return utils::Result<QByteArray>::failure({"key_encoding_failed", "The key event could not be encoded", QString::number(static_cast<int>(result))});
+        return utils::Result<QByteArray>::failure({"ghostty_key_encoding_failed", "The key event could not be encoded", QString::number(static_cast<int>(result))});
     }
 
     QByteArray output(static_cast<qsizetype>(outputSize), Qt::Uninitialized);
     result = ghostty_key_encoder_encode(m_keyEncoder, m_keyEvent, output.data(), static_cast<std::size_t>(output.size()), &outputSize);
     if (result != GHOSTTY_SUCCESS) {
-        return utils::Result<QByteArray>::failure({"key_encoding_failed", "The key event could not be encoded", QString::number(static_cast<int>(result))});
+        return utils::Result<QByteArray>::failure({"ghostty_key_encoding_failed", "The key event could not be encoded", QString::number(static_cast<int>(result))});
     }
     output.resize(static_cast<qsizetype>(outputSize));
     return utils::Result<QByteArray>::success(std::move(output));
@@ -1375,13 +1375,13 @@ utils::Result<QByteArray> GhosttyTerminalAdapter::encodeMouse(const MouseReport&
         return utils::Result<QByteArray>::success(QByteArray(stackBuffer.data(), static_cast<qsizetype>(written)));
     }
     if (result != GHOSTTY_OUT_OF_SPACE) {
-        return utils::Result<QByteArray>::failure({"mouse_encoding_failed", "The mouse event could not be encoded", QString::number(static_cast<int>(result))});
+        return utils::Result<QByteArray>::failure({"ghostty_mouse_encoding_failed", "The mouse event could not be encoded", QString::number(static_cast<int>(result))});
     }
 
     QByteArray output(static_cast<qsizetype>(written), Qt::Uninitialized);
     result = ghostty_mouse_encoder_encode(m_mouseEncoder, m_mouseEvent, output.data(), static_cast<std::size_t>(output.size()), &written);
     if (result != GHOSTTY_SUCCESS) {
-        return utils::Result<QByteArray>::failure({"mouse_encoding_failed", "The mouse event could not be encoded", QString::number(static_cast<int>(result))});
+        return utils::Result<QByteArray>::failure({"ghostty_mouse_encoding_failed", "The mouse event could not be encoded", QString::number(static_cast<int>(result))});
     }
 
     output.resize(static_cast<qsizetype>(written));
@@ -1393,7 +1393,7 @@ utils::Result<QByteArray> GhosttyTerminalAdapter::encodeFocus(bool gained) const
     std::size_t written = 0;
     const GhosttyResult result = ghostty_focus_encode(gained ? GHOSTTY_FOCUS_GAINED : GHOSTTY_FOCUS_LOST, buffer.data(), buffer.size(), &written);
     if (result != GHOSTTY_SUCCESS) {
-        return utils::Result<QByteArray>::failure({"focus_encoding_failed", "The focus event could not be encoded", QString::number(static_cast<int>(result))});
+        return utils::Result<QByteArray>::failure({"ghostty_focus_encoding_failed", "The focus event could not be encoded", QString::number(static_cast<int>(result))});
     }
 
     return utils::Result<QByteArray>::success(QByteArray(buffer.data(), static_cast<qsizetype>(written)));

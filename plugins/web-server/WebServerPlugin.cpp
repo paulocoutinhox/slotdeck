@@ -185,7 +185,11 @@ utils::Result<void> WebServerPlugin::initialize(PluginHost& host) {
     }
 
     const auto result = restoreState();
-    if (result.hasValue() && host.pluginAvailable(QStringLiteral("terminal"))) {
+    if (!result.hasValue()) {
+        shutdown();
+        return result;
+    }
+    if (host.pluginAvailable(QStringLiteral("terminal"))) {
         QTimer::singleShot(0, this, &WebServerPlugin::synchronizeTerminals);
     }
     return result;

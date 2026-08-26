@@ -34,7 +34,7 @@ utils::Result<void> Application::initialize() {
         return utils::Result<void>::failure({"application_already_initialized", "The application is already initialized", {}});
     }
     if (m_dataPath.isEmpty() || !QDir().mkpath(m_dataPath)) {
-        return utils::Result<void>::failure({"data_directory_failed", "The application data directory is unavailable", m_dataPath});
+        return utils::Result<void>::failure({"application_data_directory_failed", "The application data directory is unavailable", m_dataPath});
     }
 
     m_instanceLock = std::make_unique<QLockFile>(QDir(m_dataPath).filePath(QStringLiteral("instance.lock")));

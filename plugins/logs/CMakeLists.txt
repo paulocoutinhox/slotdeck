@@ -1,4 +1,10 @@
-qt_add_library(SlotDeckLogsObjects OBJECT LogsPlugin.cpp LogsPlugin.h LogsTranslations.h)
+qt_add_library(
+    SlotDeckLogsObjects
+    OBJECT
+    LogsPlugin.cpp
+    LogsPlugin.h
+    LogsTranslations.h
+)
 target_include_directories(SlotDeckLogsObjects PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(SlotDeckLogsObjects PUBLIC Qt6::Core Qt6::Gui Qt6::Widgets SlotDeckUi)
 set_target_properties(SlotDeckLogsObjects PROPERTIES POSITION_INDEPENDENT_CODE TRUE CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN TRUE)
