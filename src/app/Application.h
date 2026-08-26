@@ -38,6 +38,7 @@ class Application final : public QObject {
     void applyLanguage(const QString& language);
     void applyTheme(const QString& themeId);
     void restartAfterImport();
+    void replaceProcess();
     [[nodiscard]] utils::Result<void> initializePlugins();
 
     plugins::PluginManager m_pluginManager;

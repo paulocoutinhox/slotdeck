@@ -12,6 +12,7 @@
 #include <QEvent>
 #include <QProcess>
 #include <QStandardPaths>
+#include <QTimer>
 
 #include <utility>
 
@@ -188,7 +189,14 @@ void Application::applyTheme(const QString& themeId) {
     }
 }
 
+// The restart is asked for by the surface this tears down, so nothing is destroyed until that request has returned.
 void Application::restartAfterImport() {
+    // clang-format off
+    QTimer::singleShot(0, this, [this]() { replaceProcess(); });
+    // clang-format on
+}
+
+void Application::replaceProcess() {
     const QString executable = QCoreApplication::applicationFilePath();
     const QStringList arguments = QCoreApplication::arguments().mid(1);
     shutdown();

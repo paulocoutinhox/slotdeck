@@ -225,6 +225,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Every request has one core-owned identity and a thirty-second timeout.
 - Request timeout timers are stopped and destroyed through deferred deletion so a completing request never destroys the timer that is emitting.
 - Pending requests remain tracked until their guarded callback has run or its context has been destroyed.
+- A request that is gone stops watching the context it was given, because that context outlives the request and would otherwise collect one guard for every request ever made through it.
 - Plugin shutdown cancels every pending request before any plugin library starts shutting down.
 - Request callbacks and their captured plugin code are released while the owning library is still loaded.
 - Invalid senders, targets and empty topics produce asynchronous errors.
@@ -344,6 +345,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Configuration export runs behind queued database writes and creates a consistent SQLite snapshot without blocking the GUI thread.
 - Configuration import validates integrity, core schema compatibility and preferences before staging the complete database in the application data directory.
 - A successful import requests an orderly shutdown, releases every database connection and process lock, then starts a new process.
+- That shutdown is deferred out of the request that asked for it, because the surface asking is one of the things it destroys and the object carrying the request is another.
 - The new process atomically replaces the current database from the staged import before opening any application connection.
 - Invalid or interrupted imports preserve the current database and return an explicit error.
 - Import recovery removes a rejected pending database before deleting its backup so a cleanup failure cannot reapply the rejected database on the next launch.
@@ -1471,6 +1473,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A connection that bursts more than any request may occupy is refused and the server keeps serving.
 - [x] The real pseudo-terminal starts a shell, delivers what it wrote and reports its exit after it.
 - [x] Nothing destroys a socket notifier from inside the read that notifier is delivering.
+- [x] A completed plugin request leaves no guard behind on the context it was given.
+- [x] The restart after an import destroys nothing while the request that asked for it is still on the stack.
 - [x] A full review with the sanitizers, Cppcheck, clang-tidy and hand inspection found no orphan translation key, no unused theme role or icon, no legacy marker and no plugin that clears its host before its asynchronous context.
 - [x] The language-server transport disconnects from the process it abandons, so a read already queued never reaches it without one.
 - [x] A request that was given its turn and stopped before hearing about it returns that turn, so a provider limited to one request at a time keeps admitting.

@@ -30,6 +30,7 @@ struct PendingPluginRequest final {
     PluginReply reply;
     std::optional<utils::Result<QJsonObject>> result;
     QPointer<QTimer> timeout;
+    QMetaObject::Connection contextGuard;
 };
 
 class ScopedPluginHost final : public PluginHost {
@@ -562,7 +563,7 @@ void PluginManager::request(const QString& senderPluginId, const QString& target
     // clang-format on
     // clang-format off
     connect(timeout, &QTimer::timeout, this, [this, requestId, targetPluginId, topic]() { completeRequest(requestId, utils::Result<QJsonObject>::failure({"plugin_message_timeout", "The plugin request timed out", QStringLiteral("%1: %2").arg(targetPluginId, topic)})); });
-    connect(&callbackContext, &QObject::destroyed, this, [this, requestId]() { removeRequest(requestId); });
+    pending->contextGuard = connect(&callbackContext, &QObject::destroyed, this, [this, requestId]() { removeRequest(requestId); });
     // clang-format on
     timeout->start();
 
@@ -637,6 +638,8 @@ void PluginManager::removeRequest(quint64 requestId) {
         iterator.value()->timeout->stop();
         iterator.value()->timeout->deleteLater();
     }
+    // A request that is gone stops watching the context it was given, which outlives it and would otherwise collect one guard per request.
+    QObject::disconnect(iterator.value()->contextGuard);
     iterator.value()->reply = {};
     m_pendingRequests.erase(iterator);
 }
