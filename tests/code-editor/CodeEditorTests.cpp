@@ -15,14 +15,11 @@
 #include "ui/Components.h"
 #include "ui/FindBar.h"
 
-#include <QAbstractItemView>
 #include <QAction>
 #include <QCompleter>
 #include <QCoreApplication>
-#include <QElapsedTimer>
 #include <QFile>
 #include <QFileSystemModel>
-
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -44,6 +41,7 @@
 #include <gtest/gtest.h>
 
 #include <memory>
+#include <utility>
 
 namespace slotdeck::plugins::codeeditor {
 

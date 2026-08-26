@@ -6,24 +6,18 @@
 #include "ui/TabBar.h"
 #include "ui/Theme.h"
 
-#include <QAction>
 #include <QDateTime>
 #include <QHBoxLayout>
-#include <QJsonDocument>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLocale>
 #include <QResizeEvent>
 #include <QTextDocument>
 
-#include <QPainter>
-#include <QPainterPath>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QScrollBar>
-#include <QTextBrowser>
 #include <QTimer>
-#include <QToolButton>
 #include <QVBoxLayout>
 #include <algorithm>
 #include <cmath>

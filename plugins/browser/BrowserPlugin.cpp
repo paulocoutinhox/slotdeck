@@ -11,7 +11,6 @@
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QJsonObject>
-#include <QLabel>
 #include <QLineEdit>
 #include <QSet>
 #include <QStandardPaths>
@@ -20,6 +19,7 @@
 #include <QWebEngineProfile>
 
 #include <algorithm>
+#include <memory>
 #include <utility>
 
 namespace slotdeck::plugins::browser {

@@ -8,6 +8,8 @@
 #include <QRegularExpression>
 #include <QStandardPaths>
 
+#include <optional>
+
 namespace slotdeck::plugins::codeeditor {
 
 class LanguageRegistryHelper final {

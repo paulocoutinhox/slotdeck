@@ -11,6 +11,8 @@
 #include <QUuid>
 
 #include <algorithm>
+#include <cstdint>
+#include <memory>
 #include <optional>
 #include <utility>
 

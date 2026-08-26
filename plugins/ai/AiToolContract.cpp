@@ -5,6 +5,8 @@
 #include <QRegularExpression>
 
 #include <algorithm>
+#include <functional>
+#include <optional>
 #include <utility>
 
 namespace slotdeck::plugins::ai {

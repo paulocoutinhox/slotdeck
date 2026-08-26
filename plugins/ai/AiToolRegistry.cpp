@@ -14,7 +14,6 @@
 #include <QTimeZone>
 #include <QUrl>
 #include <QUrlQuery>
-#include <QUuid>
 #include <QtConcurrent>
 
 #include <algorithm>

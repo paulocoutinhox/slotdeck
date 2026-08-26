@@ -11,7 +11,6 @@
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
-#include <QSpinBox>
 #include <QTableWidget>
 #include <QToolButton>
 #include <QVBoxLayout>

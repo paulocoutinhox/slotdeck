@@ -4,7 +4,6 @@
 #include "ui/Components.h"
 #include "ui/Icons.h"
 
-#include <QComboBox>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDropEvent>

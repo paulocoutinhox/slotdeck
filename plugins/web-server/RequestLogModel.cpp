@@ -4,6 +4,7 @@
 #include <QWriteLocker>
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 namespace slotdeck::plugins::webserver {

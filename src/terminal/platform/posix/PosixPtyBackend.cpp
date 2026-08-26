@@ -8,18 +8,6 @@
 #include <QFileInfo>
 #include <QProcessEnvironment>
 
-#include <algorithm>
-#include <array>
-#include <atomic>
-#include <cerrno>
-#include <chrono>
-#include <condition_variable>
-#include <csignal>
-#include <cstring>
-#include <mutex>
-#include <thread>
-#include <vector>
-
 #include <fcntl.h>
 #ifdef Q_OS_MACOS
 #include <libproc.h>
@@ -30,6 +18,20 @@
 #include <sys/ioctl.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <cerrno>
+#include <chrono>
+#include <condition_variable>
+#include <csignal>
+#include <cstddef>
+#include <cstring>
+#include <memory>
+#include <mutex>
+#include <thread>
+#include <vector>
 
 namespace slotdeck::terminalcore {
 

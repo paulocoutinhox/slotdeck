@@ -16,8 +16,6 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
-#include <QSignalBlocker>
-#include <QSpinBox>
 #include <QVBoxLayout>
 
 #include <algorithm>

@@ -18,7 +18,6 @@
 #include <QMenu>
 #include <QMimeData>
 #include <QMouseEvent>
-#include <QStyle>
 #include <QToolButton>
 #include <QVBoxLayout>
 

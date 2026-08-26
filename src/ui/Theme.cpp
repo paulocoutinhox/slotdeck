@@ -3,6 +3,8 @@
 #include <QApplication>
 
 #include <algorithm>
+#include <memory>
+#include <vector>
 
 namespace slotdeck::ui {
 

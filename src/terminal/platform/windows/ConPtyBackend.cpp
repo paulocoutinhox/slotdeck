@@ -10,7 +10,10 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <memory>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace slotdeck::terminalcore {

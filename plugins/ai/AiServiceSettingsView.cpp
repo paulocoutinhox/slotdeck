@@ -8,7 +8,6 @@
 #include <QComboBox>
 #include <QFormLayout>
 #include <QLineEdit>
-#include <QSignalBlocker>
 #include <QVBoxLayout>
 
 namespace slotdeck::plugins::ai {

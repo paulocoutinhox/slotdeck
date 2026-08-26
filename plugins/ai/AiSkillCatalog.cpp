@@ -1,9 +1,10 @@
 #include "AiSkillCatalog.h"
 
 #include <QDir>
-#include <QRegularExpression>
 #include <QStandardPaths>
 
+#include <algorithm>
+#include <memory>
 #include <utility>
 
 namespace slotdeck::plugins::ai {

@@ -10,13 +10,8 @@
 #include "ui/Theme.h"
 
 #include <QApplication>
-#include <QComboBox>
-#include <QDateTimeEdit>
 #include <QDialog>
-#include <QDialogButtonBox>
 #include <QDrag>
-#include <QFileDialog>
-#include <QFormLayout>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QInputDialog>
@@ -24,18 +19,14 @@
 #include <QLineEdit>
 #include <QMimeData>
 #include <QMouseEvent>
-#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QScrollArea>
-#include <QSpinBox>
-#include <QSplitter>
 #include <QStackedWidget>
-#include <QTabWidget>
-#include <QTimeZone>
 #include <QToolButton>
 #include <QVBoxLayout>
 
 #include <functional>
+#include <optional>
 #include <utility>
 
 namespace slotdeck::plugins::ai {

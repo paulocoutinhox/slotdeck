@@ -7,6 +7,7 @@
 #include <QTimer>
 
 #include <algorithm>
+#include <memory>
 #include <optional>
 #include <utility>
 

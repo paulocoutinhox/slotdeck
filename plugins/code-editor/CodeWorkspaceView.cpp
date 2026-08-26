@@ -19,6 +19,7 @@
 #include <QVBoxLayout>
 #include <QtConcurrentRun>
 
+#include <algorithm>
 #include <functional>
 #include <utility>
 

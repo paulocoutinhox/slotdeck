@@ -5,7 +5,6 @@
 #include "ui/TabBar.h"
 
 #include <QFileDialog>
-#include <QLabel>
 #include <QPushButton>
 #include <QTabBar>
 #include <QVBoxLayout>

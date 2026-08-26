@@ -12,6 +12,7 @@
 #include <QUrl>
 
 #include <algorithm>
+#include <memory>
 #include <utility>
 
 namespace slotdeck::terminalcore {

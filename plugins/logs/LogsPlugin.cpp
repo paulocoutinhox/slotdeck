@@ -19,6 +19,7 @@
 
 #include <cmath>
 #include <limits>
+#include <memory>
 #include <utility>
 
 namespace slotdeck::plugins::logs {

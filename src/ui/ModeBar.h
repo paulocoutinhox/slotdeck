@@ -1,9 +1,9 @@
 #pragma once
 
+#include "plugins/PluginInterface.h"
+
 #include <QIcon>
 #include <QWidget>
-
-#include "plugins/PluginInterface.h"
 
 class QVBoxLayout;
 

@@ -8,6 +8,7 @@
 #include <QPromise>
 
 #include <functional>
+#include <memory>
 #include <utility>
 
 namespace slotdeck::persistence {

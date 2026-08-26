@@ -6,7 +6,6 @@
 #include "ui/Theme.h"
 
 #include <QAbstractTableModel>
-#include <QApplication>
 #include <QDateTime>
 #include <QDialog>
 #include <QFileDialog>

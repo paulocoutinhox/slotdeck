@@ -3,6 +3,10 @@
 
 #include <QImage>
 
+#include <memory>
+#include <optional>
+#include <utility>
+
 namespace slotdeck::plugins::ai {
 
 TEST(AiChatClientTest, ReadsTheRejectionReasonFromEveryShapeAServiceReportsIt) {

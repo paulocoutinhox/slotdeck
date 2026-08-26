@@ -14,6 +14,9 @@
 #include <QString>
 #include <QVector>
 
+#include <cstddef>
+#include <cstdint>
+
 namespace slotdeck::terminalcore {
 
 struct RenderCell final {

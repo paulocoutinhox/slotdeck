@@ -13,6 +13,7 @@
 #include <QTimer>
 
 #include <memory>
+#include <optional>
 
 namespace slotdeck::plugins::codeeditor {
 

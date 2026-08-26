@@ -16,6 +16,10 @@
 
 #include <gtest/gtest.h>
 
+#include <memory>
+#include <optional>
+#include <utility>
+
 namespace slotdeck::plugins::browser {
 
 TEST(BrowserPluginTest, PublishesCompleteMetadataAndNormalizesSupportedAddresses) {

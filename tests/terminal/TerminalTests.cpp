@@ -43,10 +43,12 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <memory>
 #include <optional>
 #include <stdexcept>
+#include <utility>
 
 namespace slotdeck {
 

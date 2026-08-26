@@ -3,6 +3,7 @@
 #include <QMetaObject>
 
 #include <algorithm>
+#include <functional>
 #include <utility>
 
 namespace slotdeck::plugins::ai {

@@ -11,6 +11,7 @@
 
 #include <memory>
 #include <optional>
+#include <utility>
 
 namespace slotdeck::plugins::donate {
 

@@ -7,7 +7,6 @@
 #include <QNetworkAccessManager>
 #include <QObject>
 #include <QStringList>
-#include <QThread>
 #include <QTimer>
 
 #include <functional>

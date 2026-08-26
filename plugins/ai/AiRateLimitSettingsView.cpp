@@ -6,7 +6,6 @@
 #include "ui/Theme.h"
 
 #include <QFormLayout>
-#include <QSignalBlocker>
 #include <QSpinBox>
 #include <QVBoxLayout>
 

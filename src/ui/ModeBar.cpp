@@ -9,7 +9,6 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPropertyAnimation>
-#include <QRegularExpression>
 #include <QSizePolicy>
 #include <QVBoxLayout>
 

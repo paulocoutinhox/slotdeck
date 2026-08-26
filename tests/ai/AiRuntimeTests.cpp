@@ -1,5 +1,9 @@
 #include "AiTestSupport.h"
 
+#include <algorithm>
+#include <memory>
+#include <utility>
+
 namespace slotdeck::plugins::ai {
 
 TEST(AiChatClientTest, DoesNotRetryARequestTheProviderRejected) {

@@ -20,7 +20,6 @@
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QScrollArea>
-#include <QStyle>
 #include <QVBoxLayout>
 
 #include <utility>

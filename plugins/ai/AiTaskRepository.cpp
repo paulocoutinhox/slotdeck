@@ -14,7 +14,9 @@
 #include <QTimeZone>
 #include <QUrl>
 
+#include <algorithm>
 #include <limits>
+#include <optional>
 #include <utility>
 
 namespace slotdeck::plugins::ai {

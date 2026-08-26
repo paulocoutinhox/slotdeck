@@ -11,16 +11,17 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QFormLayout>
-#include <QLabel>
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QSpinBox>
 #include <QTableWidget>
+#include <QTableWidgetItem>
 #include <QUuid>
 #include <QVBoxLayout>
 #include <QtConcurrentRun>
 
 #include <algorithm>
+#include <memory>
 #include <utility>
 
 namespace slotdeck::plugins::codeeditor {

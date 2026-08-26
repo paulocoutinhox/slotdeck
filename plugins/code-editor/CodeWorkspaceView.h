@@ -10,8 +10,6 @@
 #include <QHash>
 #include <QLabel>
 #include <QLineEdit>
-#include <QSortFilterProxyModel>
-#include <QTabWidget>
 #include <QToolButton>
 #include <QTreeView>
 #include <QTreeWidget>

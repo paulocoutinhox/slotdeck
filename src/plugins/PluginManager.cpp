@@ -21,6 +21,9 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstddef>
+#include <memory>
+#include <optional>
 #include <utility>
 
 namespace slotdeck::plugins {

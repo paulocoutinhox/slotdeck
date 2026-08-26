@@ -19,22 +19,21 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
-#include <QFileInfo>
 #include <QFormLayout>
 #include <QJsonDocument>
 #include <QLabel>
-#include <QLineEdit>
 #include <QPushButton>
-#include <QSignalBlocker>
 #include <QSpinBox>
 #include <QSysInfo>
-#include <QTableWidget>
 #include <QTimeZone>
 #include <QUuid>
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <chrono>
 #include <limits>
+#include <memory>
+#include <optional>
 #include <tuple>
 #include <utility>
 

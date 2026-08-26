@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <memory>
 #include <utility>
 
 namespace slotdeck::plugins::webserver {

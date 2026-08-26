@@ -8,6 +8,7 @@
 #include <QUrlQuery>
 
 #include <algorithm>
+#include <functional>
 
 namespace slotdeck::plugins::ai {
 

@@ -5,7 +5,6 @@
 #include <QHash>
 #include <QSqlDatabase>
 #include <QString>
-#include <QStringList>
 
 namespace slotdeck::persistence {
 

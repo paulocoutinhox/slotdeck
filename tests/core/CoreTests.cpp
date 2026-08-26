@@ -30,7 +30,6 @@
 #include <QApplication>
 #include <QComboBox>
 #include <QDialog>
-#include <QDialogButtonBox>
 #include <QEvent>
 #include <QFile>
 #include <QFileInfo>
@@ -40,7 +39,6 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QLocale>
-#include <QPainter>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSet>
@@ -62,7 +60,9 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
+#include <limits>
 #include <optional>
 #include <type_traits>
 

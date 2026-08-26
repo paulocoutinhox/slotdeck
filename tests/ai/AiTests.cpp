@@ -1,11 +1,15 @@
 #include "AiConversationView.h"
+#include "AiTestSupport.h"
+#include "TestTranslations.h"
 #include "ui/Components.h"
 
 #include <QScrollArea>
 #include <QScrollBar>
 
-#include "AiTestSupport.h"
-#include "TestTranslations.h"
+#include <algorithm>
+#include <memory>
+#include <optional>
+#include <utility>
 
 namespace slotdeck::plugins::ai {
 

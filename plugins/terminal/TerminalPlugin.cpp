@@ -12,9 +12,10 @@
 #include <QDir>
 #include <QFormLayout>
 #include <QJsonArray>
-#include <QLabel>
 #include <QSpinBox>
 #include <QVBoxLayout>
+
+#include <memory>
 
 namespace slotdeck::plugins::terminalplugin {
 

@@ -6,6 +6,7 @@
 #include <QtGlobal>
 
 #include <algorithm>
+#include <optional>
 
 namespace slotdeck::plugins::codeeditor {
 

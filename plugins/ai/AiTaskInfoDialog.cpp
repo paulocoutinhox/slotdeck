@@ -13,7 +13,6 @@
 #include <QHeaderView>
 #include <QJsonDocument>
 #include <QLabel>
-#include <QLocale>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QScrollBar>

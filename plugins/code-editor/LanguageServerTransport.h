@@ -7,7 +7,6 @@
 #include <QObject>
 #include <QProcess>
 #include <QString>
-#include <QTimer>
 
 namespace slotdeck::plugins::codeeditor {
 

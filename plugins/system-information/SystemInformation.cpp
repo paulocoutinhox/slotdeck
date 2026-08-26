@@ -1,5 +1,8 @@
 #include "SystemInformation.h"
 
+#include <QSysInfo>
+#include <QtConcurrentRun>
+
 #include <hwinfo/battery.h>
 #include <hwinfo/cpu.h>
 #include <hwinfo/disk.h>
@@ -10,19 +13,18 @@
 #include <hwinfo/network.h>
 #include <hwinfo/os.h>
 #include <hwinfo/ram.h>
-
-#include <QSysInfo>
-#include <QtConcurrentRun>
-
 #if defined(Q_OS_MACOS)
 #include <sys/sysctl.h>
 #endif
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <exception>
+#include <memory>
 #include <sstream>
+#include <string>
 #include <utility>
 
 namespace slotdeck::plugins::system_information {

@@ -7,13 +7,11 @@
 #include "ui/Icons.h"
 #include "ui/Theme.h"
 
-#include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
-#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QSpinBox>
@@ -22,6 +20,7 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <utility>
 
 namespace slotdeck::plugins::ai {

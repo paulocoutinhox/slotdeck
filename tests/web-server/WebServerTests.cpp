@@ -32,7 +32,10 @@
 #include <gtest/gtest.h>
 
 #include <atomic>
+#include <memory>
+#include <optional>
 #include <thread>
+#include <utility>
 
 namespace slotdeck {
 

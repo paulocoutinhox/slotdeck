@@ -4,14 +4,13 @@
 #include <QFileInfo>
 #include <QStandardPaths>
 
-#include <algorithm>
-
 #ifdef Q_OS_UNIX
 #include <pwd.h>
-
-#include <array>
 #include <unistd.h>
 #endif
+
+#include <algorithm>
+#include <array>
 
 namespace slotdeck::terminalcore {
 

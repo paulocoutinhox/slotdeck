@@ -6,6 +6,8 @@
 #include <QSaveFile>
 #include <QtConcurrentRun>
 
+#include <utility>
+
 namespace slotdeck::filesystem {
 
 class FileSystemServiceHelper final {

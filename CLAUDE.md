@@ -1145,6 +1145,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Artificial abstractions, generic fallbacks and unknown-value behavior are prohibited.
 - Closed value sets are validated explicitly and invalid values produce explicit errors.
 - Includes are direct, minimal, grouped and ordered consistently, so every file includes the standard header of every standard symbol it names instead of receiving it through another header.
+- A header nothing in the file needs is removed, and the compiler decides that rather than a reading, because a type reached through a chain of calls is needed complete without ever being named.
 - Every function call remains complete on one physical line.
 - Every declaration, expression, assignment and return statement remains complete on one physical line.
 - Arguments, parameters, chained calls, conditions and operators are never wrapped across lines.

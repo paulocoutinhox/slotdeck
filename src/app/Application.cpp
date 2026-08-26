@@ -14,6 +14,7 @@
 #include <QStandardPaths>
 #include <QTimer>
 
+#include <memory>
 #include <utility>
 
 namespace slotdeck::app {
