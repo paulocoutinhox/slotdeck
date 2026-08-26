@@ -341,6 +341,7 @@ const EditorLimits& LanguageRegistry::limits() {
 
         limits.maximumFileBytes = read(QStringLiteral("maximumFileBytes"), 1024, 64 * 1024 * 1024);
         limits.maximumHighlightedLineLength = static_cast<int>(read(QStringLiteral("maximumHighlightedLineLength"), 80, 100000));
+        limits.maximumHighlightedMatchesPerLine = static_cast<int>(read(QStringLiteral("maximumHighlightedMatchesPerLine"), 32, 100000));
         limits.maximumSemanticTokenLines = static_cast<int>(read(QStringLiteral("maximumSemanticTokenLines"), 100, 1000000));
         limits.maximumSearchMatches = static_cast<int>(read(QStringLiteral("maximumSearchMatches"), 100, 1000000));
         limits.partialRepaintDivisor = static_cast<int>(read(QStringLiteral("partialRepaintDivisor"), 1, 100));

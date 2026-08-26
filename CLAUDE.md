@@ -987,6 +987,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Writing in a chosen encoding rewrites the file whole even when nothing was typed, because the bytes on disk are what changed.
 - A mark is stripped from the bytes only when the file really starts with it, because an encoding chosen by hand names no mark those bytes have to carry.
 - A line longer than the highlighting bound keeps its text and loses only its colors, because running every pattern over generated content costs more than the colors are worth.
+- A line is bounded by how much decoration it accumulates as well as by its length, because laying that decoration out is paid again on every edit and a line short enough to colour can still carry thousands of ranges.
 - Semantic tokens repaint only the lines whose tokens changed, and repaint the whole document only when most of them did, because repainting every line on every answer costs the whole file at the rhythm of typing.
 - Every language and every language server the editor knows lives in the catalog file the plugin carries as a resource, so a language is added by one entry of data and never by interface code.
 - The patterns a language needs beyond its keywords are declared with it in that file, so no language is named in the code that colours it.
@@ -1494,7 +1495,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 375 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 376 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
@@ -1573,6 +1574,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A code span and a fenced block carry that family while the prose around them does not, read back from the document rather than from a style sheet it never received.
 - [x] Every platform reaches the declared family, proven after Windows reported a resolved name where macOS reports the generic one.
 - [x] Plain text carries no format range of its own, measured as forty percent of the ranges a source line used to carry for no visible difference.
+- [x] A line dense enough to cost more than its colours keeps its text and loses them, while the longest line this project really writes keeps every colour it had.
 - [x] The terminal, the editor and the shared document open on one monospaced family, and a family the user chose still wins over it.
 
 ## Recorded pending work

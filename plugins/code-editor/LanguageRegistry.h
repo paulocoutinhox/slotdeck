@@ -56,6 +56,7 @@ struct ResolvedLanguageServer final {
 struct EditorLimits final {
     qint64 maximumFileBytes{0};
     int maximumHighlightedLineLength{0};
+    int maximumHighlightedMatchesPerLine{0};
     int maximumSemanticTokenLines{0};
     int maximumSearchMatches{0};
     int partialRepaintDivisor{0};

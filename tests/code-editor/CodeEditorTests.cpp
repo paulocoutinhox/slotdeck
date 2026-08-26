@@ -17,6 +17,7 @@
 #include "ui/Components.h"
 #include "ui/FindBar.h"
 
+#include <QAbstractTextDocumentLayout>
 #include <QAction>
 #include <QCompleter>
 #include <QCoreApplication>
@@ -2640,6 +2641,35 @@ TEST(CodeColorSchemeTest, OpensOnTheSameMonospacedFamilyTheTerminalDoes) {
 
     editor.setEditorFont(ui::monospacedFontFamilies().last(), defaultEditorFontSize);
     EXPECT_EQ(editor.font().family(), ui::monospacedFontFamilies().last()) << "a chosen family no longer wins over the declared one";
+}
+
+// The size of a line is decided by whoever wrote the file, and laying out its decoration is paid again on every edit, so what a line may carry is bounded.
+TEST(CodeColorSchemeTest, BoundsWhatOneLineMayBeDecoratedWith) {
+    const CodeColorScheme& scheme = CodeColorSchemeCatalog::schemes().first();
+    const LanguageDefinition language = LanguageRegistry::languageForPath(QStringLiteral("x.cpp"));
+    const int bound = LanguageRegistry::limits().maximumHighlightedMatchesPerLine;
+    ASSERT_GT(bound, 0);
+
+    const auto rangesOf = [&](const QString& line) {
+        QTextDocument document;
+        document.setPlainText(line);
+        CodeSyntaxHighlighter highlighter(&document, language, scheme);
+        highlighter.rehighlight();
+        return static_cast<int>(document.begin().layout()->formats().size());
+    };
+
+    EXPECT_GT(rangesOf(QStringLiteral("    const int total = compute(alpha, beta + 3, \"literal\");")), 3) << "an ordinary line lost its colours";
+
+    // A line of the shape this project really writes, where a table of values is one statement.
+    const QString table = QStringLiteral("    const QMap<QString, QString> tokens{") + QStringLiteral("{QStringLiteral(\"@token\"), theme.color(ThemeColor::Name).name()}, ").repeated(60) + QStringLiteral("};");
+    EXPECT_GT(rangesOf(table), 100) << "a long line this project really carries lost its colours";
+
+    // Density no one writes by hand, which is what the bound exists for.
+    EXPECT_EQ(rangesOf(QStringLiteral("f(").repeated(2000)), 0) << "a line dense enough to cost more than its colours keeps them";
+    EXPECT_EQ(rangesOf(QStringLiteral("if (A::b(C_D, 0x1f) != nullptr) { return \"s\"; } ").repeated(90)), 0) << "a line dense enough to cost more than its colours keeps them";
+
+    // A line past the character bound was never decorated at all.
+    EXPECT_EQ(rangesOf(QStringLiteral("value ").repeated(LanguageRegistry::limits().maximumHighlightedLineLength)), 0);
 }
 
 } // namespace slotdeck::plugins::codeeditor

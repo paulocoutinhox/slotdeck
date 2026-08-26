@@ -139,10 +139,18 @@ void CodeSyntaxHighlighter::setSemanticTokens(const QVector<SemanticToken>& toke
 // A single line longer than the declared bound is generated content, and running every pattern over it costs more than the colors are worth.
 void CodeSyntaxHighlighter::highlightBlock(const QString& text) {
     if (text.size() <= LanguageRegistry::limits().maximumHighlightedLineLength) {
+        int applied = 0;
+
         for (const auto& rule : m_rules) {
-            applyRule(text, rule);
+            applied += applyRule(text, rule);
         }
+
         applyBlockComments(text);
+
+        // A line decorated past this bound costs more to lay out on every edit than the colours are worth, so it keeps its text and loses them.
+        if (applied > LanguageRegistry::limits().maximumHighlightedMatchesPerLine) {
+            setFormat(0, static_cast<int>(text.size()), QTextCharFormat());
+        }
     }
 
     for (const auto& token : m_semanticTokens.value(currentBlock().blockNumber())) {
@@ -152,13 +160,17 @@ void CodeSyntaxHighlighter::highlightBlock(const QString& text) {
     }
 }
 
-void CodeSyntaxHighlighter::applyRule(const QString& text, const Rule& rule) {
+int CodeSyntaxHighlighter::applyRule(const QString& text, const Rule& rule) {
     auto match = rule.expression.globalMatch(text);
+    int applied = 0;
 
     while (match.hasNext()) {
         const auto current = match.next();
         setFormat(static_cast<int>(current.capturedStart()), static_cast<int>(current.capturedLength()), rule.format);
+        ++applied;
     }
+
+    return applied;
 }
 
 void CodeSyntaxHighlighter::applyBlockComments(const QString& text) {

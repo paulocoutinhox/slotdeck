@@ -28,7 +28,7 @@ class CodeSyntaxHighlighter final : public QSyntaxHighlighter {
         QTextCharFormat format;
     };
 
-    void applyRule(const QString& text, const Rule& rule);
+    [[nodiscard]] int applyRule(const QString& text, const Rule& rule);
     void applyBlockComments(const QString& text);
 
     LanguageDefinition m_definition;
