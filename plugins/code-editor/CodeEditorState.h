@@ -38,6 +38,8 @@ struct CodeEditorSettings final {
     int fontSize{defaultEditorFontSize};
     // A file carrying no mark and spelling no valid UTF-8 is read in this one, and Latin-1 is the only encoding that returns every byte it was given.
     TextCharset defaultCharset{TextCharset::Latin1};
+    // The colouring of code is editor content, so it is selected here and never follows the application theme.
+    QString colorSchemeId;
 };
 
 struct CodeWorkspaceState final {

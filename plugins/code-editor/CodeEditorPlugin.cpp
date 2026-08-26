@@ -158,12 +158,22 @@ QWidget* CodeEditorPlugin::createAppearanceSection(QWidget* parent) {
     fontSize->setObjectName(QStringLiteral("codeEditorFontSize"));
     fontSize->setRange(ui::minimumContentFontSize, ui::maximumContentFontSize);
     fontSize->setValue(m_settings.fontSize);
+    auto* colorScheme = new ui::ComboBox(m_host->theme(), view);
+    colorScheme->setObjectName(QStringLiteral("codeEditorColorScheme"));
+
+    for (const auto& scheme : CodeColorSchemeCatalog::schemes()) {
+        colorScheme->addItem(scheme.name, scheme.id);
+    }
+
+    ui::sortComboBoxItems(colorScheme);
+    colorScheme->setCurrentIndex(std::max(0, colorScheme->findData(m_settings.colorSchemeId)));
     auto* wordWrap = new QCheckBox(view);
     wordWrap->setObjectName(QStringLiteral("codeEditorWordWrapSetting"));
     wordWrap->setChecked(m_settings.wordWrap);
     wordWrap->setToolTip(m_host->translate(QStringLiteral("code-editor.settings.word-wrap-description")));
     ui::addSettingsRow(form, m_host->translate(QStringLiteral("code-editor.settings.font-family")), fontFamily);
     ui::addSettingsRow(form, m_host->translate(QStringLiteral("code-editor.settings.font-size")), ui::stepperRow(fontSize, m_host->theme(), view));
+    ui::addSettingsRow(form, m_host->translate(QStringLiteral("code-editor.settings.color-scheme")), colorScheme);
     ui::addSettingsRow(form, m_host->translate(QStringLiteral("code-editor.settings.word-wrap")), wordWrap);
     layout->addLayout(form);
     // clang-format off
@@ -172,6 +182,8 @@ QWidget* CodeEditorPlugin::createAppearanceSection(QWidget* parent) {
     connect(this, &CodeEditorPlugin::wordWrapChanged, wordWrap, [this, wordWrap]() { const QSignalBlocker blocker(wordWrap); wordWrap->setChecked(m_settings.wordWrap); });
     connect(fontSize, &QSpinBox::valueChanged, this, [this](int pointSize) { setEditorFontSize(pointSize); });
     connect(this, &CodeEditorPlugin::editorFontChanged, fontSize, [this, fontSize]() { const QSignalBlocker blocker(fontSize); fontSize->setValue(m_settings.fontSize); });
+    connect(colorScheme, &QComboBox::currentIndexChanged, this, [this, colorScheme](int index) { setColorScheme(colorScheme->itemData(index).toString()); });
+    connect(this, &CodeEditorPlugin::colorSchemeChanged, colorScheme, [this, colorScheme]() { const QSignalBlocker blocker(colorScheme); colorScheme->setCurrentIndex(std::max(0, colorScheme->findData(m_settings.colorSchemeId))); });
     // clang-format on
     return view;
 }
@@ -279,6 +291,22 @@ bool CodeEditorPlugin::wordWrap() const {
 
 TextCharset CodeEditorPlugin::defaultCharset() const {
     return m_settings.defaultCharset;
+}
+
+// A scheme the catalog does not declare is refused rather than normalised into another one.
+void CodeEditorPlugin::setColorScheme(const QString& schemeId) {
+    if (m_settings.colorSchemeId == schemeId || m_repository == nullptr || !CodeColorSchemeCatalog::exists(schemeId)) {
+        return;
+    }
+
+    m_settings.colorSchemeId = schemeId;
+    emit colorSchemeChanged();
+    persistSettings();
+}
+
+const CodeColorScheme& CodeEditorPlugin::colorScheme() const {
+    const CodeColorScheme* selected = CodeColorSchemeCatalog::scheme(m_settings.colorSchemeId);
+    return selected != nullptr ? *selected : CodeColorSchemeCatalog::schemes().first();
 }
 
 void CodeEditorPlugin::setEditorFontFamily(const QString& family) {

@@ -26,6 +26,7 @@
 #include <QClipboard>
 #include <QDir>
 #include <QFontDatabase>
+#include <QFontMetricsF>
 #include <QImage>
 #include <QInputMethodEvent>
 #include <QJsonArray>
@@ -45,6 +46,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -299,7 +301,7 @@ TEST(TerminalSettingsTest, LoadsMutatesAndSignalsValidSettings) {
     plugins::terminalplugin::TerminalSettingsStore settings(host);
     ASSERT_TRUE(settings.initialize().hasValue());
     ASSERT_FALSE(ui::monospacedFontFamilies().isEmpty());
-    EXPECT_EQ(settings.fontFamily(), ui::monospacedFontFamilies().first());
+    EXPECT_EQ(settings.fontFamily(), ui::defaultMonospacedFontFamily());
     EXPECT_EQ(settings.themeId(), QStringLiteral("balanced"));
     EXPECT_EQ(settings.fontSize(), plugins::terminalplugin::defaultTerminalFontSize);
     EXPECT_TRUE(settings.confirmMultilinePaste());
@@ -360,7 +362,7 @@ TEST(TerminalSettingsTest, StepsItsOwnFontSizeWithinTheSupportedRange) {
 
 TEST(TerminalSettingsTest, TakesTheDeclaredDefaultForEveryStoredValueItCannotUse) {
     test::TestPluginHost host;
-    host.settingsDocument = {{QStringLiteral("fontFamily"), ui::monospacedFontFamilies().first()}, {QStringLiteral("fontSize"), ui::maximumContentFontSize + 1}, {QStringLiteral("themeId"), QStringLiteral("balanced")}, {QStringLiteral("confirmMultilinePaste"), true}};
+    host.settingsDocument = {{QStringLiteral("fontFamily"), ui::defaultMonospacedFontFamily()}, {QStringLiteral("fontSize"), ui::maximumContentFontSize + 1}, {QStringLiteral("themeId"), QStringLiteral("balanced")}, {QStringLiteral("confirmMultilinePaste"), true}};
     plugins::terminalplugin::TerminalSettingsStore settings(host);
     ASSERT_TRUE(settings.initialize().hasValue());
     EXPECT_EQ(settings.fontSize(), plugins::terminalplugin::defaultTerminalFontSize);
@@ -370,7 +372,7 @@ TEST(TerminalSettingsTest, TakesTheDeclaredDefaultForEveryStoredValueItCannotUse
     malformedHost.settingsDocument = {{QStringLiteral("fontFamily"), QStringLiteral("missing")}, {QStringLiteral("fontSize"), 13.5}, {QStringLiteral("themeId"), QStringLiteral("nothing")}, {QStringLiteral("nobodyDeclaresThis"), true}};
     plugins::terminalplugin::TerminalSettingsStore malformed(malformedHost);
     ASSERT_TRUE(malformed.initialize().hasValue());
-    EXPECT_EQ(malformed.fontFamily(), ui::monospacedFontFamilies().first());
+    EXPECT_EQ(malformed.fontFamily(), ui::defaultMonospacedFontFamily());
     EXPECT_EQ(malformed.fontSize(), plugins::terminalplugin::defaultTerminalFontSize);
     EXPECT_EQ(malformed.themeId(), QStringLiteral("balanced"));
 
@@ -1641,6 +1643,54 @@ std::unique_ptr<terminalcore::TerminalSession> TerminalTestsHelper::createSessio
     state.historyFile = QStringLiteral("history");
     terminalcore::ShellProfile profile{QStringLiteral("shell"), QStringLiteral("Shell"), QStringLiteral("/bin/sh"), {}};
     return std::make_unique<terminalcore::TerminalSession>(state, std::move(profile), *terminalcore::terminalTheme(QStringLiteral("balanced")), std::move(backend));
+}
+
+TEST(TerminalFontTests, OpensOnTheFirstDeclaredFamilyThatIsInstalled) {
+    const QStringList& installed = ui::monospacedFontFamilies();
+    ASSERT_FALSE(installed.isEmpty());
+    const QString opened = ui::defaultMonospacedFontFamily();
+    ASSERT_FALSE(opened.isEmpty());
+
+    for (const auto& preferred : ui::preferredMonospacedFontFamilies()) {
+        if (installed.contains(preferred)) {
+            EXPECT_EQ(opened, preferred);
+
+            if (installed.first() != preferred) {
+                EXPECT_NE(opened, installed.first()) << "the family is still the one that happens to sort first";
+            }
+
+            return;
+        }
+    }
+
+    EXPECT_EQ(opened, installed.first());
+}
+
+TEST(TerminalFontTests, SizesEveryCellToWhatItsFontAsksForRatherThanPastIt) {
+    test::TestPluginHost host;
+    ui::TerminalWidget widget(host);
+    const QString family = ui::defaultMonospacedFontFamily();
+    const int horizontalPadding = host.theme().metric(ui::ThemeMetric::TerminalHorizontalPadding) * 2;
+    const int verticalPadding = host.theme().metric(ui::ThemeMetric::TerminalVerticalPadding) * 2;
+    const int columns = host.theme().metric(ui::ThemeMetric::TerminalMinimumColumns);
+    const int rows = host.theme().metric(ui::ThemeMetric::TerminalMinimumRows);
+    ASSERT_GT(columns, 0);
+    ASSERT_GT(rows, 0);
+
+    for (const int pointSize : {8, 12, 18, 36}) {
+        widget.setTerminalFont(family, pointSize);
+        QFont font(family);
+        font.setStyleHint(QFont::Monospace);
+        font.setFixedPitch(true);
+        font.setPointSizeF(pointSize);
+        const QFontMetricsF metrics(font);
+        const QSize minimum = widget.minimumSizeHint();
+        const qreal cellWidth = static_cast<qreal>(minimum.width() - horizontalPadding) / columns;
+        const qreal cellHeight = static_cast<qreal>(minimum.height() - verticalPadding) / rows;
+
+        EXPECT_LE(std::abs(cellWidth - metrics.horizontalAdvance(QLatin1Char('M'))), 0.5) << "the cell leaves a gap after every glyph at " << pointSize << " points";
+        EXPECT_LE(std::abs(cellHeight - metrics.lineSpacing()), 0.5) << "the cell leaves a gap under every line at " << pointSize << " points";
+    }
 }
 
 } // namespace slotdeck

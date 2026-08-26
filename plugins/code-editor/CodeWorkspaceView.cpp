@@ -52,7 +52,7 @@ bool CodeWorkspaceViewHelper::validEntryName(const QString& name) {
     return !name.isEmpty() && name != QStringLiteral(".") && name != QStringLiteral("..") && !name.contains(QLatin1Char('/')) && !name.contains(QLatin1Char('\\')) && !name.contains(QChar::Null);
 }
 
-CodeWorkspaceView::CodeWorkspaceView(CodeWorkspaceState state, QVector<ResolvedLanguageServer> languageServers, bool wordWrap, CodeEditorFont font, TextCharset defaultCharset, PluginHost& host, QWidget* parent) : QWidget(parent), m_initialState(std::move(state)), m_defaultCharset(defaultCharset), m_host(host), m_fileModel(new QFileSystemModel(this)), m_tree(new QTreeView(this)), m_documents(new ui::TabWidget(host.theme(), this)), m_problems(new QTreeWidget(this)), m_references(new QTreeWidget(this)), m_symbols(new QTreeWidget(this)), m_symbolSearch(new QLineEdit(this)), m_bottomPanel(new ui::TabWidget(host.theme(), this)), m_availableLanguageServers(std::move(languageServers)), m_wordWrapEnabled(wordWrap), m_font(std::move(font)) {
+CodeWorkspaceView::CodeWorkspaceView(CodeWorkspaceState state, QVector<ResolvedLanguageServer> languageServers, bool wordWrap, CodeEditorFont font, CodeColorScheme scheme, TextCharset defaultCharset, PluginHost& host, QWidget* parent) : QWidget(parent), m_initialState(std::move(state)), m_defaultCharset(defaultCharset), m_host(host), m_fileModel(new QFileSystemModel(this)), m_tree(new QTreeView(this)), m_documents(new ui::TabWidget(host.theme(), this)), m_problems(new QTreeWidget(this)), m_references(new QTreeWidget(this)), m_symbols(new QTreeWidget(this)), m_symbolSearch(new QLineEdit(this)), m_bottomPanel(new ui::TabWidget(host.theme(), this)), m_availableLanguageServers(std::move(languageServers)), m_wordWrapEnabled(wordWrap), m_font(std::move(font)), m_colorScheme(std::move(scheme)) {
     // Containment compares canonical paths, so the root it compares against is resolved here rather than trusted from whoever opened the workspace.
     if (const QString canonicalRoot = QFileInfo(m_initialState.rootPath).canonicalFilePath(); !canonicalRoot.isEmpty()) {
         m_initialState.rootPath = canonicalRoot;
@@ -310,7 +310,7 @@ void CodeWorkspaceView::openFile(const QString& path, int cursorPosition) {
         return;
     }
 
-    auto* openDocument = new CodeDocument(normalized, m_initialState.rootPath, m_wordWrapEnabled, m_font, m_defaultCharset, m_host, m_documents);
+    auto* openDocument = new CodeDocument(normalized, m_initialState.rootPath, m_wordWrapEnabled, m_font, m_colorScheme, m_defaultCharset, m_host, m_documents);
     const int index = m_documents->addTab(openDocument, openDocument->title());
     m_documents->setTabToolTip(index, normalized);
     m_documents->setCurrentIndex(index);
@@ -576,6 +576,14 @@ void CodeWorkspaceView::setEditorFont(const CodeEditorFont& font) {
 
     for (int index = 0; index < m_documents->count(); ++index) {
         qobject_cast<CodeDocument*>(m_documents->widget(index))->setEditorFont(font);
+    }
+}
+
+void CodeWorkspaceView::setColorScheme(const CodeColorScheme& scheme) {
+    m_colorScheme = scheme;
+
+    for (int index = 0; index < m_documents->count(); ++index) {
+        qobject_cast<CodeDocument*>(m_documents->widget(index))->setColorScheme(scheme);
     }
 }
 

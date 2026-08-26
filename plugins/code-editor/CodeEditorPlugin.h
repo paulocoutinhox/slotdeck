@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CodeColorScheme.h"
 #include "CodeEditorRepository.h"
 #include "LanguageRegistry.h"
 #include "plugins/PluginInterface.h"
@@ -39,11 +40,13 @@ class CodeEditorPlugin final : public QObject, public PluginInterface {
     [[nodiscard]] bool wordWrap() const;
     [[nodiscard]] TextCharset defaultCharset() const;
     [[nodiscard]] CodeEditorFont editorFont() const;
+    [[nodiscard]] const CodeColorScheme& colorScheme() const;
     void setWordWrap(bool enabled);
     void setDefaultCharset(TextCharset charset);
     void setLanguageServersEnabled(bool enabled);
     void setEditorFontFamily(const QString& family);
     void setEditorFontSize(int pointSize);
+    void setColorScheme(const QString& schemeId);
     [[nodiscard]] const QVector<ResolvedLanguageServer>& languageServers() const;
     [[nodiscard]] QVector<ResolvedLanguageServer> activeLanguageServers() const;
     [[nodiscard]] bool languageServersEnabled() const;
@@ -59,6 +62,7 @@ class CodeEditorPlugin final : public QObject, public PluginInterface {
     void workspacesChanged();
     void wordWrapChanged();
     void editorFontChanged();
+    void colorSchemeChanged();
     void languageServersChanged();
     void languageServerDiscoveryStateChanged(bool running);
 

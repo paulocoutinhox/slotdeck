@@ -856,6 +856,30 @@ const QStringList& monospacedFontFamilies() {
     return families;
 }
 
+const QStringList& preferredMonospacedFontFamilies() {
+    // clang-format off
+    static const QStringList families{
+        QStringLiteral("Menlo"), QStringLiteral("SF Mono"), QStringLiteral("Monaco"),
+        QStringLiteral("Cascadia Mono"), QStringLiteral("Cascadia Code"), QStringLiteral("Consolas"),
+        QStringLiteral("DejaVu Sans Mono"), QStringLiteral("Liberation Mono"), QStringLiteral("Noto Sans Mono"), QStringLiteral("Ubuntu Mono"),
+        QStringLiteral("JetBrains Mono"), QStringLiteral("Fira Mono"), QStringLiteral("Source Code Pro"), QStringLiteral("Hack"), QStringLiteral("Inconsolata"),
+        QStringLiteral("Courier New")};
+    // clang-format on
+    return families;
+}
+
+QString defaultMonospacedFontFamily() {
+    const QStringList& installed = monospacedFontFamilies();
+
+    for (const auto& family : preferredMonospacedFontFamilies()) {
+        if (installed.contains(family)) {
+            return family;
+        }
+    }
+
+    return installed.value(0);
+}
+
 QString localTimestamp(const QDateTime& utcTimestamp) {
     return QLocale::system().toString(utcTimestamp.toLocalTime(), QLocale::ShortFormat);
 }

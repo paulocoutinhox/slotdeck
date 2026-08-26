@@ -11,11 +11,15 @@
 
 namespace slotdeck::plugins::codeeditor {
 
-enum class HighlightRole { Keyword, Number, String, Identifier, Declaration, Function, Comment, Heading, Emphasis, Markup };
+// The set covers every token type the protocol reports, so nothing a language server knows is collapsed into a role that loses it.
+enum class HighlightRole { Text, Keyword, ControlFlow, PrimitiveType, Type, Namespace, Enumeration, Constant, Function, Method, Macro, Parameter, Variable, Property, Number, String, Regexp, Comment, Operator, Punctuation, Preprocessor, Label, Decorator, Attribute, Heading, Emphasis, Strong, Link, Markup, CodeSpan };
+
+[[nodiscard]] const QVector<HighlightRole>& highlightRoles();
+[[nodiscard]] QString highlightRoleIdentifier(HighlightRole role);
 
 struct HighlightPattern final {
     QString pattern;
-    HighlightRole role{HighlightRole::Identifier};
+    HighlightRole role{HighlightRole::Text};
 };
 
 struct LanguageDefinition final {
@@ -74,7 +78,12 @@ class LanguageRegistry final {
     [[nodiscard]] static const utils::Result<void>& catalogError();
     [[nodiscard]] static utils::Result<void>& mutableCatalogError();
     [[nodiscard]] static const LanguageDefinition* languageForId(const QString& languageId);
-    [[nodiscard]] static const QVector<HighlightPattern>& commonPatterns();
+    // The order a rule is applied in decides which one wins, so the catalog declares what runs before the keywords of a language and what runs after them.
+    [[nodiscard]] static const QVector<HighlightPattern>& patternsBeforeKeywords();
+    [[nodiscard]] static const QVector<HighlightPattern>& patternsAfterKeywords();
+    // A keyword a language already declares is painted in the more specific role when it belongs to one of these sets.
+    [[nodiscard]] static const QStringList& controlFlowKeywords();
+    [[nodiscard]] static const QStringList& primitiveTypeKeywords();
     [[nodiscard]] static const QMap<QString, HighlightRole>& semanticRoles();
     [[nodiscard]] static const EditorLimits& limits();
     [[nodiscard]] static const QVector<LanguageServerDefinition>& languageServers();

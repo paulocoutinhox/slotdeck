@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CodeColorScheme.h"
 #include "LanguageRegistry.h"
 #include "LanguageServerClient.h"
 
@@ -8,17 +9,13 @@
 #include <QSyntaxHighlighter>
 #include <QTextCharFormat>
 
-namespace slotdeck::ui {
-class Theme;
-}
-
 namespace slotdeck::plugins::codeeditor {
 
 class CodeSyntaxHighlighter final : public QSyntaxHighlighter {
     Q_OBJECT
 
   public:
-    CodeSyntaxHighlighter(QTextDocument* document, LanguageDefinition definition, const ui::Theme& theme);
+    CodeSyntaxHighlighter(QTextDocument* document, LanguageDefinition definition, const CodeColorScheme& scheme);
 
     void setSemanticTokens(const QVector<SemanticToken>& tokens);
 

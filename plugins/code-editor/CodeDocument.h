@@ -21,7 +21,7 @@ class CodeDocument final : public QWidget {
     Q_OBJECT
 
   public:
-    CodeDocument(const QString& path, const QString& rootPath, bool wordWrap, CodeEditorFont font, TextCharset defaultCharset, PluginHost& host, QWidget* parent = nullptr);
+    CodeDocument(const QString& path, const QString& rootPath, bool wordWrap, CodeEditorFont font, CodeColorScheme scheme, TextCharset defaultCharset, PluginHost& host, QWidget* parent = nullptr);
     ~CodeDocument() override;
 
     [[nodiscard]] const QString& path() const;
@@ -40,6 +40,7 @@ class CodeDocument final : public QWidget {
     void setLanguageServer(LanguageServerClient* server);
     void setWordWrap(bool enabled);
     void setEditorFont(const CodeEditorFont& font);
+    void setColorScheme(const CodeColorScheme& scheme);
     void updatePath(const QString& path);
     void reloadEditorConfig();
     void reopenWithCharset(TextCharset charset);
@@ -109,6 +110,7 @@ class CodeDocument final : public QWidget {
     LineEnding m_detectedLineEnding{LineEnding::Lf};
     TextCharset m_detectedCharset{TextCharset::Utf8};
     std::unique_ptr<CodeSyntaxHighlighter> m_highlighter;
+    CodeColorScheme m_scheme;
     QFileSystemWatcher m_watcher;
     QTimer m_externalChangeTimer;
     QTimer m_languageServerTimer;

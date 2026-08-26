@@ -20,7 +20,7 @@ class CodeWorkspaceView final : public QWidget {
     Q_OBJECT
 
   public:
-    CodeWorkspaceView(CodeWorkspaceState state, QVector<ResolvedLanguageServer> languageServers, bool wordWrap, CodeEditorFont font, TextCharset defaultCharset, PluginHost& host, QWidget* parent = nullptr);
+    CodeWorkspaceView(CodeWorkspaceState state, QVector<ResolvedLanguageServer> languageServers, bool wordWrap, CodeEditorFont font, CodeColorScheme scheme, TextCharset defaultCharset, PluginHost& host, QWidget* parent = nullptr);
     ~CodeWorkspaceView() override;
 
     [[nodiscard]] const QString& workspaceId() const;
@@ -34,6 +34,7 @@ class CodeWorkspaceView final : public QWidget {
     void setLanguageServers(QVector<ResolvedLanguageServer> languageServers);
     void setWordWrap(bool enabled);
     void setEditorFont(const CodeEditorFont& font);
+    void setColorScheme(const CodeColorScheme& scheme);
     [[nodiscard]] bool wordWrapEnabled() const;
     void renameEntry(const QString& path, const QString& name);
     void closeCurrentDocument();
@@ -112,6 +113,7 @@ class CodeWorkspaceView final : public QWidget {
     QHash<QString, LanguageServerClient*> m_languageServers;
     bool m_wordWrapEnabled{false};
     CodeEditorFont m_font;
+    CodeColorScheme m_colorScheme;
 };
 
 } // namespace slotdeck::plugins::codeeditor

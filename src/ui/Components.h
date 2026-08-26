@@ -286,6 +286,10 @@ void growDialogToContents(QDialog* dialog);
 void showDialogWindow(QDialog* dialog, const QString& title);
 [[nodiscard]] QLabel* emptyStateLabel(const QString& text, QWidget* parent);
 [[nodiscard]] const QStringList& monospacedFontFamilies();
+// The families a monospaced surface is conventionally read in, in the order they are preferred.
+[[nodiscard]] const QStringList& preferredMonospacedFontFamilies();
+// The family a monospaced surface opens on, because the first family the system happens to list is not a font anyone chose.
+[[nodiscard]] QString defaultMonospacedFontFamily();
 [[nodiscard]] QString localTimestamp(const QDateTime& utcTimestamp);
 // A label breaks between words, and only a single word wider than the space it has left has no word boundary to break at.
 [[nodiscard]] Qt::TextFlag labelWrapping(const QString& text, const QFontMetrics& metrics, int availableWidth);

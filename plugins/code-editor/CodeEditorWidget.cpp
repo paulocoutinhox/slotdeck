@@ -90,7 +90,7 @@ int CodeEditorWidget::lineNumberAreaWidth() const {
 
 void CodeEditorWidget::paintLineNumbers(QPaintEvent* event) {
     QPainter painter(m_lineNumberArea);
-    painter.fillRect(event->rect(), m_theme.color(ui::ThemeColor::Raised));
+    painter.fillRect(event->rect(), m_scheme.surface.lineNumberBackground);
 
     QTextBlock block = firstVisibleBlock();
     int number = block.blockNumber();
@@ -99,7 +99,7 @@ void CodeEditorWidget::paintLineNumbers(QPaintEvent* event) {
 
     while (block.isValid() && top <= event->rect().bottom()) {
         if (block.isVisible() && bottom >= event->rect().top()) {
-            painter.setPen(number == textCursor().blockNumber() ? m_theme.color(ui::ThemeColor::Text) : m_theme.color(ui::ThemeColor::TextMuted));
+            painter.setPen(number == textCursor().blockNumber() ? m_scheme.surface.currentLineNumber : m_scheme.surface.lineNumber);
             painter.drawText(0, top, m_lineNumberArea->width() - 6, fontMetrics().height(), Qt::AlignRight, QString::number(number + 1));
         }
         block = block.next();
@@ -434,7 +434,7 @@ void CodeEditorWidget::setDiagnostics(const QVector<LanguageDiagnostic>& diagnos
 }
 
 void CodeEditorWidget::setOccurrences(const QVector<SourceLocation>& occurrences) {
-    QColor tint = m_theme.color(ui::ThemeColor::Accent);
+    QColor tint = m_scheme.color(HighlightRole::Function);
     tint.setAlphaF(0.25F);
     m_occurrenceSelections.clear();
 
@@ -452,7 +452,7 @@ void CodeEditorWidget::setOccurrences(const QVector<SourceLocation>& occurrences
 }
 
 void CodeEditorWidget::setSearchMatches(const QVector<QPair<int, int>>& matches) {
-    QColor tint = m_theme.color(ui::ThemeColor::Warning);
+    QColor tint = m_scheme.color(HighlightRole::Constant);
     tint.setAlphaF(0.35F);
     m_searchSelections.clear();
 
@@ -471,9 +471,7 @@ void CodeEditorWidget::setSearchMatches(const QVector<QPair<int, int>>& matches)
 // The cursor moves on every keystroke, so only the current line is rebuilt and every other mark is kept as it already is.
 void CodeEditorWidget::refreshExtraSelections() {
     QTextEdit::ExtraSelection current;
-    QColor line = m_theme.color(ui::ThemeColor::Hover);
-    line.setAlphaF(0.55F);
-    current.format.setBackground(line);
+    current.format.setBackground(m_scheme.surface.currentLine);
     current.format.setProperty(QTextFormat::FullWidthSelection, true);
     current.cursor = textCursor();
     current.cursor.clearSelection();
@@ -506,6 +504,16 @@ QSize LineNumberArea::sizeHint() const {
 
 void LineNumberArea::paintEvent(QPaintEvent* event) {
     m_editor.paintLineNumbers(event);
+}
+
+// The scheme owns the surface the code is read on, so the palette of the editor follows it rather than the application theme.
+void CodeEditorWidget::setColorScheme(const CodeColorScheme& scheme) {
+    m_scheme = scheme;
+    // The shared sheet paints every text edit in the window colour, so the surface of a scheme is declared on this widget where it wins.
+    setStyleSheet(QStringLiteral("QPlainTextEdit { background: %1; color: %2; selection-background-color: %3; selection-color: %4; border: none; }").arg(m_scheme.surface.background.name(), m_scheme.color(HighlightRole::Text).name(), m_scheme.surface.selection.name(), m_scheme.surface.selectionText.name()));
+    refreshExtraSelections();
+    m_lineNumberArea->update();
+    viewport()->update();
 }
 
 } // namespace slotdeck::plugins::codeeditor

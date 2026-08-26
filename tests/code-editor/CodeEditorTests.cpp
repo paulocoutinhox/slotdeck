@@ -1,3 +1,4 @@
+#include "CodeColorScheme.h"
 #include "CodeDocument.h"
 #include "CodeEditorPlugin.h"
 #include "CodeEditorRepository.h"
@@ -12,6 +13,7 @@
 #include "TestProcess.h"
 #include "TestTranslations.h"
 #include "filesystem/FileSystemService.h"
+#include "ui/AppStyle.h"
 #include "ui/Components.h"
 #include "ui/FindBar.h"
 
@@ -20,6 +22,10 @@
 #include <QCoreApplication>
 #include <QFile>
 #include <QFileSystemModel>
+#include <QImage>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -27,12 +33,16 @@
 #include <QPointer>
 #include <QPromise>
 #include <QScrollBar>
+#include <QSet>
 #include <QSignalSpy>
 #include <QSplitter>
 #include <QStringConverter>
 #include <QTabWidget>
 #include <QTableWidget>
 #include <QTemporaryDir>
+#include <QTextBlock>
+#include <QTextDocument>
+#include <QTextLayout>
 #include <QToolButton>
 #include <QTreeView>
 #include <QTreeWidget>
@@ -138,7 +148,7 @@ TEST(CodeWorkspaceViewTest, OpensTheFileALocationPointsAtAndPlacesTheCursorOnIts
     const QString target = QDir(canonicalRoot).filePath(QStringLiteral("target.cpp"));
     ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(target, QByteArrayLiteral("one\ntwo\nthree\nfour\n")));
     const QDateTime now = QDateTime::currentDateTimeUtc();
-    CodeWorkspaceView view({QStringLiteral("workspace"), canonicalRoot, 0, true, now, now, {}}, {}, false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeWorkspaceView view({QStringLiteral("workspace"), canonicalRoot, 0, true, now, now, {}}, {}, false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     auto* documents = view.findChild<QTabWidget*>(QStringLiteral("codeEditorDocuments"));
     ASSERT_NE(documents, nullptr);
 
@@ -222,7 +232,7 @@ TEST(CodeWorkspaceViewTest, ReplacesALanguageServerThatGaveUpInsteadOfKeepingThe
     ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(path, QByteArrayLiteral("int main() { return 0; }\n")));
     const QDateTime now = QDateTime::currentDateTimeUtc();
     const ResolvedLanguageServer crashing{QStringLiteral("cpp"), QCoreApplication::applicationFilePath(), {QStringLiteral("--slotdeck-test-lsp-crash")}};
-    CodeWorkspaceView view({QStringLiteral("workspace"), canonicalRoot, 0, true, now, now, {}}, {crashing}, false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeWorkspaceView view({QStringLiteral("workspace"), canonicalRoot, 0, true, now, now, {}}, {crashing}, false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
 
     QSignalSpy failures(&view, &CodeWorkspaceView::operationFailed);
     view.openFile(path);
@@ -247,7 +257,7 @@ TEST(CodeWorkspaceViewTest, PresentsTheAnalysisOfTheWorkspaceAndForgetsItWhenThe
     ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(path, QByteArrayLiteral("int main() { return 0; }\n")));
     const QDateTime now = QDateTime::currentDateTimeUtc();
     const ResolvedLanguageServer fixture{QStringLiteral("cpp"), QCoreApplication::applicationFilePath(), {QStringLiteral("--slotdeck-test-lsp")}};
-    CodeWorkspaceView view({QStringLiteral("workspace"), canonicalRoot, 0, true, now, now, {}}, {fixture}, false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeWorkspaceView view({QStringLiteral("workspace"), canonicalRoot, 0, true, now, now, {}}, {fixture}, false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     auto* documents = view.findChild<QTabWidget*>(QStringLiteral("codeEditorDocuments"));
     auto* problems = view.findChild<QTreeWidget*>(QStringLiteral("codeEditorProblems"));
     auto* references = view.findChild<QTreeWidget*>(QStringLiteral("codeEditorReferences"));
@@ -348,7 +358,7 @@ TEST(CodeDocumentTest, SendsOnlyWhatChangedToTheLanguageServerAndSavesThroughIt)
     ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(path, QByteArrayLiteral("int main() {}\n")));
 
     LanguageServerClient client({QStringLiteral("cpp"), QCoreApplication::applicationFilePath(), {QStringLiteral("--slotdeck-test-lsp")}}, root.path());
-    CodeDocument document(path, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeDocument document(path, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     QStringList diagnostics;
     QSignalSpy loaded(&document, &CodeDocument::loaded);
     // clang-format off
@@ -829,7 +839,7 @@ TEST(CodeDocumentTest, AppliesEditorConfigIndentationAndSaveNormalization) {
     const QString path = QDir(root.path()).filePath(QStringLiteral("main.cpp"));
     ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(path, QByteArrayLiteral("int value = 1;")));
 
-    CodeDocument document(path, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeDocument document(path, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     QSignalSpy configured(&document, &CodeDocument::editorConfigChanged);
     QSignalSpy loaded(&document, &CodeDocument::loaded);
     // clang-format off
@@ -867,7 +877,7 @@ TEST(CodeDocumentTest, KeepsEveryByteOfTheFileItOpenedWhenNothingDeclaresOtherwi
         const QString path = QDir(root.path()).filePath(sample.name);
         ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(path, sample.content)) << qPrintable(sample.name);
 
-        CodeDocument document(path, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+        CodeDocument document(path, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
         QSignalSpy loaded(&document, &CodeDocument::loaded);
         // clang-format off
         ASSERT_TRUE(test::waitUntil([&]() { return loaded.count() >= 1; })) << qPrintable(sample.name);
@@ -897,7 +907,7 @@ TEST(CodeDocumentTest, ReportsAndKeepsTheLineEndingAndTheByteOrderMarkTheFileCar
 
     const QString windows = QDir(root.path()).filePath(QStringLiteral("windows.txt"));
     ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(windows, QByteArrayLiteral("\xEF\xBB\xBF") + QByteArrayLiteral("alpha\r\nbeta\r\n")));
-    CodeDocument document(windows, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeDocument document(windows, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     QSignalSpy loaded(&document, &CodeDocument::loaded);
     // clang-format off
     ASSERT_TRUE(test::waitUntil([&]() { return loaded.count() >= 1; }));
@@ -915,7 +925,7 @@ TEST(CodeDocumentTest, ReportsAndKeepsTheLineEndingAndTheByteOrderMarkTheFileCar
 
     const QString unix = QDir(root.path()).filePath(QStringLiteral("unix.txt"));
     ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(unix, QByteArrayLiteral("alpha\nbeta\n")));
-    CodeDocument plain(unix, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeDocument plain(unix, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     QSignalSpy plainLoaded(&plain, &CodeDocument::loaded);
     // clang-format off
     ASSERT_TRUE(test::waitUntil([&]() { return plainLoaded.count() >= 1; }));
@@ -934,7 +944,7 @@ TEST(CodeDocumentTest, AnnouncesItsFirstLoadOnlyAfterTheCallerCouldConnect) {
     // clang-format on
 
     // A read that is already finished runs its continuation immediately, so a document that loaded inside its own constructor would announce it to nobody.
-    CodeDocument document(path, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeDocument document(path, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     QSignalSpy loaded(&document, &CodeDocument::loaded);
     QSignalSpy configured(&document, &CodeDocument::editorConfigChanged);
     EXPECT_TRUE(document.editor().toPlainText().isEmpty());
@@ -966,7 +976,7 @@ TEST(CodeDocumentTest, OpensEveryEncodingItCanWriteBackAndNamesTheOnesItCannot) 
         const QString path = QDir(root.path()).filePath(sample.name);
         ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(path, sample.content)) << qPrintable(sample.name);
 
-        CodeDocument document(path, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+        CodeDocument document(path, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
         QSignalSpy loaded(&document, &CodeDocument::loaded);
         QSignalSpy failures(&document, &CodeDocument::operationFailed);
         // clang-format off
@@ -989,7 +999,7 @@ TEST(CodeDocumentTest, OpensEveryEncodingItCanWriteBackAndNamesTheOnesItCannot) 
     // An encoding the editor cannot write back is named instead of being opened as text or rejected as binary.
     const QString utf32 = QDir(root.path()).filePath(QStringLiteral("wide.txt"));
     ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(utf32, QByteArray("\xFF\xFE\0\0", 4) + QByteArray("a\0\0\0", 4)));
-    CodeDocument wide(utf32, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeDocument wide(utf32, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     QSignalSpy wideFailures(&wide, &CodeDocument::operationFailed);
     // clang-format off
     ASSERT_TRUE(test::waitUntil([&]() { return wideFailures.count() >= 1; }));
@@ -1001,7 +1011,7 @@ TEST(CodeDocumentTest, OpensEveryEncodingItCanWriteBackAndNamesTheOnesItCannot) 
     ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(binary, QByteArray("\x7F"
                                                                         "ELF\0\1",
                                                                         6)));
-    CodeDocument executable(binary, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeDocument executable(binary, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     QSignalSpy binaryFailures(&executable, &CodeDocument::operationFailed);
     // clang-format off
     ASSERT_TRUE(test::waitUntil([&]() { return binaryFailures.count() >= 1; }));
@@ -1025,7 +1035,7 @@ TEST(CodeDocumentTest, SavingKeepsTheCursorAndTheScrollWhereTheReaderLeftThem) {
     const QString path = QDir(root.path()).filePath(QStringLiteral("long.txt"));
     ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(path, content));
 
-    CodeDocument document(path, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeDocument document(path, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     QSignalSpy loaded(&document, &CodeDocument::loaded);
     // clang-format off
     ASSERT_TRUE(test::waitUntil([&]() { return loaded.count() >= 1; }));
@@ -1059,7 +1069,7 @@ TEST(CodeDocumentTest, ReportsAConflictOnlyWhenTheBytesOnDiskReallyDiffer) {
     const QString path = QDir(root.path()).filePath(QStringLiteral("notes.txt"));
     ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(path, QByteArrayLiteral("alpha\n")));
 
-    CodeDocument document(path, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeDocument document(path, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     QSignalSpy loaded(&document, &CodeDocument::loaded);
     QSignalSpy conflicts(&document, &CodeDocument::externalChangeConflict);
     // clang-format off
@@ -1148,10 +1158,10 @@ TEST(LanguageRegistryTest, LoadsEveryLanguageAndServerTheCatalogDeclares) {
     EXPECT_GE(limits.bottomPanelInitialHeight, limits.bottomPanelMinimumHeight);
 
     // The highlighting the catalog declares is loaded, and a language that needs its own patterns declares them there rather than in code.
-    EXPECT_FALSE(LanguageRegistry::commonPatterns().isEmpty());
+    EXPECT_FALSE(LanguageRegistry::patternsBeforeKeywords().isEmpty());
     EXPECT_FALSE(LanguageRegistry::semanticRoles().isEmpty());
 
-    for (const auto& pattern : LanguageRegistry::commonPatterns()) {
+    for (const auto& pattern : LanguageRegistry::patternsBeforeKeywords()) {
         EXPECT_TRUE(QRegularExpression(pattern.pattern).isValid()) << pattern.pattern.toStdString();
     }
 
@@ -1183,7 +1193,7 @@ TEST(CodeWorkspaceViewTest, AnalysesADocumentAgainWhenTheServerFinishesStartingL
 
     // The server answers initialization long after the analysis debounce, so everything the document asked for first was never sent.
     const ResolvedLanguageServer late{QStringLiteral("cpp"), QCoreApplication::applicationFilePath(), {QStringLiteral("--slotdeck-test-lsp-slow-start")}};
-    CodeWorkspaceView view({QStringLiteral("workspace"), canonicalRoot, 0, true, now, now, {}}, {late}, false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeWorkspaceView view({QStringLiteral("workspace"), canonicalRoot, 0, true, now, now, {}}, {late}, false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     auto* symbols = view.findChild<QTreeWidget*>(QStringLiteral("codeEditorSymbols"));
     ASSERT_NE(symbols, nullptr);
 
@@ -1264,7 +1274,7 @@ TEST(CodeWorkspaceViewTest, GivesTheBottomPanelEveryPixelItIsDraggedTo) {
     const QString canonicalRoot = QFileInfo(root.path()).canonicalFilePath();
     const QDateTime now = QDateTime::currentDateTimeUtc();
     const ResolvedLanguageServer fixture{QStringLiteral("cpp"), QCoreApplication::applicationFilePath(), {QStringLiteral("--slotdeck-test-lsp")}};
-    CodeWorkspaceView view({QStringLiteral("workspace"), canonicalRoot, 0, true, now, now, {}}, {fixture}, false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeWorkspaceView view({QStringLiteral("workspace"), canonicalRoot, 0, true, now, now, {}}, {fixture}, false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     view.resize(1400, 900);
     view.show();
 
@@ -1320,7 +1330,7 @@ TEST(CodeWorkspaceViewTest, NarrowsTheTreeToWhatWasTypedAndKeepsThePathThatLeads
     CodeWorkspaceState state;
     state.id = QStringLiteral("workspace-1");
     state.rootPath = root.path();
-    CodeWorkspaceView view(state, {}, false, {}, TextCharset::Utf8, host, nullptr);
+    CodeWorkspaceView view(state, {}, false, {}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Utf8, host, nullptr);
     view.resize(900, 600);
     view.show();
 
@@ -1386,7 +1396,7 @@ TEST(CodeWorkspaceViewTest, RenamesTheFileOnDiskAndFollowsItWithTheOpenDocument)
     ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(path, QByteArrayLiteral("#pragma once\n")));
     const QDateTime now = QDateTime::currentDateTimeUtc();
 
-    CodeWorkspaceView view({QStringLiteral("workspace"), canonicalRoot, 0, true, now, now, {}}, {}, false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeWorkspaceView view({QStringLiteral("workspace"), canonicalRoot, 0, true, now, now, {}}, {}, false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     view.resize(1000, 700);
     view.show();
     view.openFile(path);
@@ -1435,7 +1445,7 @@ TEST(CodeWorkspaceViewTest, RenamingAnOpenFileFollowsItWithoutReportingAConflict
     const QString path = QDir(root.path()).filePath(QStringLiteral("before.txt"));
     ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(path, QByteArrayLiteral("content\n")));
 
-    CodeDocument document(path, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeDocument document(path, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     QSignalSpy loaded(&document, &CodeDocument::loaded);
     QSignalSpy conflicts(&document, &CodeDocument::externalChangeConflict);
     QSignalSpy removals(&document, &CodeDocument::externalFileRemoved);
@@ -1476,7 +1486,7 @@ TEST(CodeDocumentTest, FindsMatchesForwardBackwardAndWrapsAround) {
     const QString path = QDir(root.path()).filePath(QStringLiteral("search.txt"));
     ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(path, QByteArrayLiteral("alpha\nbeta\nalpha\nALPHA alphabet\n")));
 
-    CodeDocument document(path, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeDocument document(path, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     document.resize(800, 600);
     document.show();
     QSignalSpy loaded(&document, &CodeDocument::loaded);
@@ -1554,7 +1564,7 @@ TEST(CodeWorkspaceViewTest, ReportsCursorLocationAndClosesDocumentsWithTheNative
     ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(path, QByteArrayLiteral("int main() {\n    return 0;\n}\n")));
     const QDateTime now = QDateTime::currentDateTimeUtc();
 
-    CodeWorkspaceView view({QStringLiteral("workspace"), QFileInfo(root.path()).canonicalFilePath(), 0, true, now, now, {}}, {}, false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeWorkspaceView view({QStringLiteral("workspace"), QFileInfo(root.path()).canonicalFilePath(), 0, true, now, now, {}}, {}, false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     view.resize(1000, 700);
     view.show();
     view.openFile(path);
@@ -1607,7 +1617,7 @@ TEST(CodeEditorRepositoryTest, MigratesLoadsAndPersistsStrictWorkspaceState) {
     CodeEditorTestsHelper::installSettingsDocument(host, true);
     EXPECT_TRUE(repository.loadSettings().wordWrap);
     EXPECT_EQ(repository.loadSettings().fontSize, defaultEditorFontSize);
-    EXPECT_TRUE(test::awaitFuture(repository.saveSettings({false, true, QString{}, defaultEditorFontSize})).hasValue());
+    EXPECT_TRUE(test::awaitFuture(repository.saveSettings({false, true, QString{}, defaultEditorFontSize, TextCharset::Latin1, CodeColorSchemeCatalog::defaultSchemeId()})).hasValue());
 
     // A value this editor cannot use is the declared default, and everything around it still loads.
     CodeEditorTestsHelper::installSettingsDocument(host, true, ui::maximumContentFontSize + 1);
@@ -1707,7 +1717,7 @@ TEST(CodeEditorPluginTest, DisablingLanguageServersStopsThemAndHidesTheProblemsP
     ASSERT_TRUE(root.isValid());
     const QDateTime now = QDateTime::currentDateTimeUtc();
     const ResolvedLanguageServer resolved{QStringLiteral("cpp"), QStringLiteral("/usr/bin/false"), {}};
-    CodeWorkspaceView view({QStringLiteral("workspace"), QFileInfo(root.path()).canonicalFilePath(), 0, true, now, now, {}}, {resolved}, false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeWorkspaceView view({QStringLiteral("workspace"), QFileInfo(root.path()).canonicalFilePath(), 0, true, now, now, {}}, {resolved}, false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     view.show();
     auto* problems = view.findChild<QTreeWidget*>(QStringLiteral("codeEditorProblems"));
     ASSERT_NE(problems, nullptr);
@@ -1802,7 +1812,7 @@ TEST(CodeDocumentTest, LoadsHighlightsEditsAndSavesUtf8TextAsynchronously) {
     ASSERT_TRUE(test::awaitFuture(service.createFile(path)).hasValue());
     ASSERT_TRUE(test::awaitFuture(service.writeFile(path, QByteArrayLiteral("int value = 1;\n"))).hasValue());
 
-    CodeDocument document(path, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeDocument document(path, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     QSignalSpy loaded(&document, &CodeDocument::loaded);
     // clang-format off
     ASSERT_TRUE(test::waitUntil([&]() { return loaded.count() == 1; }));
@@ -1828,7 +1838,7 @@ TEST(CodeDocumentTest, RejectsBinaryAndInvalidUtf8FilesWithFriendlyErrors) {
     ASSERT_TRUE(test::awaitFuture(service.createFile(path)).hasValue());
     ASSERT_TRUE(test::awaitFuture(service.writeFile(path, QByteArray("abc\0def", 7))).hasValue());
 
-    CodeDocument binary(path, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeDocument binary(path, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     QSignalSpy binaryError(&binary, &CodeDocument::operationFailed);
     // clang-format off
     ASSERT_TRUE(test::waitUntil([&]() { return binaryError.count() == 1; }));
@@ -1837,7 +1847,7 @@ TEST(CodeDocumentTest, RejectsBinaryAndInvalidUtf8FilesWithFriendlyErrors) {
 
     // A byte sequence that carries no mark and spells no valid UTF-8 opens in the encoding the settings declare, which is named in the status bar.
     ASSERT_TRUE(test::awaitFuture(service.writeFile(path, QByteArray::fromHex("c328"))).hasValue());
-    CodeDocument unmarked(path, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeDocument unmarked(path, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     QSignalSpy unmarkedLoaded(&unmarked, &CodeDocument::loaded);
     // clang-format off
     ASSERT_TRUE(test::waitUntil([&]() { return unmarkedLoaded.count() == 1; }));
@@ -1894,7 +1904,7 @@ TEST(CodeWorkspaceViewTest, FindsAFileByPartOfItsNameAndOpensIt) {
     ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(QDir(canonicalRoot).filePath(QStringLiteral("other.txt")), QByteArrayLiteral("other\n")));
 
     const QDateTime now = QDateTime::currentDateTimeUtc();
-    CodeWorkspaceView view({QStringLiteral("workspace"), canonicalRoot, 0, true, now, now, {}}, {}, false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeWorkspaceView view({QStringLiteral("workspace"), canonicalRoot, 0, true, now, now, {}}, {}, false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     view.resize(1200, 800);
 
     auto* action = view.findChild<QAction*>(QStringLiteral("codeEditorFindFileAction"));
@@ -1940,7 +1950,7 @@ TEST(CodeWorkspaceViewTest, ReadsAndWritesTheOpenFileInAnEncodingTheReaderChoose
     // The file spells valid UTF-8, so it is read as UTF-8 until the reader says otherwise.
     ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(path, QByteArrayLiteral("caf\xC3\xA9\n")));
     const QDateTime now = QDateTime::currentDateTimeUtc();
-    CodeWorkspaceView view({QStringLiteral("workspace"), canonicalRoot, 0, true, now, now, {}}, {}, false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeWorkspaceView view({QStringLiteral("workspace"), canonicalRoot, 0, true, now, now, {}}, {}, false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     view.resize(1200, 800);
     view.openFile(path);
     auto* documents = view.findChild<QTabWidget*>(QStringLiteral("codeEditorDocuments"));
@@ -2024,7 +2034,7 @@ TEST(CodeDocumentTest, RefusesToSaveACharacterTheDeclaredEncodingCannotWrite) {
     ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(root.path() + QStringLiteral("/.editorconfig"), QByteArrayLiteral("root = true\n[*]\ncharset = latin1\n")));
     ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(path, QByteArrayLiteral("plain\n")));
 
-    CodeDocument document(path, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeDocument document(path, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     QSignalSpy loaded(&document, &CodeDocument::loaded);
     // clang-format off
     ASSERT_TRUE(test::waitUntil([&]() { return loaded.count() == 1 && document.charset() == TextCharset::Latin1; }));
@@ -2060,7 +2070,7 @@ TEST(CodeDocumentTest, ReloadsCleanExternalChangesAndPreservesDirtyBuffers) {
     ASSERT_TRUE(test::awaitFuture(service.createFile(path)).hasValue());
     ASSERT_TRUE(test::awaitFuture(service.writeFile(path, QByteArrayLiteral("first\n"))).hasValue());
 
-    CodeDocument document(path, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeDocument document(path, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     QSignalSpy loaded(&document, &CodeDocument::loaded);
     // clang-format off
     ASSERT_TRUE(test::waitUntil([&]() { return loaded.count() == 1; }));
@@ -2091,7 +2101,7 @@ TEST(CodeDocumentTest, KeepsWhatWasTypedWhileTheFileItWasReadingWasStillBeingDec
     ASSERT_TRUE(test::awaitFuture(service.createFile(path)).hasValue());
     ASSERT_TRUE(test::awaitFuture(service.writeFile(path, QByteArrayLiteral("first\n"))).hasValue());
 
-    CodeDocument document(path, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeDocument document(path, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     QSignalSpy loaded(&document, &CodeDocument::loaded);
     // clang-format off
     ASSERT_TRUE(test::waitUntil([&]() { return loaded.count() == 1; }));
@@ -2118,7 +2128,7 @@ TEST(CodeDocumentTest, WritesTheEditThatArrivedWhileTheEarlierSaveWasStillInFlig
     ASSERT_TRUE(test::awaitFuture(service.createFile(path)).hasValue());
     ASSERT_TRUE(test::awaitFuture(service.writeFile(path, QByteArrayLiteral("first\n"))).hasValue());
 
-    CodeDocument document(path, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeDocument document(path, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     QSignalSpy loaded(&document, &CodeDocument::loaded);
     // clang-format off
     ASSERT_TRUE(test::waitUntil([&]() { return loaded.count() == 1; }));
@@ -2155,7 +2165,7 @@ TEST(CodeWorkspaceViewTest, SurvivesManyDocumentsOpenedEditedSavedAndClosedInOne
     }
 
     const QDateTime now = QDateTime::currentDateTimeUtc();
-    CodeWorkspaceView view({QStringLiteral("workspace"), root.path(), 0, true, now, now, {}}, {}, false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeWorkspaceView view({QStringLiteral("workspace"), root.path(), 0, true, now, now, {}}, {}, false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     auto* documents = view.findChild<ui::TabWidget*>(QStringLiteral("codeEditorDocuments"));
     ASSERT_NE(documents, nullptr);
 
@@ -2214,7 +2224,7 @@ TEST(CodeWorkspaceViewTest, TracksExternalTreeChangesAndRejectsSymlinkEscape) {
     ASSERT_TRUE(root.isValid());
     ASSERT_TRUE(external.isValid());
     const QDateTime now = QDateTime::currentDateTimeUtc();
-    CodeWorkspaceView view({QStringLiteral("workspace"), root.path(), 0, true, now, now, {}}, {}, false, CodeEditorFont{}, TextCharset::Latin1, host);
+    CodeWorkspaceView view({QStringLiteral("workspace"), root.path(), 0, true, now, now, {}}, {}, false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     auto* model = view.findChild<QFileSystemModel*>();
     ASSERT_NE(model, nullptr);
 
@@ -2333,6 +2343,252 @@ TEST(LanguageServerClientTest, StopsReadingAnOutlineNestedDeeperThanItDeclares) 
 
     client.stop();
     LanguageServerClient::drainTransports();
+}
+
+// The colours a highlighted line really carries, which is what a reader sees.
+QSet<QRgb> highlightedColors(const QString& path, const QString& text, const CodeColorScheme& scheme) {
+    QTextDocument document;
+    document.setPlainText(text);
+    CodeSyntaxHighlighter highlighter(&document, LanguageRegistry::languageForPath(path), scheme);
+    highlighter.rehighlight();
+    QSet<QRgb> colors;
+
+    for (QTextBlock block = document.begin(); block.isValid(); block = block.next()) {
+        for (const auto& range : block.layout()->formats()) {
+            if (range.format.foreground().style() != Qt::NoBrush) {
+                colors.insert(range.format.foreground().color().rgb());
+            }
+        }
+    }
+
+    return colors;
+}
+
+TEST(CodeColorSchemeTest, ColoursEveryDeclaredRoleInEveryScheme) {
+    ASSERT_TRUE(CodeColorSchemeCatalog::catalogError().hasValue()) << CodeColorSchemeCatalog::catalogError().error().message.toStdString();
+    ASSERT_FALSE(CodeColorSchemeCatalog::schemes().isEmpty());
+    QSet<QString> identifiers;
+
+    for (const auto& scheme : CodeColorSchemeCatalog::schemes()) {
+        EXPECT_FALSE(scheme.id.isEmpty());
+        EXPECT_FALSE(scheme.name.isEmpty());
+        EXPECT_FALSE(identifiers.contains(scheme.id)) << scheme.id.toStdString();
+        identifiers.insert(scheme.id);
+        EXPECT_TRUE(scheme.surface.background.isValid()) << scheme.id.toStdString();
+        EXPECT_TRUE(scheme.surface.currentLine.isValid()) << scheme.id.toStdString();
+        EXPECT_TRUE(scheme.surface.selection.isValid()) << scheme.id.toStdString();
+        EXPECT_TRUE(scheme.surface.selectionText.isValid()) << scheme.id.toStdString();
+        EXPECT_TRUE(scheme.surface.lineNumber.isValid()) << scheme.id.toStdString();
+        EXPECT_TRUE(scheme.surface.currentLineNumber.isValid()) << scheme.id.toStdString();
+        EXPECT_TRUE(scheme.surface.lineNumberBackground.isValid()) << scheme.id.toStdString();
+
+        for (const HighlightRole role : highlightRoles()) {
+            EXPECT_TRUE(scheme.color(role).isValid()) << scheme.id.toStdString() << "/" << highlightRoleIdentifier(role).toStdString();
+        }
+    }
+
+    EXPECT_TRUE(CodeColorSchemeCatalog::exists(CodeColorSchemeCatalog::defaultSchemeId()));
+    EXPECT_EQ(CodeColorSchemeCatalog::scheme(QStringLiteral("nobody-declares-this")), nullptr);
+}
+
+// Every role the closed set declares is reachable from a pattern, from a keyword set or from the map a language server answers into.
+TEST(CodeColorSchemeTest, ProducesEveryRoleItDeclaresAndDeclaresEveryRoleItProduces) {
+    QSet<HighlightRole> produced{HighlightRole::Text, HighlightRole::Comment, HighlightRole::Keyword, HighlightRole::ControlFlow, HighlightRole::PrimitiveType};
+
+    for (const auto& pattern : LanguageRegistry::patternsBeforeKeywords()) {
+        produced.insert(pattern.role);
+    }
+
+    for (const auto& pattern : LanguageRegistry::patternsAfterKeywords()) {
+        produced.insert(pattern.role);
+    }
+
+    for (const auto& language : LanguageRegistry::languages()) {
+        for (const auto& pattern : language.patterns) {
+            produced.insert(pattern.role);
+        }
+    }
+
+    const QMap<QString, HighlightRole>& semantic = LanguageRegistry::semanticRoles();
+
+    for (auto entry = semantic.constBegin(); entry != semantic.constEnd(); ++entry) {
+        produced.insert(entry.value());
+    }
+
+    for (const HighlightRole role : highlightRoles()) {
+        EXPECT_TRUE(produced.contains(role)) << "nothing ever paints " << highlightRoleIdentifier(role).toStdString();
+    }
+
+    EXPECT_EQ(produced.size(), highlightRoles().size());
+    EXPECT_FALSE(LanguageRegistry::controlFlowKeywords().isEmpty());
+    EXPECT_FALSE(LanguageRegistry::primitiveTypeKeywords().isEmpty());
+}
+
+TEST(CodeColorSchemeTest, PaintsOneSourceLineInManyColoursRatherThanTwo) {
+    const CodeColorScheme& scheme = CodeColorSchemeCatalog::schemes().first();
+    const QString source = QStringLiteral("#include <vector>\nint Widget::count(int limit) const {\n    // counts\n    const int total = 42 + LIMIT;\n    return format(total, \"done\");\n}\n");
+    const QSet<QRgb> colors = highlightedColors(QStringLiteral("main.cpp"), source, scheme);
+
+    EXPECT_GE(colors.size(), 8) << "the file is still painted in a handful of colours";
+    EXPECT_TRUE(colors.contains(scheme.color(HighlightRole::ControlFlow).rgb())) << "return does not read as control flow";
+    EXPECT_TRUE(colors.contains(scheme.color(HighlightRole::PrimitiveType).rgb())) << "int does not read as a primitive type";
+    EXPECT_TRUE(colors.contains(scheme.color(HighlightRole::Comment).rgb()));
+    EXPECT_TRUE(colors.contains(scheme.color(HighlightRole::String).rgb()));
+    EXPECT_TRUE(colors.contains(scheme.color(HighlightRole::Number).rgb()));
+    EXPECT_TRUE(colors.contains(scheme.color(HighlightRole::Preprocessor).rgb()));
+    EXPECT_TRUE(colors.contains(scheme.color(HighlightRole::Constant).rgb()));
+    EXPECT_TRUE(colors.contains(scheme.color(HighlightRole::Function).rgb()));
+    EXPECT_NE(scheme.color(HighlightRole::Keyword).rgb(), scheme.color(HighlightRole::String).rgb()) << "a keyword and a string are still one colour";
+}
+
+// A language server reports what a name really is, so what it reports must not arrive as one colour.
+TEST(CodeColorSchemeTest, KeepsEveryTokenTypeAServerReportsApart) {
+    const CodeColorScheme& scheme = CodeColorSchemeCatalog::schemes().first();
+    const QMap<QString, HighlightRole>& semantic = LanguageRegistry::semanticRoles();
+
+    for (const auto& type : {QStringLiteral("class"), QStringLiteral("parameter"), QStringLiteral("enumMember"), QStringLiteral("method"), QStringLiteral("namespace"), QStringLiteral("macro")}) {
+        ASSERT_TRUE(semantic.contains(type)) << type.toStdString();
+    }
+
+    QSet<QRgb> colors;
+
+    for (const auto& type : {QStringLiteral("class"), QStringLiteral("parameter"), QStringLiteral("enumMember"), QStringLiteral("method"), QStringLiteral("macro")}) {
+        colors.insert(scheme.color(semantic.value(type)).rgb());
+    }
+
+    EXPECT_GE(colors.size(), 4) << "a class, a parameter, an enum member, a method and a macro collapse into one colour";
+}
+
+TEST(CodeColorSchemeTest, PersistsTheSelectedSchemeAndRefusesOneNobodyDeclares) {
+    test::TestPluginHost host;
+    CodeEditorRepository repository(host);
+    EXPECT_EQ(repository.loadSettings().colorSchemeId, CodeColorSchemeCatalog::defaultSchemeId());
+
+    host.settingsDocument = {{QStringLiteral("colorSchemeId"), QStringLiteral("nobody-declares-this")}};
+    EXPECT_EQ(repository.loadSettings().colorSchemeId, CodeColorSchemeCatalog::defaultSchemeId()) << "a stored scheme nobody declares is not the declared default";
+
+    ASSERT_GE(CodeColorSchemeCatalog::schemes().size(), 2);
+    const QString other = CodeColorSchemeCatalog::schemes().at(1).id;
+    host.settingsDocument = {{QStringLiteral("colorSchemeId"), other}};
+    EXPECT_EQ(repository.loadSettings().colorSchemeId, other);
+
+    host.settingsDocument = {{QStringLiteral("colorSchemeId"), 7}};
+    EXPECT_EQ(repository.loadSettings().colorSchemeId, CodeColorSchemeCatalog::defaultSchemeId()) << "a scheme stored in a shape the owner cannot use is not the declared default";
+}
+
+// Every rejection the catalog declares is reached from text, because a branch nothing exercises is a branch nobody knows works.
+TEST(CodeColorSchemeTest, RefusesEveryMalformedCatalogItDeclaresARefusalFor) {
+    QFile file(QStringLiteral(":/slotdeck/code-editor/assets/schemes.json"));
+    ASSERT_TRUE(file.open(QIODevice::ReadOnly));
+    const QByteArray text = file.readAll();
+    utils::Result<void> outcome = utils::Result<void>::success();
+    ASSERT_FALSE(CodeColorSchemeCatalog::parse(text, outcome).isEmpty());
+    ASSERT_TRUE(outcome.hasValue());
+
+    const QJsonObject original = QJsonDocument::fromJson(text).object();
+    const auto rebuild = [&original](const QJsonObject& scheme) {
+        QJsonObject catalog = original;
+        catalog.insert(QStringLiteral("schemes"), QJsonArray{scheme});
+        return QJsonDocument(catalog).toJson();
+    };
+    const QJsonObject sound = original.value(QStringLiteral("schemes")).toArray().first().toObject();
+
+    QVector<QPair<QString, QByteArray>> malformed;
+    malformed.append({QStringLiteral("not a document"), QByteArrayLiteral("{ this is not json")});
+    malformed.append({QStringLiteral("no schemes array"), QByteArrayLiteral("{\"schemes\": 7}")});
+    malformed.append({QStringLiteral("no scheme at all"), QByteArrayLiteral("{\"schemes\": []}")});
+
+    QJsonObject noIdentity = sound;
+    noIdentity.remove(QStringLiteral("id"));
+    malformed.append({QStringLiteral("no identifier"), rebuild(noIdentity)});
+
+    QJsonObject emptyIdentity = sound;
+    emptyIdentity.insert(QStringLiteral("id"), QString{});
+    malformed.append({QStringLiteral("empty identifier"), rebuild(emptyIdentity)});
+
+    QJsonObject noSurface = sound;
+    noSurface.remove(QStringLiteral("surface"));
+    malformed.append({QStringLiteral("no surface"), rebuild(noSurface)});
+
+    QJsonObject shortSurface = sound;
+    QJsonObject surface = sound.value(QStringLiteral("surface")).toObject();
+    surface.remove(QStringLiteral("selection"));
+    shortSurface.insert(QStringLiteral("surface"), surface);
+    malformed.append({QStringLiteral("a surface value missing"), rebuild(shortSurface)});
+
+    QJsonObject brokenSurface = sound;
+    QJsonObject tinted = sound.value(QStringLiteral("surface")).toObject();
+    tinted.insert(QStringLiteral("background"), QStringLiteral("not a colour"));
+    brokenSurface.insert(QStringLiteral("surface"), tinted);
+    malformed.append({QStringLiteral("a surface colour that is not one"), rebuild(brokenSurface)});
+
+    QJsonObject missingRole = sound;
+    QJsonObject roles = sound.value(QStringLiteral("roles")).toObject();
+    roles.remove(highlightRoleIdentifier(HighlightRole::Keyword));
+    missingRole.insert(QStringLiteral("roles"), roles);
+    malformed.append({QStringLiteral("a declared role left uncoloured"), rebuild(missingRole)});
+
+    QJsonObject extraRole = sound;
+    QJsonObject widened = sound.value(QStringLiteral("roles")).toObject();
+    widened.insert(QStringLiteral("nobodyDeclaresThis"), QJsonObject{{QStringLiteral("foreground"), QStringLiteral("#ff0000")}});
+    extraRole.insert(QStringLiteral("roles"), widened);
+    malformed.append({QStringLiteral("a role nobody declares"), rebuild(extraRole)});
+
+    QJsonObject brokenRole = sound;
+    QJsonObject tintedRole = sound.value(QStringLiteral("roles")).toObject();
+    tintedRole.insert(highlightRoleIdentifier(HighlightRole::Keyword), QJsonObject{{QStringLiteral("foreground"), QStringLiteral("not a colour")}});
+    brokenRole.insert(QStringLiteral("roles"), tintedRole);
+    malformed.append({QStringLiteral("a role colour that is not one"), rebuild(brokenRole)});
+
+    QJsonObject unknownField = sound;
+    QJsonObject fielded = sound.value(QStringLiteral("roles")).toObject();
+    fielded.insert(highlightRoleIdentifier(HighlightRole::Keyword), QJsonObject{{QStringLiteral("foreground"), QStringLiteral("#ff0000")}, {QStringLiteral("shiny"), true}});
+    unknownField.insert(QStringLiteral("roles"), fielded);
+    malformed.append({QStringLiteral("a role field nobody declares"), rebuild(unknownField)});
+
+    QJsonObject wrongFlag = sound;
+    QJsonObject flagged = sound.value(QStringLiteral("roles")).toObject();
+    flagged.insert(highlightRoleIdentifier(HighlightRole::Keyword), QJsonObject{{QStringLiteral("foreground"), QStringLiteral("#ff0000")}, {QStringLiteral("bold"), QStringLiteral("yes")}});
+    wrongFlag.insert(QStringLiteral("roles"), flagged);
+    malformed.append({QStringLiteral("a role flag of the wrong type"), rebuild(wrongFlag)});
+
+    QJsonObject notARole = sound;
+    QJsonObject scalar = sound.value(QStringLiteral("roles")).toObject();
+    scalar.insert(highlightRoleIdentifier(HighlightRole::Keyword), QStringLiteral("#ff0000"));
+    notARole.insert(QStringLiteral("roles"), scalar);
+    malformed.append({QStringLiteral("a role that is not a role"), rebuild(notARole)});
+
+    QJsonObject repeated = original;
+    repeated.insert(QStringLiteral("schemes"), QJsonArray{sound, sound});
+    malformed.append({QStringLiteral("a repeated identifier"), QJsonDocument(repeated).toJson()});
+
+    for (const auto& shape : malformed) {
+        utils::Result<void> rejected = utils::Result<void>::success();
+        const QVector<CodeColorScheme> parsed = CodeColorSchemeCatalog::parse(shape.second, rejected);
+        EXPECT_TRUE(parsed.isEmpty()) << shape.first.toStdString() << " was accepted";
+        ASSERT_FALSE(rejected.hasValue()) << shape.first.toStdString() << " was accepted without a reason";
+        EXPECT_EQ(rejected.error().code, std::string{"code_editor_schemes_invalid"}) << shape.first.toStdString();
+    }
+}
+
+// The shared sheet paints every text edit in the window colour, so a scheme that only set a palette would never reach the screen.
+TEST(CodeColorSchemeTest, PaintsTheSurfaceOfTheSchemeRatherThanTheOneTheSharedSheetDeclares) {
+    test::TestPluginHost host;
+    QWidget container;
+    container.setStyleSheet(ui::applicationStyleSheet(host.theme()));
+    auto* editor = new CodeEditorWidget(host.theme(), &container);
+    editor->resize(200, 120);
+
+    for (const auto& scheme : CodeColorSchemeCatalog::schemes()) {
+        editor->setColorScheme(scheme);
+        QImage painted(editor->size(), QImage::Format_ARGB32);
+        painted.fill(Qt::transparent);
+        editor->render(&painted);
+        const QColor drawn = painted.pixelColor(editor->width() - 4, editor->height() - 4);
+
+        EXPECT_EQ(drawn.rgb(), scheme.surface.background.rgb()) << scheme.id.toStdString() << " is drawn on a surface it does not own";
+        EXPECT_NE(drawn.rgb(), host.theme().color(ui::ThemeColor::Window).rgb()) << scheme.id.toStdString() << " still reads the application window colour";
+    }
 }
 
 } // namespace slotdeck::plugins::codeeditor

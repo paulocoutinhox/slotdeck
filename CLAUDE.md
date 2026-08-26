@@ -140,7 +140,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Language changes persist asynchronously and retranslate the complete shell and every plugin view immediately without restarting plugin runtimes.
 - A failed language persistence restores the last committed language and retranslates the interface back to that value.
 - The terminal plugin owns terminal font family, terminal font size, terminal theme, paste confirmation and whether a program may write to the clipboard, all of them in its settings document.
-- The code-editor plugin owns the editor font family, the editor font size, the word wrap preference and whether language servers are enabled.
+- The code-editor plugin owns the editor font family, the editor font size, the word wrap preference, the selected code colour scheme and whether language servers are enabled.
 - Every content surface owns and persists its own font size and its own default, because a terminal and an editor do not share a conventional reading size.
 - The terminal, the editor and the chat all open at twelve points, which is the reading size of every content surface.
 - Font sizes outside the shared range of eight to thirty-six points are rejected by settings, by the stored value contract and by the font step.
@@ -439,6 +439,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Resolving an ANSI theme requires an identifier already validated against the catalog and no caller resolves a literal identifier, and an identifier nobody declares is answered rather than thrown.
 - Theme changes apply to current and future sessions.
 - Font choices contain only installed monospaced families.
+- A monospaced surface opens on the first family a declared preference names that is installed, because the first family the system happens to list is not a font anyone chose.
+- A terminal cell is the glyph advance rounded to the nearest pixel and its row is the line spacing the font declares, because every cell is positioned explicitly and a cell wider or taller than the font asks for reads as a gap after every glyph and under every line.
 - A platform without an installed monospaced family keeps the terminal on the monospace style hint instead of resolving an empty family.
 - A shell runs every line a plain paste delivers, so text is handed over between the markers whenever the program asked to receive it that way, and the confirmation warns about text that would run rather than about text that merely wraps.
 - Terminal view shortcuts are active only while focus is inside the Terminal plugin view.
@@ -984,7 +986,17 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Semantic tokens repaint only the lines whose tokens changed, and repaint the whole document only when most of them did, because repainting every line on every answer costs the whole file at the rhythm of typing.
 - Every language and every language server the editor knows lives in the catalog file the plugin carries as a resource, so a language is added by one entry of data and never by interface code.
 - The patterns a language needs beyond its keywords are declared with it in that file, so no language is named in the code that colours it.
-- A pattern declares the role it paints rather than a colour, and the roles are a closed set the active theme resolves, so colouring follows the theme like every other surface.
+- A pattern declares the role it paints rather than a colour, and the roles are a closed set a code colour scheme resolves.
+- The colouring of code is editor content rather than application chrome, so a code colour scheme is selected in the Code Editor independently of the application theme, exactly as the ANSI colours of a terminal are.
+- A scheme owns the surface the code is read on, covering its background, its current line, its selection and its line numbers, because ink alone cannot be read on a background it does not control.
+- The shared style sheet paints every text edit in the window colour, so a surface a scheme owns is declared on the widget itself where it wins rather than left to a palette that rule overrides.
+- Schemes live in the catalog file the plugin carries as a resource, so a scheme is added by one entry of data and never by interface code, and the name of a scheme lives with the scheme it names.
+- Every scheme colours every declared role, and a scheme that leaves one uncoloured, names a role nobody declares, repeats an identifier, carries a field nobody declares or spells a colour that is not one rejects the complete plugin.
+- The scheme catalog is parsed from the text of its file rather than from its path, so every rejection it declares is exercised by a test.
+- The closed role set covers every token type the protocol reports, so a class, a parameter and an enum member reach the reader as three colours rather than one.
+- A role nothing produces is an unused value, so every declared role is reached by a pattern, by a keyword set or by the map a language server answers into.
+- The order a rule is applied in decides which one wins, so the catalog declares what runs before the keywords of a language and what runs after them rather than leaving that order to the code.
+- A keyword a language already declares is painted in the more specific role when it belongs to the declared control-flow or primitive-type set, so no language needs its keywords split by hand.
 - The catalog covers the common languages of the trade, from C and C++, Python, TypeScript, Go and Rust to PHP, Ruby, C#, Kotlin, Swift, Dart, Lua, SQL, TOML, XML and the configuration formats around them, without language-specific plugins.
 - Two languages never claim one extension, because the first that claims it answers for it and the second would never be reached, and the catalog ends with plain text because that is what an unknown file falls to.
 - The name of a language is declared once, with the language it names in that catalog, because a second copy in the translation catalog drifts and presents a key where a name belongs.
@@ -1474,7 +1486,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 363 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 372 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
@@ -1542,6 +1554,12 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Nothing stored in a settings document keeps a feature from opening, because every value it cannot use is the declared default.
 - [x] Every refusal of a tool names the tool and the argument, proven for every declared tool from its own schema.
 - [x] Runtime state a signal can reach is held behind a shared pointer, and every transport thread is drained before the code it runs unloads.
+- [x] A terminal cell leaves no gap after its glyph or under its line, proven at four reading sizes against what the font itself declares.
+- [x] The terminal opens on a family a declared preference names rather than on the one that happens to sort first.
+- [x] A source file is painted in the colours of its scheme rather than in the accent and the text of the application theme, proven by counting the colours one file really carries.
+- [x] Every token type a language server reports keeps a colour of its own, and every declared role is produced by something.
+- [x] The surface of a scheme reaches the screen, proven by reading the pixel the editor drew under the shared style sheet.
+- [x] Every malformed colour scheme the catalog declares a refusal for is refused from text.
 
 ## Recorded pending work
 

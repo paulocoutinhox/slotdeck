@@ -13,6 +13,8 @@ qt_add_library(
     CodeEditorView.h
     CodeEditorWidget.cpp
     CodeEditorWidget.h
+    CodeColorScheme.cpp
+    CodeColorScheme.h
     CodeSyntaxHighlighter.cpp
     CodeSyntaxHighlighter.h
     CodeWorkspaceView.cpp
@@ -30,7 +32,7 @@ qt_add_library(
     LanguageServerTransport.cpp
     LanguageServerTransport.h
 )
-qt_add_resources(SlotDeckCodeEditorObjects "code-editor-assets" PREFIX "/slotdeck/code-editor" FILES assets/languages.json)
+qt_add_resources(SlotDeckCodeEditorObjects "code-editor-assets" PREFIX "/slotdeck/code-editor" FILES assets/languages.json assets/schemes.json)
 target_include_directories(SlotDeckCodeEditorObjects PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(SlotDeckCodeEditorObjects PUBLIC Qt6::Concurrent Qt6::Core Qt6::Gui Qt6::Widgets SlotDeckUi)
 set_target_properties(SlotDeckCodeEditorObjects PROPERTIES POSITION_INDEPENDENT_CODE TRUE CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN TRUE)

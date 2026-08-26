@@ -37,6 +37,7 @@ CodeEditorView::CodeEditorView(CodeEditorPlugin& plugin, QWidget* parent) : QWid
     connect(&m_plugin, &CodeEditorPlugin::languageServersChanged, this, [this]() { synchronizeLanguageServers(); });
     connect(&m_plugin, &CodeEditorPlugin::wordWrapChanged, this, [this]() { synchronizeWordWrap(); });
     connect(&m_plugin, &CodeEditorPlugin::editorFontChanged, this, [this]() { synchronizeEditorFont(); });
+    connect(&m_plugin, &CodeEditorPlugin::colorSchemeChanged, this, [this]() { synchronizeColorScheme(); });
     // clang-format on
     synchronizeWorkspaces();
 }
@@ -88,7 +89,7 @@ void CodeEditorView::synchronizeWorkspaces() {
         const auto& state = m_plugin.workspaces().at(index);
         auto* view = workspaceView(state.id);
         if (view == nullptr) {
-            view = new CodeWorkspaceView(state, m_plugin.activeLanguageServers(), m_plugin.wordWrap(), m_plugin.editorFont(), m_plugin.defaultCharset(), m_plugin.host(), m_workspaces);
+            view = new CodeWorkspaceView(state, m_plugin.activeLanguageServers(), m_plugin.wordWrap(), m_plugin.editorFont(), m_plugin.colorScheme(), m_plugin.defaultCharset(), m_plugin.host(), m_workspaces);
             m_workspaces->addTab(view, view->title());
             // clang-format off
             connect(view, &CodeWorkspaceView::stateChanged, this, [this, view]() { const auto result = m_plugin.updateWorkspace(view->state()); if (!result.hasValue()) { reportError(result.error().message); } });
@@ -119,6 +120,12 @@ void CodeEditorView::synchronizeWordWrap() {
 void CodeEditorView::synchronizeEditorFont() {
     for (int index = 0; index < m_workspaces->count(); ++index) {
         qobject_cast<CodeWorkspaceView*>(m_workspaces->widget(index))->setEditorFont(m_plugin.editorFont());
+    }
+}
+
+void CodeEditorView::synchronizeColorScheme() {
+    for (int index = 0; index < m_workspaces->count(); ++index) {
+        qobject_cast<CodeWorkspaceView*>(m_workspaces->widget(index))->setColorScheme(m_plugin.colorScheme());
     }
 }
 

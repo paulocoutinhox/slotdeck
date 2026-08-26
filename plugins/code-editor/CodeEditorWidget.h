@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CodeColorScheme.h"
 #include "EditorConfig.h"
 #include "LanguageServerClient.h"
 
@@ -38,6 +39,7 @@ class CodeEditorWidget final : public QPlainTextEdit {
     void setSearchMatches(const QVector<QPair<int, int>>& matches);
     void setIndentation(IndentStyle style, int width);
     void setWordWrap(bool enabled);
+    void setColorScheme(const CodeColorScheme& scheme);
 
   signals:
     void saveRequested();
@@ -81,6 +83,7 @@ class CodeEditorWidget final : public QPlainTextEdit {
     QCompleter* m_completer{nullptr};
     QStandardItemModel* m_proposalModel{nullptr};
     const ui::Theme& m_theme;
+    CodeColorScheme m_scheme;
     IndentStyle m_indentStyle{IndentStyle::Space};
     int m_indentWidth{4};
 };

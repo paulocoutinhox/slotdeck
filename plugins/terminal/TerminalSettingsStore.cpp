@@ -54,7 +54,7 @@ utils::Result<void> TerminalSettingsStore::initialize() {
         return utils::Result<void>::failure({"terminal_fonts_unavailable", "No monospaced terminal font is installed", {}});
     }
 
-    m_settings = TerminalSettingsStoreHelper::settingsFromDocument(m_host.settings(), families.first());
+    m_settings = TerminalSettingsStoreHelper::settingsFromDocument(m_host.settings(), ui::defaultMonospacedFontFamily());
     m_committedSettings = m_settings;
     return utils::Result<void>::success();
 }

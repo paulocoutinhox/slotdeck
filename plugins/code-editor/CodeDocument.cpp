@@ -156,8 +156,9 @@ QString CodeDocumentHelper::lineEndingText(LineEnding ending) {
     Q_UNREACHABLE_RETURN(QStringLiteral("\n"));
 }
 
-CodeDocument::CodeDocument(const QString& path, const QString& rootPath, bool wordWrap, CodeEditorFont font, TextCharset defaultCharset, PluginHost& host, QWidget* parent) : QWidget(parent), m_path(QDir::cleanPath(path)), m_rootPath(QDir::cleanPath(rootPath)), m_defaultCharset(defaultCharset), m_host(host), m_editor(new CodeEditorWidget(host.theme(), this)), m_findBar(new ui::FindBar(host.theme(), CodeDocumentHelper::findBarLabels(host), this)), m_language(LanguageRegistry::languageForPath(m_path)) {
+CodeDocument::CodeDocument(const QString& path, const QString& rootPath, bool wordWrap, CodeEditorFont font, CodeColorScheme scheme, TextCharset defaultCharset, PluginHost& host, QWidget* parent) : QWidget(parent), m_path(QDir::cleanPath(path)), m_rootPath(QDir::cleanPath(rootPath)), m_defaultCharset(defaultCharset), m_host(host), m_editor(new CodeEditorWidget(host.theme(), this)), m_findBar(new ui::FindBar(host.theme(), CodeDocumentHelper::findBarLabels(host), this)), m_language(LanguageRegistry::languageForPath(m_path)), m_scheme(std::move(scheme)) {
     m_editor->setEditorFont(font.family, font.size);
+    m_editor->setColorScheme(m_scheme);
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
@@ -166,7 +167,7 @@ CodeDocument::CodeDocument(const QString& path, const QString& rootPath, bool wo
     m_findBar->hide();
     m_editor->setWordWrap(wordWrap);
     m_editor->setContextMenuPolicy(Qt::CustomContextMenu);
-    m_highlighter = std::make_unique<CodeSyntaxHighlighter>(m_editor->document(), m_language, m_host.theme());
+    m_highlighter = std::make_unique<CodeSyntaxHighlighter>(m_editor->document(), m_language, m_scheme);
     m_externalChangeTimer.setSingleShot(true);
     m_externalChangeTimer.setInterval(LanguageRegistry::limits().externalChangeDebounceMs);
     m_languageServerTimer.setSingleShot(true);
@@ -336,6 +337,17 @@ void CodeDocument::setEditorFont(const CodeEditorFont& font) {
     m_editor->setEditorFont(font.family, font.size);
 }
 
+// The highlighter carries the colours it was built with, so a scheme change rebuilds it and reapplies the surface under it.
+void CodeDocument::setColorScheme(const CodeColorScheme& scheme) {
+    m_scheme = scheme;
+    m_editor->setColorScheme(m_scheme);
+    m_highlighter = std::make_unique<CodeSyntaxHighlighter>(m_editor->document(), m_language, m_scheme);
+
+    if (m_languageServer != nullptr && m_editor->document()->blockCount() <= LanguageRegistry::limits().maximumSemanticTokenLines) {
+        m_languageServer->requestSemanticTokens(m_path);
+    }
+}
+
 void CodeDocument::setWordWrap(bool enabled) {
     m_editor->setWordWrap(enabled);
 }
@@ -352,7 +364,7 @@ void CodeDocument::updatePath(const QString& path) {
     m_watcher.removePath(m_path);
     m_path = QDir::cleanPath(path);
     m_language = LanguageRegistry::languageForPath(m_path);
-    m_highlighter = std::make_unique<CodeSyntaxHighlighter>(m_editor->document(), m_language, m_host.theme());
+    m_highlighter = std::make_unique<CodeSyntaxHighlighter>(m_editor->document(), m_language, m_scheme);
     m_watcher.addPath(m_path);
     loadEditorConfig();
     emit titleChanged();

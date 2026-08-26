@@ -82,10 +82,10 @@ TerminalWidget::TerminalWidget(plugins::PluginHost& host, QWidget* parent) : QWi
     };
     // clang-format on
     connect(m_scrollBar, &QScrollBar::valueChanged, this, scrollToRow);
-    const QStringList monospacedFamilies = ui::monospacedFontFamilies();
+    const QString defaultFamily = ui::defaultMonospacedFontFamily();
 
-    if (!monospacedFamilies.isEmpty()) {
-        m_font.setFamily(monospacedFamilies.first());
+    if (!defaultFamily.isEmpty()) {
+        m_font.setFamily(defaultFamily);
     }
 
     m_font.setStyleHint(QFont::Monospace);
@@ -963,8 +963,10 @@ void TerminalWidget::updateTerminalSize() {
 
 void TerminalWidget::updateCellMetrics() {
     const QFontMetricsF fontMetrics(m_font);
-    m_cellWidth = std::max(1, static_cast<int>(std::ceil(fontMetrics.horizontalAdvance(QLatin1Char('M')))));
-    m_cellHeight = std::max(1, static_cast<int>(std::ceil(fontMetrics.height() + 1.0)));
+    // The cell is the advance rounded to the nearest pixel, because every cell is positioned explicitly and one wider than the advance reads as a gap after every glyph.
+    m_cellWidth = std::max(1, static_cast<int>(std::llround(fontMetrics.horizontalAdvance(QLatin1Char('M')))));
+    // The leading is what a font answers for the distance between two of its lines.
+    m_cellHeight = std::max(1, static_cast<int>(std::llround(fontMetrics.lineSpacing())));
 }
 
 void TerminalWidget::updateScrollBar(const terminalcore::TerminalRenderSnapshot& snapshot) {

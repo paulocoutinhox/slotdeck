@@ -1,7 +1,5 @@
 #include "CodeSyntaxHighlighter.h"
 
-#include "ui/Theme.h"
-
 #include <QRegularExpression>
 #include <QTextBlock>
 
@@ -11,18 +9,10 @@ namespace slotdeck::plugins::codeeditor {
 
 class CodeSyntaxHighlighterHelper final {
   public:
-    static QTextCharFormat roleFormat(HighlightRole role, const ui::Theme& theme);
-    static QTextCharFormat makeFormat(const QColor& color, QFont::Weight weight = QFont::Normal, bool italic = false);
     static QString keywordPattern(const QStringList& keywords);
+    static QStringList keywordsIn(const QStringList& keywords, const QStringList& set);
+    static QStringList keywordsOutside(const QStringList& keywords, const QStringList& first, const QStringList& second);
 };
-
-QTextCharFormat CodeSyntaxHighlighterHelper::makeFormat(const QColor& color, QFont::Weight weight, bool italic) {
-    QTextCharFormat value;
-    value.setForeground(color);
-    value.setFontWeight(weight);
-    value.setFontItalic(italic);
-    return value;
-}
 
 QString CodeSyntaxHighlighterHelper::keywordPattern(const QStringList& keywords) {
     QStringList escaped;
@@ -35,52 +25,61 @@ QString CodeSyntaxHighlighterHelper::keywordPattern(const QStringList& keywords)
     return QStringLiteral("\\b(?:%1)\\b").arg(escaped.join(QLatin1Char('|')));
 }
 
-QTextCharFormat CodeSyntaxHighlighterHelper::roleFormat(HighlightRole role, const ui::Theme& theme) {
-    switch (role) {
-    case HighlightRole::Keyword:
-        return makeFormat(theme.color(ui::ThemeColor::Accent), QFont::DemiBold);
-    case HighlightRole::Number:
-        return makeFormat(theme.color(ui::ThemeColor::Warning));
-    case HighlightRole::String:
-        return makeFormat(theme.color(ui::ThemeColor::Success));
-    case HighlightRole::Identifier:
-        return makeFormat(theme.color(ui::ThemeColor::Text));
-    case HighlightRole::Declaration:
-        return makeFormat(theme.color(ui::ThemeColor::Text), QFont::DemiBold);
-    case HighlightRole::Function:
-        return makeFormat(theme.color(ui::ThemeColor::AccentHover), QFont::DemiBold);
-    case HighlightRole::Comment:
-        return makeFormat(theme.color(ui::ThemeColor::TextMuted), QFont::Normal, true);
-    case HighlightRole::Heading:
-        return makeFormat(theme.color(ui::ThemeColor::Accent), QFont::Bold);
-    case HighlightRole::Emphasis:
-        return makeFormat(theme.color(ui::ThemeColor::Text), QFont::Bold);
-    case HighlightRole::Markup:
-        return makeFormat(theme.color(ui::ThemeColor::Accent));
+QStringList CodeSyntaxHighlighterHelper::keywordsIn(const QStringList& keywords, const QStringList& set) {
+    QStringList values;
+
+    for (const auto& keyword : keywords) {
+        if (set.contains(keyword)) {
+            values.append(keyword);
+        }
     }
 
-    Q_UNREACHABLE_RETURN({});
+    return values;
 }
 
-CodeSyntaxHighlighter::CodeSyntaxHighlighter(QTextDocument* document, LanguageDefinition definition, const ui::Theme& theme) : QSyntaxHighlighter(document), m_definition(std::move(definition)) {
-    m_commentFormat = CodeSyntaxHighlighterHelper::roleFormat(HighlightRole::Comment, theme);
+QStringList CodeSyntaxHighlighterHelper::keywordsOutside(const QStringList& keywords, const QStringList& first, const QStringList& second) {
+    QStringList values;
 
-    if (!m_definition.keywords.isEmpty()) {
-        m_rules.append({QRegularExpression(CodeSyntaxHighlighterHelper::keywordPattern(m_definition.keywords)), CodeSyntaxHighlighterHelper::roleFormat(HighlightRole::Keyword, theme)});
+    for (const auto& keyword : keywords) {
+        if (!first.contains(keyword) && !second.contains(keyword)) {
+            values.append(keyword);
+        }
     }
 
-    for (const auto& pattern : LanguageRegistry::commonPatterns()) {
-        m_rules.append({QRegularExpression(pattern.pattern), CodeSyntaxHighlighterHelper::roleFormat(pattern.role, theme)});
+    return values;
+}
+
+// The order a rule is added in decides which one wins, so a keyword beats the shape that only guessed at it and a string beats them both.
+CodeSyntaxHighlighter::CodeSyntaxHighlighter(QTextDocument* document, LanguageDefinition definition, const CodeColorScheme& scheme) : QSyntaxHighlighter(document), m_definition(std::move(definition)) {
+    m_commentFormat = scheme.format(HighlightRole::Comment);
+
+    for (const auto& pattern : LanguageRegistry::patternsBeforeKeywords()) {
+        m_rules.append({QRegularExpression(pattern.pattern), scheme.format(pattern.role)});
+    }
+
+    const QStringList controlFlow = CodeSyntaxHighlighterHelper::keywordsIn(m_definition.keywords, LanguageRegistry::controlFlowKeywords());
+    const QStringList primitiveTypes = CodeSyntaxHighlighterHelper::keywordsIn(m_definition.keywords, LanguageRegistry::primitiveTypeKeywords());
+    const QStringList plain = CodeSyntaxHighlighterHelper::keywordsOutside(m_definition.keywords, LanguageRegistry::controlFlowKeywords(), LanguageRegistry::primitiveTypeKeywords());
+    const QVector<QPair<QStringList, HighlightRole>> keywordGroups{{plain, HighlightRole::Keyword}, {controlFlow, HighlightRole::ControlFlow}, {primitiveTypes, HighlightRole::PrimitiveType}};
+
+    for (const auto& group : keywordGroups) {
+        if (!group.first.isEmpty()) {
+            m_rules.append({QRegularExpression(CodeSyntaxHighlighterHelper::keywordPattern(group.first)), scheme.format(group.second)});
+        }
+    }
+
+    for (const auto& pattern : LanguageRegistry::patternsAfterKeywords()) {
+        m_rules.append({QRegularExpression(pattern.pattern), scheme.format(pattern.role)});
     }
 
     for (const auto& pattern : m_definition.patterns) {
-        m_rules.append({QRegularExpression(pattern.pattern), CodeSyntaxHighlighterHelper::roleFormat(pattern.role, theme)});
+        m_rules.append({QRegularExpression(pattern.pattern), scheme.format(pattern.role)});
     }
 
     const QMap<QString, HighlightRole>& roles = LanguageRegistry::semanticRoles();
 
     for (auto entry = roles.constBegin(); entry != roles.constEnd(); ++entry) {
-        m_semanticFormats.insert(entry.key(), CodeSyntaxHighlighterHelper::roleFormat(entry.value(), theme));
+        m_semanticFormats.insert(entry.key(), scheme.format(entry.value()));
     }
 
     if (!m_definition.lineComment.isEmpty()) {

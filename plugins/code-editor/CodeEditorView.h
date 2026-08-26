@@ -20,6 +20,7 @@ class CodeEditorView final : public QWidget {
     void synchronizeWorkspaces();
     void synchronizeWordWrap();
     void synchronizeEditorFont();
+    void synchronizeColorScheme();
     void synchronizeLanguageServers();
     void reportError(const QString& message);
     [[nodiscard]] CodeWorkspaceView* workspaceView(const QString& workspaceId) const;

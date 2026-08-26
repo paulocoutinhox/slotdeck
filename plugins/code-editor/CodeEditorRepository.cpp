@@ -1,5 +1,7 @@
 #include "CodeEditorRepository.h"
 
+#include "CodeColorScheme.h"
+
 #include "persistence/StoredValues.h"
 #include "ui/Components.h"
 
@@ -119,8 +121,9 @@ utils::Result<QVector<CodeWorkspaceState>> CodeEditorRepository::load() const {
 
 // Every value the settings document omits is the declared default, so a setting added later needs no schema and no stored row.
 CodeEditorSettings CodeEditorRepositoryHelper::settingsFromDocument(const QJsonObject& document) {
-    const CodeEditorSettings declared;
     CodeEditorSettings settings;
+    settings.colorSchemeId = CodeColorSchemeCatalog::defaultSchemeId();
+    const CodeEditorSettings declared = settings;
     QString charsetName = textCharsetName(settings.defaultCharset);
     plugins::SettingsReader reader(document);
     reader.readBool(QStringLiteral("wordWrap"), settings.wordWrap);
@@ -128,6 +131,7 @@ CodeEditorSettings CodeEditorRepositoryHelper::settingsFromDocument(const QJsonO
     reader.readText(QStringLiteral("fontFamily"), settings.fontFamily);
     reader.readInteger(QStringLiteral("fontSize"), settings.fontSize);
     reader.readText(QStringLiteral("defaultCharset"), charsetName);
+    reader.readText(QStringLiteral("colorSchemeId"), settings.colorSchemeId);
 
     settings.defaultCharset = parseTextCharset(charsetName).value_or(declared.defaultCharset);
 
@@ -139,11 +143,15 @@ CodeEditorSettings CodeEditorRepositoryHelper::settingsFromDocument(const QJsonO
         settings.fontSize = declared.fontSize;
     }
 
+    if (!CodeColorSchemeCatalog::exists(settings.colorSchemeId)) {
+        settings.colorSchemeId = declared.colorSchemeId;
+    }
+
     return settings;
 }
 
 QJsonObject CodeEditorRepositoryHelper::settingsDocument(const CodeEditorSettings& settings) {
-    return {{QStringLiteral("wordWrap"), settings.wordWrap}, {QStringLiteral("languageServersEnabled"), settings.languageServersEnabled}, {QStringLiteral("fontFamily"), settings.fontFamily}, {QStringLiteral("fontSize"), settings.fontSize}, {QStringLiteral("defaultCharset"), textCharsetName(settings.defaultCharset)}};
+    return {{QStringLiteral("wordWrap"), settings.wordWrap}, {QStringLiteral("languageServersEnabled"), settings.languageServersEnabled}, {QStringLiteral("fontFamily"), settings.fontFamily}, {QStringLiteral("fontSize"), settings.fontSize}, {QStringLiteral("defaultCharset"), textCharsetName(settings.defaultCharset)}, {QStringLiteral("colorSchemeId"), settings.colorSchemeId}};
 }
 
 CodeEditorSettings CodeEditorRepository::loadSettings() const {
