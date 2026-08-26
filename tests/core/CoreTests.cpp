@@ -39,6 +39,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QLocale>
+#include <QPluginLoader>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSet>
@@ -2095,6 +2096,118 @@ TEST(SettingsReaderTest, LeavesEveryDeclaredDefaultStandingForAnyHostileDocument
     QJsonObject value;
     nestedReader.readObject(QStringLiteral("nested"), value);
     SUCCEED();
+}
+
+TEST(PluginManagerIntegrationTest, LeavesNoGuardOnTheContextOfARequestThatAlreadyAnswered) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const QString databasePath = directory.filePath(QStringLiteral("slotdeck.sqlite3"));
+    persistence::StateStore store(databasePath);
+    persistence::DatabaseExecutor databaseExecutor(databasePath);
+    ASSERT_TRUE(store.initialize().hasValue());
+    plugins::PluginManager manager;
+    ASSERT_TRUE(manager.loadPlugins().hasValue());
+    ASSERT_TRUE(manager.initialize(directory.path(), store, databaseExecutor).hasValue());
+
+    // Qt hands back the instance the manager already loaded, so the plugin that asks the terminal for a snapshot can be named from here.
+    QObject* webServer = nullptr;
+    const QDir applicationDirectory(QCoreApplication::applicationDirPath());
+    for (const auto& candidate : {QStringLiteral("plugins"), QStringLiteral("../PlugIns")}) {
+        for (const auto& entry : QDir(applicationDirectory.filePath(candidate)).entryInfoList(QDir::Files)) {
+            if (entry.fileName().contains(QStringLiteral("web-server"))) {
+                QPluginLoader loader(entry.absoluteFilePath());
+                webServer = loader.instance();
+            }
+        }
+    }
+    ASSERT_NE(webServer, nullptr);
+
+    QSignalSpy synchronized(webServer, SIGNAL(webServerChanged(QString)));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return synchronized.count() > 0; }));
+    // clang-format on
+
+    // The request forgets itself one queued call after the answer reaches its caller, so that call is drained before the guard is looked for.
+    for (int pass = 0; pass < 10; ++pass) {
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
+    }
+
+    // The snapshot request answered, so the context it was given carries nothing of it any more.
+    EXPECT_FALSE(QObject::disconnect(webServer, SIGNAL(destroyed()), &manager, nullptr));
+
+    manager.unloadPlugins();
+}
+
+TEST(PluginManagerIntegrationTest, HoldsEveryPluginToTheContractTheStandardStatesOfAllOfThem) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const QString databasePath = directory.filePath(QStringLiteral("slotdeck.sqlite3"));
+    persistence::StateStore store(databasePath);
+    persistence::DatabaseExecutor databaseExecutor(databasePath);
+    ASSERT_TRUE(store.initialize().hasValue());
+    plugins::PluginManager manager;
+    ASSERT_TRUE(manager.setLocale(QStringLiteral("en")).hasValue());
+    ASSERT_TRUE(manager.loadPlugins().hasValue());
+    ASSERT_TRUE(manager.initialize(directory.path(), store, databaseExecutor).hasValue());
+
+    const QRegularExpression identifierPattern(QStringLiteral("^[a-z0-9]+(?:-[a-z0-9]+)*$"));
+    const auto navigation = manager.navigationItems();
+    ASSERT_FALSE(navigation.isEmpty());
+
+    QSet<QString> owners;
+    QHash<QString, QSet<QString>> itemsByOwner;
+    QHash<int, QString> positionsByPlacement;
+    for (const auto& contribution : navigation) {
+        const QString owner = contribution.pluginId;
+        owners.insert(owner);
+        EXPECT_TRUE(identifierPattern.match(owner).hasMatch()) << owner.toStdString();
+        EXPECT_TRUE(identifierPattern.match(contribution.item.id).hasMatch()) << contribution.item.id.toStdString();
+        EXPECT_FALSE(itemsByOwner[owner].contains(contribution.item.id)) << owner.toStdString() << " declares " << contribution.item.id.toStdString() << " twice";
+        itemsByOwner[owner].insert(contribution.item.id);
+
+        // A navigation item carries an icon that is really painted and a title its own catalog spells.
+        EXPECT_FALSE(contribution.item.icon.isNull()) << owner.toStdString();
+        EXPECT_TRUE(contribution.item.titleKey.startsWith(owner + QLatin1Char('.'))) << contribution.item.titleKey.toStdString();
+        EXPECT_NE(manager.translate(contribution.item.titleKey), contribution.item.titleKey) << contribution.item.titleKey.toStdString();
+
+        // Two destinations never claim one position within one placement.
+        const int placementKey = static_cast<int>(contribution.item.placement) * 100000 + static_cast<int>(contribution.item.order);
+        EXPECT_FALSE(positionsByPlacement.contains(placementKey)) << owner.toStdString() << " shares a position with " << positionsByPlacement.value(placementKey).toStdString();
+        positionsByPlacement.insert(placementKey, owner);
+    }
+
+    for (const auto& contribution : manager.settings()) {
+        const QString owner = contribution.pluginId;
+        EXPECT_TRUE(identifierPattern.match(contribution.group.id).hasMatch()) << contribution.group.id.toStdString();
+        EXPECT_NE(manager.translate(contribution.group.titleKey), contribution.group.titleKey) << contribution.group.titleKey.toStdString();
+        ASSERT_FALSE(contribution.group.sections.isEmpty()) << contribution.group.id.toStdString();
+
+        // A group of one section identifies that section as general, and every section is searchable.
+        if (contribution.group.sections.size() == 1) {
+            EXPECT_EQ(contribution.group.sections.first().id, QStringLiteral("general")) << owner.toStdString() << " " << contribution.group.id.toStdString();
+        }
+
+        QSet<QString> sectionIds;
+        for (const auto& section : contribution.group.sections) {
+            EXPECT_TRUE(identifierPattern.match(section.id).hasMatch()) << section.id.toStdString();
+            EXPECT_FALSE(sectionIds.contains(section.id)) << contribution.group.id.toStdString() << " declares " << section.id.toStdString() << " twice";
+            sectionIds.insert(section.id);
+            EXPECT_NE(manager.translate(section.titleKey), section.titleKey) << section.titleKey.toStdString();
+            EXPECT_FALSE(section.searchKeys.isEmpty()) << contribution.group.id.toStdString() << " " << section.id.toStdString();
+            for (const auto& searchKey : section.searchKeys) {
+                EXPECT_NE(manager.translate(searchKey), searchKey) << searchKey.toStdString();
+            }
+        }
+    }
+
+    // Every plugin that declares a schema declares version one and owns the tables carrying its own prefix.
+    const auto versions = manager.databaseSchemaVersions();
+    for (auto version = versions.constBegin(); version != versions.constEnd(); ++version) {
+        EXPECT_EQ(version.value(), 1) << version.key().toStdString();
+        EXPECT_TRUE(owners.contains(version.key())) << version.key().toStdString();
+    }
+
+    manager.unloadPlugins();
 }
 
 } // namespace slotdeck
