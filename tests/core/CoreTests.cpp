@@ -451,6 +451,38 @@ TEST(ApplicationSettingsTest, RollsBackLanguageWhenAsynchronousPersistenceFails)
     EXPECT_EQ(languageChanged.count(), 2);
 }
 
+TEST(ApplicationSettingsTest, CommitsWhatReachedStorageWhenManySavesOverlap) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("slotdeck.sqlite3"));
+    const QStringList themes{QStringLiteral("green"), QStringLiteral("blue"), QStringLiteral("red")};
+    QString lastRequested;
+    {
+        persistence::StateStore store(path);
+        persistence::DatabaseExecutor executor(path);
+        app::ApplicationSettingsStore settings(store, executor);
+        ASSERT_TRUE(settings.initialize().hasValue());
+        QSignalSpy saveFailed(&settings, &app::ApplicationSettingsStore::saveFailed);
+
+        for (int round = 0; round < 60; ++round) {
+            lastRequested = themes.at(round % themes.size());
+            ASSERT_TRUE(settings.setTheme(lastRequested).hasValue());
+            ASSERT_TRUE(settings.setLanguage(round % 2 == 0 ? QStringLiteral("en") : QStringLiteral("pt")).hasValue());
+        }
+        // clang-format off
+        ASSERT_TRUE(test::waitUntil([&]() { return settings.themeId() == lastRequested; }));
+        // clang-format on
+        EXPECT_EQ(saveFailed.count(), 0);
+    }
+
+    // What the next start reads is what the last write put there, because a memory that disagrees with storage is a lie that start discovers.
+    persistence::StateStore reopened(path);
+    persistence::DatabaseExecutor reopenedExecutor(path);
+    app::ApplicationSettingsStore restored(reopened, reopenedExecutor);
+    ASSERT_TRUE(restored.initialize().hasValue());
+    EXPECT_EQ(restored.themeId(), lastRequested);
+}
+
 TEST(ApplicationSettingsTest, RollsBackThemeWhenAsynchronousPersistenceFails) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());

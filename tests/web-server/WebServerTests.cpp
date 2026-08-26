@@ -194,6 +194,34 @@ TEST(WebServerInstanceTest, RefusesABurstLargerThanAnyRequestAndKeepsServing) {
     EXPECT_TRUE(server.running());
 }
 
+TEST(WebServerInstanceTest, KeepsServingThroughManyConnectionsIncludingOnesThatLeaveEarly) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    WebServerTestsHelper::writeFile(directory.filePath(QStringLiteral("index.html")), QByteArray(64 * 1024, 'a'));
+    plugins::webserver::WebServerInstance server;
+    ASSERT_TRUE(server.start(directory.path(), QStringLiteral("127.0.0.1"), 0));
+
+    int served = 0;
+    for (int round = 0; round < 60; ++round) {
+        // A client that opens a connection and leaves without speaking must not keep the server from answering the next one.
+        QTcpSocket abandoned;
+        abandoned.connectToHost(QHostAddress::LocalHost, server.port());
+        ASSERT_TRUE(abandoned.waitForConnected(2000));
+        abandoned.abort();
+
+        const QByteArray answered = WebServerTestsHelper::request(server, QByteArrayLiteral("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n"));
+        if (answered.startsWith(QByteArrayLiteral("HTTP/1.1 200 OK"))) {
+            ++served;
+        }
+    }
+
+    EXPECT_EQ(served, 60);
+    EXPECT_TRUE(server.running());
+    // The log is bounded, so a long run of requests never grows it past the page a reader asks for.
+    EXPECT_LE(server.requestLog().entriesSince(0, 1000).entries.size(), 1000);
+    server.stop();
+}
+
 TEST(WebServerInstanceTest, RestartsOnAnotherPortAndRejectsOccupiedPorts) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());
