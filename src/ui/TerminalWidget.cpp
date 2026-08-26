@@ -82,16 +82,7 @@ TerminalWidget::TerminalWidget(plugins::PluginHost& host, QWidget* parent) : QWi
     };
     // clang-format on
     connect(m_scrollBar, &QScrollBar::valueChanged, this, scrollToRow);
-    const QString defaultFamily = ui::defaultMonospacedFontFamily();
-
-    if (!defaultFamily.isEmpty()) {
-        m_font.setFamily(defaultFamily);
-    }
-
-    m_font.setStyleHint(QFont::Monospace);
-    m_font.setFixedPitch(true);
-    m_font.setPointSizeF(m_fontSize);
-    updateCellMetrics();
+    setTerminalFont({}, m_fontSize);
 
     m_resizeTimer.setSingleShot(true);
     m_resizeTimer.setInterval(40);
@@ -142,7 +133,7 @@ void TerminalWidget::setSession(terminalcore::TerminalSession* newSession) {
 }
 
 void TerminalWidget::setTerminalFont(const QString& family, qreal pointSize) {
-    m_font.setFamily(family);
+    m_font.setFamily(family.isEmpty() ? defaultMonospacedFontFamily() : family);
     m_font.setStyleHint(QFont::Monospace);
     m_font.setFixedPitch(true);
     m_fontSize = std::clamp(pointSize, 8.0, 36.0);
