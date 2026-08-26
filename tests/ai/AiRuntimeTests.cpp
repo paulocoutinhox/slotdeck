@@ -230,6 +230,41 @@ TEST(AiMcpClientTest, InitializesDiscoversToolsAndCallsThemOverTheStdioTransport
     EXPECT_FALSE(client.ready());
 }
 
+TEST(AiMcpClientTest, ServesToolsAgainAfterItWasStoppedAndStartedOnceMore) {
+    McpServerDescriptor fixture;
+    fixture.id = QStringLiteral("fixture");
+    fixture.command = QCoreApplication::applicationFilePath();
+    fixture.arguments = {QStringLiteral("--slotdeck-test-mcp")};
+    AiMcpClient client(fixture);
+    QSignalSpy toolsChanged(&client, &AiMcpClient::toolsChanged);
+
+    client.start();
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return toolsChanged.count() == 1; }));
+    // clang-format on
+    client.stop();
+    EXPECT_FALSE(client.ready());
+
+    client.start();
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return toolsChanged.count() == 2; }));
+    // clang-format on
+    ASSERT_EQ(client.tools().size(), 1);
+
+    QVector<utils::Result<QJsonObject>> replies;
+    // clang-format off
+    const auto collect = [&replies](utils::Result<QJsonObject> result) { replies.append(std::move(result)); };
+    // clang-format on
+    client.callTool(QStringLiteral("get_weather"), QJsonObject{{QStringLiteral("city"), QStringLiteral("Porto")}}, collect);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return !replies.isEmpty(); }));
+    // clang-format on
+    EXPECT_TRUE(replies.first().hasValue());
+
+    client.stop();
+    AiMcpClient::drainTransports();
+}
+
 TEST(AiCommandRunnerTest, KeepsOnlyTheReadableTextOfACommandThatDrawsInTheTerminal) {
     QString pending;
     const QString coloured = QString::fromUtf8("\x1b[36mhelp\x1b[0m    Show this help\n");

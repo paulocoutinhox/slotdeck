@@ -462,6 +462,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Canonical validation prevents traversal and symlink escape.
 - Directory requests resolve `index.html` before `index.htm`.
 - Request headers, files, connection counts and deadlines remain bounded.
+- A connection never buffers more than one request may occupy, because the size of what a client sends is decided by that client and the bound has to hold before the bytes are read rather than after.
 - Stopping aborts active sockets before worker destruction.
 - Request logging is bounded, thread-safe and runtime-only.
 - Timestamps are captured in UTC and rendered with system locale and timezone.
@@ -545,6 +546,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The results of a turn are answered in the order the model asked for them, whatever order they finished in.
 - An oversized tool result keeps its beginning and its end, because what a command reports last is what explains its failure.
 - A tool result carries the execution it belongs to, so a tool answering after its run was stopped is discarded instead of joining the run the card started next.
+- An answer nobody is waiting for changes nothing, because the call it carries was already answered and the turn it belonged to must not be started a second time.
+- A cancelled tool is disconnected before it is cancelled, so the exit it is about to have never answers a call the cancellation already answered.
 - The conversation is fitted to the model the run itself declares rather than to the current selection, because changing the selected model while a card runs must not change the window that run is speaking to.
 - Both execution kinds declare a working directory, required by a command and optional for an agent, because an agent without one simply has no file access.
 - A file tool resolves its path against the working directory the task declares and judges it by where it lands rather than by how it was written, so the absolute form a model naturally uses is accepted while a traversal, a symbolic link reaching outside and a task declaring no working directory are refused.
@@ -919,6 +922,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A file is written back in the encoding and the mark it arrived in, so opening it never rewrites bytes nobody asked to change.
 - Saves use atomic replacement and content revisions so an older asynchronous completion cannot mark newer edits as clean.
 - Clean documents reload after an external edit and dirty documents preserve their buffer while reporting a translated conflict.
+- What the file now says is judged once its bytes are decoded rather than when they were read, so the reader can type while a large file is being read without the reload replacing what was typed.
+- A save asked for while one is still being written runs after it instead of being dropped, because an edit the reader saved must reach the file.
 - The stored cursor of a restored document is applied once, when it first loads, because a later reload must never move the reader.
 - A reload that carries the same text leaves the buffer untouched, and a reload that changes it restores the cursor and the scroll, because saving a file must never send the reader back to the first line.
 - The document remembers the digest of what it last read or wrote, so a watcher notification only becomes a reload or a conflict when the bytes on disk really differ, and our own save or a rename stays silent.
@@ -1027,6 +1032,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Language-server shutdown is asynchronous and object destruction never waits on a child process from the GUI thread.
 - A language server dies with the transport that owns it rather than with a message that may not be delivered, so Qt never has to clean up a process that is still running.
 - A transport thread outlives the client that asked it to end, so every one of them is registered while it runs and drained at teardown, before the library it is running unloads and before the process exits.
+- A thread leaves that register by the identity it was entered with rather than by the thread the handler happens to run on, because the signal a thread ends with is delivered to the object that owns it and that object belongs to the thread that created it.
+- A client that stops its transport ends that thread with it, because a client started again would otherwise leave the previous thread running for the rest of the process.
 - A destructor never reaches across threads to disconnect an object it does not own, because its own destruction already disconnects everything it receives.
 - Workspace roots, open documents, document order, active selections, cursor positions and UTC timestamps persist in plugin-owned strict SQLite tables and every stored value is validated when the state loads.
 - The editor settings live in the settings document of the plugin, so word wrap, the font, its size and the language server switch never appear in its schema.
@@ -1437,7 +1444,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 340 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 344 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
@@ -1453,6 +1460,11 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] The Linux, macOS and Windows workflows build, test, package and validate the product on every push.
 - [x] The release workflow publishes the Linux archive, the macOS disk image and the Windows archive for every `v*` tag.
 - [x] The final audit found no legacy ABI, migration, compatibility branch or unguarded lambda.
+- [x] A transport thread leaves the drain register by its own identity, so the register never holds a thread that was already destroyed.
+- [x] A server stopped and started again serves its tools without leaving the thread of the previous one running.
+- [x] Typing while a large file is being read keeps what was typed and reports the conflict instead of losing it.
+- [x] A second save asked for while the first is still being written reaches the file.
+- [x] A connection that bursts more than any request may occupy is refused and the server keeps serving.
 - [x] A full review with the sanitizers, Cppcheck, clang-tidy and hand inspection found no orphan translation key, no unused theme role or icon, no legacy marker and no plugin that clears its host before its asynchronous context.
 - [x] The language-server transport disconnects from the process it abandons, so a read already queued never reaches it without one.
 - [x] A request that was given its turn and stopped before hearing about it returns that turn, so a provider limited to one request at a time keeps admitting.

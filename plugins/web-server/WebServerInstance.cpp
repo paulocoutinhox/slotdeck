@@ -16,6 +16,7 @@ constexpr qsizetype maximumConnections = 128;
 constexpr qint64 maximumBufferedFileBytes = 256LL * 1024;
 constexpr qint64 fileChunkSize = 64LL * 1024;
 constexpr int requestTimeoutMilliseconds = 10'000;
+constexpr qint64 maximumRequestBytes = 32LL * 1024;
 
 WebServerInstance::WebServerInstance(QObject* parent) : QObject(parent) {}
 
@@ -83,6 +84,8 @@ void WebServerInstance::acceptConnection() {
         }
 
         m_sockets.insert(socket);
+        // The size of what a client sends is decided by that client, so the socket never buffers more than one request may occupy.
+        socket->setReadBufferSize(maximumRequestBytes);
         auto* deadline = new QTimer(socket);
         deadline->setObjectName(QStringLiteral("requestDeadline"));
         deadline->setSingleShot(true);
@@ -112,7 +115,7 @@ void WebServerInstance::readRequest() {
 
     QByteArray request = socket->property("requestBuffer").toByteArray();
     request.append(socket->readAll());
-    if (request.size() > 32 * 1024) {
+    if (request.size() > maximumRequestBytes) {
         respond(*socket, {});
         return;
     }

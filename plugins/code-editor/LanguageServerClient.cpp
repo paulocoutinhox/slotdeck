@@ -166,7 +166,7 @@ LanguageServerClient::LanguageServerClient(ResolvedLanguageServer server, QStrin
         LanguageServerClientHelper::liveTransports().insert(m_transportThread);
     }
     // clang-format off
-    connect(m_transportThread, &QThread::finished, m_transportThread, []() { const QMutexLocker locked(&LanguageServerClientHelper::transportGuard()); LanguageServerClientHelper::liveTransports().remove(QThread::currentThread()); });
+    connect(m_transportThread, &QThread::finished, m_transportThread, [thread = m_transportThread]() { const QMutexLocker locked(&LanguageServerClientHelper::transportGuard()); LanguageServerClientHelper::liveTransports().remove(thread); });
     connect(m_transportThread, &QThread::finished, m_transport, &QObject::deleteLater);
     connect(m_transportThread, &QThread::finished, m_transportThread, &QObject::deleteLater);
     connect(m_transport, &LanguageServerTransport::started, this, [this]() { m_running = true; processStarted(); });
@@ -463,7 +463,7 @@ void LanguageServerClient::processFinished(int exitCode) {
         document->opened = false;
     }
 
-    if (m_stopping || m_processErrorReported) {
+    if (m_stopping) {
         emit stopped();
         return;
     }

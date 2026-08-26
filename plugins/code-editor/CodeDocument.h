@@ -123,6 +123,7 @@ class CodeDocument final : public QWidget {
     bool m_loading{false};
     bool m_dirty{false};
     bool m_saving{false};
+    bool m_saveRequested{false};
 };
 
 } // namespace slotdeck::plugins::codeeditor

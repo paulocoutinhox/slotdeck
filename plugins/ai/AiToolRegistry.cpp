@@ -506,6 +506,8 @@ void AiToolRegistry::cancel(const QString& callId) {
         return;
     }
 
+    // The answer to this call is the cancellation itself, so the runner is disconnected before it can report the exit it is about to have.
+    running.runner->disconnect(this);
     running.runner->cancel();
     running.runner->deleteLater();
     running.completion({callId, m_host.translate(QStringLiteral("ai.error.tool-cancelled")), true});

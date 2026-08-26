@@ -376,8 +376,10 @@ void CodeDocument::save() {
     writeContent();
 }
 
+// A save asked for while one is still being written is kept and runs after it, because an edit the reader saved is never dropped.
 void CodeDocument::writeContent() {
     if (m_saving) {
+        m_saveRequested = true;
         return;
     }
     const auto encoded = encodedContent();
@@ -393,6 +395,7 @@ void CodeDocument::writeContent() {
     // clang-format off
     future.then(this, [this, revision, written](utils::Result<void> result) {
         m_saving = false;
+        const bool requestedAgain = std::exchange(m_saveRequested, false);
         if (!result.hasValue()) {
             emit operationFailed(result.error().detail.isEmpty() ? result.error().message : result.error().detail);
             return;
@@ -410,6 +413,9 @@ void CodeDocument::writeContent() {
             m_languageServer->saveDocument(m_path, m_editor->toPlainText());
         }
         emit stateChanged();
+        if (requestedAgain) {
+            writeContent();
+        }
     });
     // clang-format on
 }
@@ -522,10 +528,22 @@ void CodeDocument::applyContent(const QByteArray& content) {
 }
 
 void CodeDocument::applyDecoded(const DecodedContent& decoded) {
+    // The same bytes read in another encoding spell another text, so a reading the reader asked for is applied whatever they say.
+    const bool reread = std::exchange(m_rereading, false);
     if (!decoded.errorKey.isEmpty()) {
         const QString message = m_host.translate(decoded.errorKey);
         emit operationFailed(decoded.errorDetail.isEmpty() ? message : message + QStringLiteral(" ") + decoded.errorDetail);
         return;
+    }
+    // What the file says is judged only once it is decoded, so the reader can type while it is being read without losing what was typed.
+    if (!reread) {
+        if (decoded.digest == m_storedDigest) {
+            return;
+        }
+        if (m_dirty) {
+            emit externalChangeConflict(m_path);
+            return;
+        }
     }
 
     m_storedDigest = decoded.digest;
@@ -533,9 +551,6 @@ void CodeDocument::applyDecoded(const DecodedContent& decoded) {
     m_detectedLineEnding = decoded.lineEnding;
 
     // The digest says whether the buffer already holds this text, which comparing it whole would answer at the cost of the whole document.
-    // The same bytes read in another encoding spell another text, so a reading the reader asked for is applied whatever the digest says.
-    const bool reread = m_rereading;
-    m_rereading = false;
     if (reread || decoded.digest != m_appliedDigest) {
         const int cursorPosition = m_editor->textCursor().position();
         const int scrollValue = m_editor->verticalScrollBar()->value();
@@ -681,7 +696,7 @@ void CodeDocument::scheduleExternalChange() {
     m_externalChangeTimer.start();
 }
 
-// An external change is only a change when the bytes on disk differ from what the editor holds, so our own writes and a rename stay silent.
+// What the file now says is read whole and judged once it is decoded, because hashing it is work whose size the file decides.
 void CodeDocument::watchedFileChanged() {
     if (!QFileInfo::exists(m_path)) {
         emit externalFileRemoved(m_path);
@@ -698,17 +713,9 @@ void CodeDocument::watchedFileChanged() {
     auto future = m_host.readFile(m_path, LanguageRegistry::limits().maximumFileBytes);
     // clang-format off
     future.then(this, [this, watched](utils::Result<QByteArray> result) {
-        if (!result.hasValue() || watched != m_path) {
-            return;
+        if (result.hasValue() && watched == m_path) {
+            applyContent(result.value());
         }
-        if (CodeDocumentHelper::contentDigest(result.value()) == m_storedDigest) {
-            return;
-        }
-        if (m_dirty) {
-            emit externalChangeConflict(m_path);
-            return;
-        }
-        applyContent(result.value());
     });
     // clang-format on
 }

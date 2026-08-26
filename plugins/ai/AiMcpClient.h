@@ -49,6 +49,8 @@ class AiMcpClient final : public QObject {
     explicit AiMcpClient(McpServerDescriptor descriptor, QObject* parent = nullptr);
     ~AiMcpClient() override;
 
+    static void drainTransports();
+
     void start();
     void stop();
     [[nodiscard]] bool ready() const;
@@ -88,11 +90,11 @@ class AiMcpClient final : public QObject {
     void respondWithError(const QJsonValue& id, int code, const QString& message);
     void send(const QJsonObject& message);
     void refreshTools();
+    void releaseTransport();
     void completeAll(const utils::Error& error);
     void reportFailure(const utils::Error& error);
 
     McpServerDescriptor m_descriptor;
-    QThread* m_transportThread{nullptr};
     QObject* m_transport{nullptr};
     bool m_running{false};
     QNetworkAccessManager m_network;

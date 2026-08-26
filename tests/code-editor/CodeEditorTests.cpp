@@ -2066,6 +2066,61 @@ TEST(CodeDocumentTest, ReloadsCleanExternalChangesAndPreservesDirtyBuffers) {
     EXPECT_TRUE(document.editor().toPlainText().contains(QStringLiteral("unsaved")));
 }
 
+TEST(CodeDocumentTest, KeepsWhatWasTypedWhileTheFileItWasReadingWasStillBeingDecoded) {
+    filesystem::FileSystemService service;
+    test::TestPluginHost host;
+    host.useFileSystem(service);
+    QTemporaryDir root;
+    ASSERT_TRUE(root.isValid());
+    const QString path = QDir(root.path()).filePath(QStringLiteral("raced.cpp"));
+    ASSERT_TRUE(test::awaitFuture(service.createFile(path)).hasValue());
+    ASSERT_TRUE(test::awaitFuture(service.writeFile(path, QByteArrayLiteral("first\n"))).hasValue());
+
+    CodeDocument document(path, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+    QSignalSpy loaded(&document, &CodeDocument::loaded);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return loaded.count() == 1; }));
+    // clang-format on
+
+    ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(path, QByteArrayLiteral("second\n")));
+    QSignalSpy conflict(&document, &CodeDocument::externalChangeConflict);
+    ASSERT_TRUE(QMetaObject::invokeMethod(&document, "watchedFileChanged"));
+    document.editor().appendPlainText(QStringLiteral("typed while it was reading"));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return conflict.count() >= 1; }));
+    // clang-format on
+    EXPECT_TRUE(document.editor().toPlainText().contains(QStringLiteral("typed while it was reading")));
+    EXPECT_TRUE(document.dirty());
+}
+
+TEST(CodeDocumentTest, WritesTheEditThatArrivedWhileTheEarlierSaveWasStillInFlight) {
+    filesystem::FileSystemService service;
+    test::TestPluginHost host;
+    host.useFileSystem(service);
+    QTemporaryDir root;
+    ASSERT_TRUE(root.isValid());
+    const QString path = QDir(root.path()).filePath(QStringLiteral("queued-save.cpp"));
+    ASSERT_TRUE(test::awaitFuture(service.createFile(path)).hasValue());
+    ASSERT_TRUE(test::awaitFuture(service.writeFile(path, QByteArrayLiteral("first\n"))).hasValue());
+
+    CodeDocument document(path, root.path(), false, CodeEditorFont{}, TextCharset::Latin1, host);
+    QSignalSpy loaded(&document, &CodeDocument::loaded);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return loaded.count() == 1; }));
+    // clang-format on
+
+    document.editor().setPlainText(QStringLiteral("earlier"));
+    document.save();
+    document.editor().setPlainText(QStringLiteral("later"));
+    document.save();
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return !document.dirty(); }));
+    // clang-format on
+    const auto stored = test::awaitFuture(service.readFile(path, 1024));
+    ASSERT_TRUE(stored.hasValue());
+    EXPECT_EQ(QString::fromUtf8(stored.value()), QStringLiteral("later"));
+}
+
 TEST(CodeWorkspaceViewTest, TracksExternalTreeChangesAndRejectsSymlinkEscape) {
     filesystem::FileSystemService service;
     test::TestPluginHost host;

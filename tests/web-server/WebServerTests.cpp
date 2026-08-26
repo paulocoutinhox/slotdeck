@@ -176,6 +176,24 @@ TEST(WebServerInstanceTest, ServesFilesAndReturnsProtocolErrorsWithRequestLogs) 
     EXPECT_EQ(server.port(), 0);
     server.stop();
 }
+TEST(WebServerInstanceTest, RefusesABurstLargerThanAnyRequestAndKeepsServing) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    WebServerTestsHelper::writeFile(directory.filePath(QStringLiteral("index.html")), QByteArrayLiteral("content"));
+    plugins::webserver::WebServerInstance server;
+    ASSERT_TRUE(server.start(directory.path(), QStringLiteral("127.0.0.1"), 0));
+
+    WebServerTestsHelper::request(server, QByteArray(4 * 1024 * 1024, 'x'));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&]() { return !server.requestLog().entriesSince(0, 10).entries.isEmpty(); }));
+    // clang-format on
+    EXPECT_EQ(server.requestLog().entriesSince(0, 10).entries.first().status, 400);
+
+    const QByteArray served = WebServerTestsHelper::request(server, QByteArrayLiteral("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n"));
+    EXPECT_TRUE(served.startsWith(QByteArrayLiteral("HTTP/1.1 200 OK")));
+    EXPECT_TRUE(server.running());
+}
+
 TEST(WebServerInstanceTest, RestartsOnAnotherPortAndRejectsOccupiedPorts) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());

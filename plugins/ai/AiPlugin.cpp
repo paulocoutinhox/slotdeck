@@ -406,6 +406,8 @@ void AiPlugin::shutdown() {
         client->deleteLater();
     }
     m_mcpClients.clear();
+    // A transport thread outlives the client that asked it to end, so this waits for the ones still finishing before the library they run is unloaded.
+    AiMcpClient::drainTransports();
     m_settings.mcpServers.clear();
     m_asyncContext.reset();
     m_queue.clear();
@@ -1754,6 +1756,18 @@ void AiPlugin::completeToolCall(const QString& taskId, const QString& executionI
         return;
     }
 
+    PendingToolCall* pending = nullptr;
+    for (auto& candidate : position->toolCalls) {
+        if (candidate.started && !candidate.finished && candidate.call.id == result.callId) {
+            pending = &candidate;
+            break;
+        }
+    }
+    // An answer nobody is waiting for changes nothing, because the call it carries was already answered by the turn it belonged to.
+    if (pending == nullptr) {
+        return;
+    }
+
     appendLog(executionId, result.failed ? ExecutionLogLevel::Warning : ExecutionLogLevel::Info, ExecutionLogKind::ToolReturned, QStringLiteral("%1 %2").arg(name, result.text));
     if (!result.imageData.isEmpty()) {
         position->seenImages.insert(result.callId, result);
@@ -1763,27 +1777,22 @@ void AiPlugin::completeToolCall(const QString& taskId, const QString& executionI
     } else {
         position->lastToolFailures.remove(name);
     }
-    for (auto& pending : position->toolCalls) {
-        if (pending.started && !pending.finished && pending.call.id == result.callId) {
-            pending.finished = true;
-            pending.result = std::move(result);
-            // The completion can be reached from the deadline that is emitting, so its destruction is deferred.
-            if (pending.deadline != nullptr) {
-                pending.deadline->stop();
-                pending.deadline->deleteLater();
-                pending.deadline = nullptr;
-            }
-            break;
-        }
+    pending->finished = true;
+    pending->result = std::move(result);
+    // The completion can be reached from the deadline that is emitting, so its destruction is deferred.
+    if (pending->deadline != nullptr) {
+        pending->deadline->stop();
+        pending->deadline->deleteLater();
+        pending->deadline = nullptr;
     }
 
     QVector<ToolResult> completed;
-    for (const auto& pending : position->toolCalls) {
-        if (!pending.finished) {
+    for (const auto& answeredCall : position->toolCalls) {
+        if (!answeredCall.finished) {
             dispatchPendingTools(taskId, executionId);
             return;
         }
-        completed.append(pending.result);
+        completed.append(answeredCall.result);
     }
 
     // The results are answered in the order the model asked for them, so a turn reads the same however its calls were scheduled.

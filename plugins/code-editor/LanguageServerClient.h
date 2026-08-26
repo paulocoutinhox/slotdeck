@@ -247,7 +247,6 @@ class LanguageServerClient final : public QObject {
     int m_restartsUsed{0};
     bool m_ready{false};
     bool m_stopping{false};
-    bool m_processErrorReported{false};
 };
 
 } // namespace slotdeck::plugins::codeeditor

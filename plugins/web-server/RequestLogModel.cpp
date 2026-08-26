@@ -27,7 +27,6 @@ void RequestLogModel::clear() {
 }
 
 RequestLogBatch RequestLogModel::entriesSince(std::uint64_t cursor, qsizetype maximumEntries) const {
-
     const QReadLocker locker(&m_lock);
     RequestLogBatch batch;
     batch.cursor = cursor;

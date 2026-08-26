@@ -7,9 +7,13 @@
 #include <QDir>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QMutex>
+#include <QMutexLocker>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QPointer>
+#include <QSet>
+#include <QThread>
 #include <QUrl>
 #include <QtConcurrent>
 
@@ -19,11 +23,38 @@ namespace slotdeck::plugins::ai {
 
 constexpr int methodNotFound = -32601;
 constexpr int internalError = -32603;
+constexpr int transportDrainTimeoutMs = 5000;
 
 class AiMcpClientHelper final {
   public:
     static QJsonObject clientInformation();
+    static QMutex& transportGuard();
+    static QSet<QThread*>& liveTransports();
 };
+
+// Every transport thread is registered while it runs, because the process must not end while one of them is still inside the code it was given.
+QMutex& AiMcpClientHelper::transportGuard() {
+    static QMutex guard;
+    return guard;
+}
+
+QSet<QThread*>& AiMcpClientHelper::liveTransports() {
+    static QSet<QThread*> threads;
+    return threads;
+}
+
+void AiMcpClient::drainTransports() {
+    QSet<QThread*> pending;
+    {
+        const QMutexLocker locked(&AiMcpClientHelper::transportGuard());
+        pending = AiMcpClientHelper::liveTransports();
+    }
+
+    for (auto* thread : pending) {
+        thread->quit();
+        thread->wait(transportDrainTimeoutMs);
+    }
+}
 
 QJsonObject AiMcpClientHelper::clientInformation() {
     return {{QStringLiteral("name"), QStringLiteral("SlotDeck")}, {QStringLiteral("version"), QCoreApplication::applicationVersion()}};
@@ -37,12 +68,7 @@ AiMcpClient::AiMcpClient(McpServerDescriptor descriptor, QObject* parent) : QObj
 }
 
 AiMcpClient::~AiMcpClient() {
-    if (m_transport == nullptr) {
-        return;
-    }
-
-    m_transport->disconnect(this);
-    QMetaObject::invokeMethod(m_transport, "shutdown", Qt::QueuedConnection);
+    releaseTransport();
 }
 
 // Sampling is declared only when the server is explicitly allowed to spend the configured model.
@@ -104,18 +130,23 @@ void AiMcpClient::start() {
 }
 
 void AiMcpClient::startStdio() {
-    m_transportThread = new QThread;
+    auto* transportThread = new QThread;
     auto* transport = new AiMcpTransport(m_descriptor.command, m_descriptor.arguments, m_descriptor.workdir);
     m_transport = transport;
-    transport->moveToThread(m_transportThread);
+    transport->moveToThread(transportThread);
+    {
+        const QMutexLocker locked(&AiMcpClientHelper::transportGuard());
+        AiMcpClientHelper::liveTransports().insert(transportThread);
+    }
     // clang-format off
-    connect(m_transportThread, &QThread::finished, transport, &QObject::deleteLater);
-    connect(m_transportThread, &QThread::finished, m_transportThread, &QObject::deleteLater);
+    connect(transportThread, &QThread::finished, transportThread, [transportThread]() { const QMutexLocker locked(&AiMcpClientHelper::transportGuard()); AiMcpClientHelper::liveTransports().remove(transportThread); });
+    connect(transportThread, &QThread::finished, transport, &QObject::deleteLater);
+    connect(transportThread, &QThread::finished, transportThread, &QObject::deleteLater);
     connect(transport, &AiMcpTransport::messageReceived, this, [this](const QJsonObject& message) { dispatch(message); });
     connect(transport, &AiMcpTransport::failed, this, [this](const QString& code, const QString& message) { if (!m_stopping) { reportFailure({code.toUtf8().constData(), message, m_descriptor.id}); stop(); } });
     connect(transport, &AiMcpTransport::exited, this, [this](int exitCode) { m_running = false; if (!m_stopping) { m_ready = false; completeAll({"ai_mcp_failed", QStringLiteral("The MCP server exited with code %1").arg(QString::number(exitCode)), m_descriptor.id}); } });
     // clang-format on
-    m_transportThread->start();
+    transportThread->start();
     m_running = true;
     QMetaObject::invokeMethod(transport, "start", Qt::QueuedConnection);
     m_startTimeout.start(aiLimits().serverStartTimeoutMs);
@@ -154,11 +185,20 @@ void AiMcpClient::stop() {
     m_stopping = true;
     m_ready = false;
     completeAll({"ai_mcp_stopped", "The MCP server was stopped", m_descriptor.id});
+    m_running = false;
+    releaseTransport();
+}
+
+// The transport ends its process and its own thread in one step, so a client that is started again never leaves the previous one behind.
+void AiMcpClient::releaseTransport() {
     if (m_transport == nullptr) {
         return;
     }
-    m_running = false;
-    QMetaObject::invokeMethod(m_transport, "requestTermination", Qt::QueuedConnection);
+
+    QObject* released = m_transport;
+    m_transport = nullptr;
+    released->disconnect(this);
+    QMetaObject::invokeMethod(released, "shutdown", Qt::QueuedConnection);
 }
 
 void AiMcpClient::request(const QString& method, const QJsonObject& parameters, const McpReply& reply) {
@@ -203,8 +243,6 @@ void AiMcpClient::getPrompt(const QString& name, const QJsonObject& arguments, c
 void AiMcpClient::ping(const McpReply& reply) {
     request(QStringLiteral("ping"), {}, reply);
 }
-
-// The stdio transport frames every message as one line of JSON, so the buffer is consumed line by line.
 
 void AiMcpClient::dispatch(const QJsonObject& message) {
     if (message.value(QStringLiteral("jsonrpc")).toString() != QStringLiteral("2.0")) {
