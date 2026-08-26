@@ -304,6 +304,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Every schema is declared as one single migration that creates the complete set of tables and indexes, and no migration alters, drops or rewrites an existing object before the first release.
 - Core schema evolution uses SQLite `PRAGMA user_version` and creates the complete schema when the version is zero.
 - A stored database this version cannot read is set aside under a name of its own and a new one takes its place, because nothing stored may keep the application from opening.
+- The write-ahead log of that database goes with it, because what was committed last is only there, and it never stays beside the database that replaced it.
 - The database that was set aside is named to the reader once, because the file it was kept in is where its data still is.
 - The core schema is validated by comparing the stored table definitions with the current ones after normalizing the quoting that SQLite applies to renamed tables.
 - Storage has exactly two shapes: a typed table for what is queried, related or paged, and one settings document per owner for what is only read whole and written whole.

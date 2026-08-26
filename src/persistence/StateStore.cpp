@@ -159,11 +159,19 @@ utils::Result<void> StateStore::replaceUnusableDatabase() {
     }
 
     const QString backup = m_filePath + QStringLiteral(".unusable-") + QString::number(QDateTime::currentSecsSinceEpoch());
-    if (QFileInfo::exists(m_filePath) && !QFile::rename(m_filePath, backup)) {
+    const bool moved = QFileInfo::exists(m_filePath) && QFile::rename(m_filePath, backup);
+    if (QFileInfo::exists(m_filePath)) {
         return utils::Result<void>::failure({"database_replace_failed", "The unusable application database could not be set aside", m_filePath});
     }
+    // The write-ahead log holds what was committed last, so it goes with the database it belongs to and never stays beside the new one.
     for (const auto& suffix : {QStringLiteral("-wal"), QStringLiteral("-shm")}) {
-        QFile::remove(m_filePath + suffix);
+        const QString sidecar = m_filePath + suffix;
+        if (!QFileInfo::exists(sidecar)) {
+            continue;
+        }
+        if (!moved || !QFile::rename(sidecar, backup + suffix)) {
+            QFile::remove(sidecar);
+        }
     }
     m_replacedDatabasePath = QFileInfo::exists(backup) ? backup : QString{};
 
