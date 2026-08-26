@@ -9,8 +9,6 @@
 
 namespace slotdeck::plugins::codeeditor {
 
-// A single line longer than this is generated content, and running every pattern over it costs more than the colors are worth.
-
 class CodeSyntaxHighlighterHelper final {
   public:
     static QTextCharFormat roleFormat(HighlightRole role, const ui::Theme& theme);
@@ -122,6 +120,7 @@ void CodeSyntaxHighlighter::setSemanticTokens(const QVector<SemanticToken>& toke
     }
 }
 
+// A single line longer than the declared bound is generated content, and running every pattern over it costs more than the colors are worth.
 void CodeSyntaxHighlighter::highlightBlock(const QString& text) {
     if (text.size() <= LanguageRegistry::limits().maximumHighlightedLineLength) {
         for (const auto& rule : m_rules) {

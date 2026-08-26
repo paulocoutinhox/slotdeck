@@ -24,8 +24,6 @@
 
 namespace slotdeck::plugins::codeeditor {
 
-// The panel below the editor is sized by the splitter, so it opens tall enough to read a few rows and grows to wherever it is dragged.
-
 class CodeWorkspaceViewHelper final {
   public:
     static QString charsetName(TextCharset charset);
@@ -122,6 +120,7 @@ CodeWorkspaceView::CodeWorkspaceView(CodeWorkspaceState state, QVector<ResolvedL
     m_bottomPanel->setVisible(!m_availableLanguageServers.isEmpty());
     editorArea->setStretchFactor(0, 1);
     editorArea->setStretchFactor(1, 0);
+    // The panel below the editor is sized by the splitter, so it opens tall enough to read a few rows and grows to wherever it is dragged.
     editorArea->setSizes({LanguageRegistry::limits().bottomPanelInitialHeight * 3, LanguageRegistry::limits().bottomPanelInitialHeight});
     auto* sidebar = new QSplitter(Qt::Vertical, this);
     sidebar->setObjectName(QStringLiteral("codeEditorSplitter"));

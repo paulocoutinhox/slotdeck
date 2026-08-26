@@ -108,7 +108,6 @@ utils::Result<QVector<CodeWorkspaceState>> CodeEditorRepository::load() const {
 }
 
 // Every value the settings document omits is the declared default, so a setting added later needs no schema and no stored row.
-
 CodeEditorSettings CodeEditorRepositoryHelper::settingsFromDocument(const QJsonObject& document) {
     const CodeEditorSettings declared;
     CodeEditorSettings settings;

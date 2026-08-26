@@ -7,10 +7,6 @@ namespace slotdeck::plugins::ai {
 constexpr qsizetype maximumOutputCharacters = 1 << 22;
 constexpr int terminationGraceMs = 3000;
 
-// Windows terminates only the shell it started, so the whole tree is taken down by its identity, otherwise the command keeps running after the task was stopped.
-
-// A console process on Windows has no window to close, so there is nothing for a graceful request to reach and the stop is the tree kill itself.
-
 class AiCommandRunnerHelper final {
   public:
     static QStringList shellArguments(const QString& command);
@@ -28,6 +24,7 @@ QStringList AiCommandRunnerHelper::shellArguments(const QString& command) {
 #endif
 }
 
+// Windows terminates only the shell it started, so the whole tree is taken down by its identity, otherwise the command keeps running after the task was stopped.
 void AiCommandRunnerHelper::killProcessTree(QProcess* process) {
 #ifdef Q_OS_WIN
     QProcess::startDetached(QStringLiteral("taskkill"), {QStringLiteral("/T"), QStringLiteral("/F"), QStringLiteral("/PID"), QString::number(process->processId())});
@@ -35,6 +32,7 @@ void AiCommandRunnerHelper::killProcessTree(QProcess* process) {
     process->kill();
 }
 
+// A console process on Windows has no window to close, so there is nothing for a graceful request to reach and the stop is the tree kill itself.
 void AiCommandRunnerHelper::requestTermination(QProcess* process) {
 #ifdef Q_OS_WIN
     killProcessTree(process);

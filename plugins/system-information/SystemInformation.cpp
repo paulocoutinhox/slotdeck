@@ -27,10 +27,6 @@
 
 namespace slotdeck::plugins::system_information {
 
-// Platform buffers carry fixed-size padding, so every native value keeps only printable characters.
-
-// macOS does not enumerate memory modules so the installed size comes from the kernel instead of the module sum.
-
 class SystemInformationHelper final {
   public:
     static QString fromNativeString(const std::string& value);
@@ -41,6 +37,7 @@ class SystemInformationHelper final {
     static bool isCancelled(const std::atomic_bool& cancelled);
 };
 
+// Platform buffers carry fixed-size padding, so every native value keeps only printable characters.
 QString SystemInformationHelper::fromNativeString(const std::string& value) {
     if (value.empty() || value == "<unknown>") {
         return {};
@@ -69,6 +66,7 @@ QString SystemInformationHelper::batteryStateName(const hwinfo::Battery& battery
     return QStringLiteral("unknown");
 }
 
+// macOS does not enumerate memory modules so the installed size comes from the kernel instead of the module sum.
 quint64 SystemInformationHelper::totalMemoryBytes(const hwinfo::Memory& memory) {
 #if defined(Q_OS_MACOS)
     Q_UNUSED(memory);

@@ -26,14 +26,6 @@ struct EditorConfigCollection final {
     int pending{0};
 };
 
-// A file keeps the line ending it already has, so opening and saving it never rewrites every line.
-
-// An encoding the editor does not write is named instead of being opened, because a file it cannot save back is a file it would destroy.
-
-// The mark the file starts with names its encoding, and only a file without one has to be plain UTF-8 text.
-
-// A file is written back in the encoding it arrived in, mark included, so opening it never rewrites bytes nobody asked to change.
-
 class CodeDocumentHelper final {
   public:
     static QByteArray contentDigest(const QByteArray& content);
@@ -390,17 +382,17 @@ void CodeDocument::writeContent() {
 
     m_saving = true;
     const quint64 revision = m_contentRevision;
-    const QByteArray written = encoded.value();
-    auto future = m_host.writeFile(m_path, written);
+    const QByteArray digest = CodeDocumentHelper::contentDigest(encoded.value());
+    auto future = m_host.writeFile(m_path, encoded.value());
     // clang-format off
-    future.then(this, [this, revision, written](utils::Result<void> result) {
+    future.then(this, [this, revision, digest](utils::Result<void> result) {
         m_saving = false;
         const bool requestedAgain = std::exchange(m_saveRequested, false);
         if (!result.hasValue()) {
             emit operationFailed(result.error().detail.isEmpty() ? result.error().message : result.error().detail);
             return;
         }
-        m_storedDigest = CodeDocumentHelper::contentDigest(written);
+        m_storedDigest = digest;
         if (revision == m_contentRevision) {
             m_dirty = false;
             emit titleChanged();

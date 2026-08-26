@@ -42,8 +42,6 @@ namespace slotdeck::plugins::ai {
 
 const QString taskMimeType = QStringLiteral("application/x-slotdeck-ai-task");
 
-// A schedule that already ran keeps saying when it ran, because the card is where the user remembers it.
-
 class AiTasksViewHelper final {
   public:
     static QString columnTitleKey(TaskColumn column);
@@ -54,6 +52,7 @@ QString AiTasksViewHelper::columnTitleKey(TaskColumn column) {
     return QStringLiteral("ai.column.%1").arg(AiTaskRepository::columnName(column));
 }
 
+// A schedule that already ran keeps saying when it ran, because the card is where the user remembers it.
 QString AiTasksViewHelper::scheduleSummary(const AiTask& task, PluginHost& host) {
     if (!task.schedule.has_value()) {
         return {};

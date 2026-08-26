@@ -9,8 +9,6 @@
 
 namespace slotdeck::plugins::codeeditor {
 
-// Translates one EditorConfig brace expression into a regular expression alternation.
-
 class EditorConfigHelper final {
   public:
     static QString escapedLiteral(QChar character);
@@ -108,6 +106,7 @@ QString EditorConfigHelper::translateSegment(const QString& pattern, qsizetype& 
     return expression;
 }
 
+// Translates one EditorConfig brace expression into a regular expression alternation.
 QString EditorConfigHelper::translateBraces(const QString& pattern, qsizetype& index) {
     const qsizetype start = index;
     QStringList alternatives;

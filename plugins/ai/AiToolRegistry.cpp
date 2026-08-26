@@ -41,14 +41,6 @@ constexpr int defaultSearchResults = 5;
 constexpr int maximumSearchResults = 20;
 constexpr qint64 maximumImageBytes = 1 << 24;
 
-// A service answers a failure with its own reason, and the agent needs that reason to explain what happened.
-
-// A large file must not enter the context in full, so the agent asks for the whole file, a first line or a closed range.
-
-// A tool result travels straight into the model context, so an oversized one is truncated with an explicit notice.
-
-// A server answers with content blocks, so the textual blocks become the agent visible result.
-
 class AiToolRegistryHelper final {
   public:
     static const SkillDescriptor* findSkill(const QVector<SkillDescriptor>& catalog, const QString& name);
@@ -317,6 +309,7 @@ QString AiToolRegistryHelper::formatSearchResults(SearchProvider provider, const
     return lines.isEmpty() ? emptyMessage : lines.join(QStringLiteral("\n\n"));
 }
 
+// A service answers a failure with its own reason, and the agent needs that reason to explain what happened.
 QString AiToolRegistryHelper::serviceErrorMessage(const QByteArray& payload, const QString& transportMessage) {
     const QJsonObject document = QJsonDocument::fromJson(payload).object();
     const QStringList candidates{QStringLiteral("message"), QStringLiteral("detail"), QStringLiteral("error_description")};
@@ -344,6 +337,7 @@ ToolResult AiToolRegistryHelper::failure(const ToolCall& call, const QString& me
     return {call.id, message, true};
 }
 
+// A large file must not enter the context in full, so the agent asks for the whole file, a first line or a closed range.
 QString AiToolRegistryHelper::selectedLines(const QString& content, int firstLine, int lastLine) {
     if (firstLine <= 0 && lastLine <= 0) {
         return content;
@@ -358,7 +352,7 @@ QString AiToolRegistryHelper::selectedLines(const QString& content, int firstLin
     return QStringList(lines.begin() + from, lines.begin() + to).join(QLatin1Char('\n'));
 }
 
-// What a command reports last is what explains its failure, so an oversized result keeps its end together with its beginning.
+// A tool result travels straight into the model context, so an oversized one is truncated, and what a command reports last is what explains its failure so its end is kept with its beginning.
 QString AiToolRegistryHelper::boundedText(const QString& text) {
     if (text.size() <= maximumResultCharacters) {
         return text;
@@ -386,6 +380,7 @@ QString AiToolRegistryHelper::qualifiedToolName(const QString& serverId, const Q
     return exposed.size() > 64 ? QString() : exposed;
 }
 
+// A server answers with content blocks, so the textual blocks become the agent visible result.
 ToolResult AiToolRegistryHelper::mcpToolResult(const ToolCall& call, const QJsonObject& payload) {
     QStringList sections;
     for (const auto& value : payload.value(QStringLiteral("content")).toArray()) {

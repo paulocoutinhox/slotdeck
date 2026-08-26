@@ -15,8 +15,6 @@
 
 namespace slotdeck::plugins::codeeditor {
 
-// A server answers either the nested document symbols or the flat symbol information, and both describe the same outline.
-
 constexpr int transportDrainTimeoutMs = 5000;
 
 class LanguageServerClientHelper final {
@@ -104,6 +102,7 @@ QVector<SourceLocation> LanguageServerClientHelper::locationsOf(const QJsonValue
     return locations;
 }
 
+// A server answers either the nested document symbols or the flat symbol information, and both describe the same outline.
 QVector<DocumentSymbolNode> LanguageServerClientHelper::symbolNodes(const QJsonArray& items) {
     QVector<DocumentSymbolNode> nodes;
     for (const auto& entry : items) {

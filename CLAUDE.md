@@ -1129,6 +1129,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The `// clang-format off` and `// clang-format on` markers are formatter directives rather than comments and stay lowercase.
 - Comments explain context or intent and never narrate literal behavior.
 - Headers contain no comments describing methods, members or artificial sections.
+- A comment sits on the declaration it explains, so a comment followed by a blank line explains nothing and does not exist in the project.
 - Complex methods use short intent comments only at important responsibility boundaries.
 - Validation, mutation, side effects and returns are visually separated.
 - Methods have a visually clear beginning, middle and end.
