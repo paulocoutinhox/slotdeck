@@ -551,7 +551,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - An oversized tool result keeps its beginning and its end, because what a command reports last is what explains its failure.
 - A tool result carries the execution it belongs to, so a tool answering after its run was stopped is discarded instead of joining the run the card started next.
 - An answer nobody is waiting for changes nothing, because the call it carries was already answered and the turn it belonged to must not be started a second time.
-- A cancelled tool is disconnected before it is cancelled, so the exit it is about to have never answers a call the cancellation already answered.
+- A tool being cancelled is disconnected before that cancellation reaches it, so the exit it is about to have never answers a call the cancellation already answered.
 - The conversation is fitted to the model the run itself declares rather than to the current selection, because changing the selected model while a card runs must not change the window that run is speaking to.
 - Both execution kinds declare a working directory, required by a command and optional for an agent, because an agent without one simply has no file access.
 - A file tool resolves its path against the working directory the task declares and judges it by where it lands rather than by how it was written, so the absolute form a model naturally uses is accepted while a traversal, a symbolic link reaching outside and a task declaring no working directory are refused.
