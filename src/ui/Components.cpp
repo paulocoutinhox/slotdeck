@@ -313,16 +313,15 @@ class ComponentsHelper final {
     static void resolveCodeFamily(QTextDocument* document, const QString& family);
 };
 
-// The Markdown reader marks code with the generic monospace name, which no platform installs, so the family it stands for is written in its place.
+// The Markdown reader names a family only on the runs it read as code, and which name that is differs by platform, so the run is found by the property rather than by its value.
 void ComponentsHelper::resolveCodeFamily(QTextDocument* document, const QString& family) {
-    static const QStringList generic{QStringLiteral("monospace")};
     QVector<QPair<int, int>> spans;
 
     for (QTextBlock block = document->begin(); block.isValid(); block = block.next()) {
         for (auto entry = block.begin(); entry != block.end(); ++entry) {
             const QTextFragment fragment = entry.fragment();
 
-            if (fragment.isValid() && fragment.charFormat().fontFamilies().toStringList() == generic) {
+            if (fragment.isValid() && fragment.charFormat().hasProperty(QTextFormat::FontFamilies)) {
                 spans.append({fragment.position(), fragment.length()});
             }
         }

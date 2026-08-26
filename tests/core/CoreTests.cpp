@@ -1261,14 +1261,14 @@ TEST(MarkdownViewTest, ReadsAChatMessageWithItsLineBreaksAndACompleteMarkdownDoc
                 continue;
             }
 
-            const QStringList families = fragment.charFormat().fontFamilies().toStringList();
+            const QTextCharFormat format = fragment.charFormat();
 
             if (fragment.text().contains(QStringLiteral("span")) || fragment.text().contains(QStringLiteral("int a"))) {
                 ++codeRuns;
-                EXPECT_EQ(families, QStringList{monospace}) << fragment.text().toStdString() << " does not carry the monospace family";
-                EXPECT_TRUE(QFontDatabase::isFixedPitch(families.value(0))) << fragment.text().toStdString() << " carries a family that is not monospaced";
+                EXPECT_EQ(format.fontFamilies().toStringList(), QStringList{monospace}) << fragment.text().toStdString() << " does not carry the monospace family";
+                EXPECT_TRUE(QFontDatabase::isFixedPitch(monospace)) << monospace.toStdString() << " is not a monospaced family";
             } else {
-                EXPECT_FALSE(families.contains(monospace)) << "prose carries the monospace family";
+                EXPECT_FALSE(format.hasProperty(QTextFormat::FontFamilies)) << "prose is given a family of its own";
             }
         }
     }

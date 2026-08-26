@@ -792,7 +792,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The box is a painted shape in the colour the theme gives that side, so its corner stays correct at any size and follows the selected theme.
 - A message that follows one from the same writer repeats no avatar and keeps the room that avatar would take, so the boxes of one group share an edge.
 - Every message of every role is Markdown read through the shared document, covering headings, emphasis, lists, quotes, links, tables, inline code, fenced code in the monospace role and emoji.
-- The Markdown reader marks code with a generic family name no platform installs, so the shared document writes the family that name stands for over the runs it marked.
+- The Markdown reader names a family only on the runs it read as code, and which name that is differs by platform, so the shared document finds those runs by the property rather than by its value and writes the declared family over them.
 - A style sheet declared for a document reaches what is parsed as markup and never what is read as Markdown, so a rule about code is applied to the document rather than declared for it.
 - A chat message is written with the return key, so a single newline is a line break and only the prose between fenced blocks is broken that way.
 - A box is as wide as the words it carries up to seventy percent of the surface, because a wall of text edge to edge is not a conversation.
