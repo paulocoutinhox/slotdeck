@@ -989,7 +989,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Writing in a chosen encoding rewrites the file whole even when nothing was typed, because the bytes on disk are what changed.
 - A mark is stripped from the bytes only when the file really starts with it, because an encoding chosen by hand names no mark those bytes have to carry.
 - A line longer than the highlighting bound keeps its text and loses only its colors, because running every pattern over generated content costs more than the colors are worth.
-- A line is bounded by how much decoration it accumulates as well as by its length, because laying that decoration out is paid again on every edit and a line short enough to colour can still carry thousands of ranges.
+- A line is bounded by how much decoration it accumulates as well as by its length, because a text edit that does not wrap re-measures the widest line in the document on every keystroke, so one long decorated line is paid for while typing anywhere in that file.
+- That bound is placed by measurement rather than by taste, at roughly one range for every eight characters of dense code, so a line a reader really reads keeps its colours and a table of values written as one statement does not.
 - Semantic tokens repaint only the lines whose tokens changed, and repaint the whole document only when most of them did, because repainting every line on every answer costs the whole file at the rhythm of typing.
 - Every language and every language server the editor knows lives in the catalog file the plugin carries as a resource, so a language is added by one entry of data and never by interface code.
 - The patterns a language needs beyond its keywords are declared with it in that file, so no language is named in the code that colours it.
@@ -1582,7 +1583,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Every platform reaches the declared family, proven after Windows reported a resolved name where macOS reports the generic one.
 - [x] Every reader of the settings contract is fed the hostile documents, including the text list that reads the arguments and roots of a stored server.
 - [x] Plain text carries no format range of its own, measured as forty percent of the ranges a source line used to carry for no visible difference.
-- [x] A line dense enough to cost more than its colours keeps its text and loses them, while the longest line this project really writes keeps every colour it had.
+- [x] A line dense enough to cost more than its colours keeps its text and loses them, measured as three hundred keystrokes falling from 1224ms to 672ms in a file carrying such lines.
 - [x] Every malformed language catalog the code declares a refusal for is refused from text, covering eighteen shapes across the languages, the servers, the highlighting and the limits.
 - [x] A catalog wrong in more than one way is refused for the reason its reader hits first.
 - [x] Every one of the eight plugins answers a topic it does not implement by the one shared name, asked through its own interface rather than sampled.

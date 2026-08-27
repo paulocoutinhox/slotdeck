@@ -1273,7 +1273,7 @@
   "limits": {
     "maximumFileBytes": 16777216,
     "maximumHighlightedLineLength": 5000,
-    "maximumHighlightedMatchesPerLine": 1000,
+    "maximumHighlightedMatchesPerLine": 300,
     "maximumSemanticTokenLines": 20000,
     "maximumSearchMatches": 5000,
     "partialRepaintDivisor": 4,

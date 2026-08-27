@@ -2664,9 +2664,13 @@ TEST(CodeColorSchemeTest, BoundsWhatOneLineMayBeDecoratedWith) {
 
     EXPECT_GT(rangesOf(QStringLiteral("    const int total = compute(alpha, beta + 3, \"literal\");")), 3) << "an ordinary line lost its colours";
 
-    // A line of the shape this project really writes, where a table of values is one statement.
+    // A line long enough to be read is still coloured, which measured at one range for every eight characters.
+    const QString readable = QStringLiteral("    const int total = compute(alpha, beta + 3, \"literal\"); ").repeated(16);
+    EXPECT_GT(rangesOf(readable), 100) << "a long line a reader really reads lost its colours";
+
+    // A table of values written as one statement is what typing pays for, so it keeps its text and loses its colours.
     const QString table = QStringLiteral("    const QMap<QString, QString> tokens{") + QStringLiteral("{QStringLiteral(\"@token\"), theme.color(ThemeColor::Name).name()}, ").repeated(60) + QStringLiteral("};");
-    EXPECT_GT(rangesOf(table), 100) << "a long line this project really carries lost its colours";
+    EXPECT_EQ(rangesOf(table), 0) << "a line whose decoration is re-laid out on every keystroke keeps it";
 
     // Density no one writes by hand, which is what the bound exists for.
     EXPECT_EQ(rangesOf(QStringLiteral("f(").repeated(2000)), 0) << "a line dense enough to cost more than its colours keeps them";
