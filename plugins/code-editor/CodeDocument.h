@@ -92,6 +92,8 @@ class CodeDocument final : public QWidget {
     void requestCompletionOnTrigger(const QString& addedText);
     void requestAnalysis();
     void showContextMenu(const QPoint& position);
+    // The plain text of Qt rewrites a non-breaking space and a line separator, so the buffer is read raw everywhere its exact content matters.
+    [[nodiscard]] QString bufferText() const;
     [[nodiscard]] std::optional<QByteArray> encodedContent() const;
     void writeContent();
 

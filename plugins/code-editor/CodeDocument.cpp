@@ -328,7 +328,7 @@ void CodeDocument::setLanguageServer(LanguageServerClient* server) {
     connect(server, &LanguageServerClient::symbolLocationsReady, this, [this](const QString& path, SymbolQueryKind kind, const QVector<SourceLocation>& locations) { if (path != m_path) { return; } if (kind == SymbolQueryKind::References) { emit referencesReady(path, locations); return; } if (!locations.isEmpty()) { emit navigationRequested(locations.first().path, locations.first().line, locations.first().character); } });
     connect(server, &LanguageServerClient::hoverReady, this, [this](const QString& path, const QString& contents) { if (path == m_path) { m_editor->showHover(contents); } });
     // clang-format on
-    server->openDocument(m_path, m_editor->toPlainText(), LanguageRegistry::protocolLanguageId(m_path));
+    server->openDocument(m_path, bufferText(), LanguageRegistry::protocolLanguageId(m_path));
     m_analysisTimer.start();
 }
 
@@ -433,7 +433,7 @@ void CodeDocument::writeContent() {
         }
         synchronizeLanguageServer();
         if (m_languageServer != nullptr) {
-            m_languageServer->saveDocument(m_path, m_editor->toPlainText());
+            m_languageServer->saveDocument(m_path, bufferText());
         }
         emit stateChanged();
         if (requestedAgain) {
@@ -443,8 +443,14 @@ void CodeDocument::writeContent() {
     // clang-format on
 }
 
+QString CodeDocument::bufferText() const {
+    QString text = m_editor->document()->toRawText();
+    text.replace(QChar::ParagraphSeparator, QLatin1Char('\n'));
+    return text;
+}
+
 std::optional<QByteArray> CodeDocument::encodedContent() const {
-    QStringList lines = m_editor->toPlainText().split(QLatin1Char('\n'));
+    QStringList lines = bufferText().split(QLatin1Char('\n'));
 
     if (m_editorConfig.trimTrailingWhitespace.value_or(false)) {
         for (auto& line : lines) {
@@ -846,7 +852,7 @@ void CodeDocument::synchronizeLanguageServer() {
     }
 
     if (!m_languageServer->editDocument(m_path, m_pendingEdits)) {
-        m_languageServer->replaceDocument(m_path, m_editor->toPlainText());
+        m_languageServer->replaceDocument(m_path, bufferText());
     }
 
     m_pendingEdits.clear();

@@ -1001,6 +1001,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The character sets are the five EditorConfig declares, which are the ones Qt converts without another dependency, and a declared set outside them is reported as an explicit translated error.
 - A file is read in the encoding its byte order mark names, otherwise in UTF-8 when it spells valid UTF-8, and otherwise in the encoding the settings declare for a file carrying no mark.
 - That declared encoding opens as Latin-1, because it is the only one that returns every byte it was given, so a file read in it is written back byte for byte even when the guess was wrong.
+- The buffer is read as the document really holds it rather than as the plain text of Qt, which rewrites a non-breaking space as a space and a line separator as a newline, so a file carrying either keeps it.
+- The block break of the document is the only character that becomes a newline, so one reading of the buffer serves both the bytes that are written and the text the language server is given.
 - Saving is refused when the encoding cannot spell a character the buffer holds, because writing a question mark in its place loses what the user typed.
 - Changing the declared encoding governs the next file that carries no mark and never re-reads a file already open.
 - The encoding in the status bar is the control that changes it, offering every encoding to read the bytes again in and every one to write them in.
@@ -1503,6 +1505,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Every one of the nine catalogs declares both languages itself, so the case that reads them back can fail, and the five provider names that were only inherited are declared.
 - [x] A window whose reservation leaves no room fits the conversation down to the instructions and the task, and a model that declares no window still passes it whole.
 - [x] An import applied over a database whose log a crash left behind reads what the import brought, proven by a case that reads back the previous value without the replacement that discards it.
+- [x] Every byte a text file may carry survives being opened and saved, and a non-breaking space of a UTF-8 source file is still there afterwards.
 - [x] The view follows the reader instead of dragging them to the end of every message that arrives.
 - [x] AI tasks are grouped into renameable workspace tabs and rendered across the To Do, Doing, Blocked, Review and Done columns.
 - [x] AI task cards keep their own margin, use the filled play symbol and expose Play, Stop, Edit and Remove.

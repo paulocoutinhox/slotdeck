@@ -960,6 +960,80 @@ TEST(CodeDocumentTest, AnnouncesItsFirstLoadOnlyAfterTheCallerCouldConnect) {
     EXPECT_GE(configured.count(), 1);
 }
 
+// A non-breaking space is a character of the file rather than a space, so a source file keeps it exactly where it was written.
+TEST(CodeDocumentTest, KeepsANonBreakingSpaceOfAUtf8File) {
+    filesystem::FileSystemService service;
+    test::TestPluginHost host;
+    host.useFileSystem(service);
+    QTemporaryDir root;
+    ASSERT_TRUE(root.isValid());
+
+    const QByteArray content = QByteArrayLiteral("const value = \"one\xC2\xA0two\";\nconst other = 1;\n");
+    const QString path = QDir(root.path()).filePath(QStringLiteral("sample.js"));
+    ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(path, content));
+
+    CodeDocument document(path, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
+    QSignalSpy loaded(&document, &CodeDocument::loaded);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&loaded]() { return loaded.count() >= 1; }));
+    // clang-format on
+    ASSERT_EQ(document.charset(), TextCharset::Utf8);
+
+    document.editor().insertPlainText(QStringLiteral("x"));
+    document.editor().undo();
+    document.save();
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&document]() { return !document.dirty(); }));
+    // clang-format on
+
+    QFile written(path);
+    ASSERT_TRUE(written.open(QIODevice::ReadOnly));
+    EXPECT_EQ(written.readAll(), content);
+}
+
+// The declared encoding is the one that returns every byte it was given, so a file the editor guessed wrong about is still written back unchanged.
+TEST(CodeDocumentTest, WritesBackEveryByteOfAFileItReadInTheDeclaredEncoding) {
+    filesystem::FileSystemService service;
+    test::TestPluginHost host;
+    host.useFileSystem(service);
+    QTemporaryDir root;
+    ASSERT_TRUE(root.isValid());
+
+    // Every byte a text file may carry, which is none of them valid UTF-8 above the ASCII range and no mark to name an encoding.
+    QByteArray content;
+
+    for (int byte = 0x01; byte <= 0xFF; ++byte) {
+        if (byte != '\r' && byte != '\n') {
+            content.append(static_cast<char>(byte));
+        }
+    }
+
+    content.append('\n');
+    const QString path = QDir(root.path()).filePath(QStringLiteral("guessed.txt"));
+    ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(path, content));
+
+    CodeDocument document(path, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
+    QSignalSpy loaded(&document, &CodeDocument::loaded);
+    QSignalSpy failures(&document, &CodeDocument::operationFailed);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&loaded]() { return loaded.count() >= 1; }));
+    // clang-format on
+    EXPECT_EQ(failures.count(), 0);
+    EXPECT_EQ(document.charset(), TextCharset::Latin1);
+
+    document.editor().insertPlainText(QStringLiteral("x"));
+    document.editor().undo();
+    document.save();
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&document]() { return !document.dirty(); }));
+    // clang-format on
+
+    QFile written(path);
+    ASSERT_TRUE(written.open(QIODevice::ReadOnly));
+    const QByteArray back = written.readAll();
+    EXPECT_EQ(back, content);
+}
+
 TEST(CodeDocumentTest, OpensEveryEncodingItCanWriteBackAndNamesTheOnesItCannot) {
     filesystem::FileSystemService service;
     test::TestPluginHost host;
