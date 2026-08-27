@@ -93,34 +93,28 @@ CodeSyntaxHighlighter::CodeSyntaxHighlighter(QTextDocument* document, LanguageDe
 
 // The server knows what a name really is, so its token wins over the pattern that only guessed from the shape of the text.
 // Repainting the whole document on every answer costs the file, so only the lines whose tokens really changed are invalidated.
-void CodeSyntaxHighlighter::setSemanticTokens(const QVector<SemanticToken>& tokens) {
-    QHash<int, QVector<SemanticToken>> updated;
-
-    for (const auto& token : tokens) {
-        if (m_semanticFormats.contains(token.type)) {
-            updated[token.line].append(token);
-        }
-    }
+// The tokens arrive already decoded and grouped, so only the lines whose tokens really changed are invalidated.
+void CodeSyntaxHighlighter::setSemanticTokens(const SemanticTokenSet& tokens) {
 
     QSet<int> changed;
 
-    for (auto entry = updated.constBegin(); entry != updated.constEnd(); ++entry) {
+    for (auto entry = tokens.constBegin(); entry != tokens.constEnd(); ++entry) {
         if (m_semanticTokens.value(entry.key()) != entry.value()) {
             changed.insert(entry.key());
         }
     }
 
     for (auto entry = m_semanticTokens.constBegin(); entry != m_semanticTokens.constEnd(); ++entry) {
-        if (!updated.contains(entry.key())) {
+        if (!tokens.contains(entry.key())) {
             changed.insert(entry.key());
         }
     }
 
+    m_semanticTokens = tokens;
+
     if (changed.isEmpty()) {
         return;
     }
-
-    m_semanticTokens = std::move(updated);
 
     // Invalidating one line at a time stops paying off once most of them changed, which is what the first answer for a file does.
     if (changed.size() * LanguageRegistry::limits().partialRepaintDivisor >= document()->blockCount()) {
@@ -130,6 +124,7 @@ void CodeSyntaxHighlighter::setSemanticTokens(const QVector<SemanticToken>& toke
 
     for (const int line : changed) {
         const QTextBlock block = document()->findBlockByNumber(line);
+
         if (block.isValid()) {
             rehighlightBlock(block);
         }

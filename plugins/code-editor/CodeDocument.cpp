@@ -318,7 +318,7 @@ void CodeDocument::setLanguageServer(LanguageServerClient* server) {
     // clang-format off
     connect(server, &LanguageServerClient::diagnosticsPublished, this, [this](const QString& path, const QVector<LanguageDiagnostic>& diagnostics) { if (path == m_path) { m_editor->setDiagnostics(diagnostics); emit diagnosticsChanged(path, diagnostics); } });
     connect(server, &LanguageServerClient::documentHighlightsReady, this, [this](const QString& path, const QVector<SourceLocation>& highlights) { if (path == m_path) { m_editor->setOccurrences(highlights); } });
-    connect(server, &LanguageServerClient::semanticTokensReady, this, [this](const QString& path, const QVector<SemanticToken>& tokens) { if (path == m_path) { m_highlighter->setSemanticTokens(tokens); } });
+    connect(server, &LanguageServerClient::semanticTokensReady, this, [this](const QString& path, const SemanticTokenSet& tokens) { if (path == m_path) { m_highlighter->setSemanticTokens(tokens); } });
     connect(server, &LanguageServerClient::documentSymbolsReady, this, [this](const QString& path, const QVector<DocumentSymbolNode>& symbols) { if (path == m_path) { emit outlineChanged(path, symbols); } });
     connect(server, &LanguageServerClient::signatureHelpReady, this, [this](const QString& path, const SignatureHelpInfo& help) { if (path == m_path) { m_editor->showSignatureHelp(help); } });
     connect(server, &LanguageServerClient::initialized, this, [this]() { m_analysisTimer.start(); });

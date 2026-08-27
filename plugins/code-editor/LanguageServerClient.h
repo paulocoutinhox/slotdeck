@@ -94,6 +94,9 @@ struct SemanticToken final {
     bool operator==(const SemanticToken& other) const = default;
 };
 
+// The server decides how many tokens it sends, so they are decoded and grouped away from the thread that draws.
+using SemanticTokenSet = QHash<int, QVector<SemanticToken>>;
+
 enum class SymbolQueryKind { Definition, Declaration, TypeDefinition, Implementation, References };
 
 class LanguageServerClient final : public QObject {
@@ -140,7 +143,7 @@ class LanguageServerClient final : public QObject {
     void documentHighlightsReady(const QString& path, const QVector<SourceLocation>& highlights);
     void documentSymbolsReady(const QString& path, const QVector<DocumentSymbolNode>& symbols);
     void workspaceSymbolsReady(const QVector<WorkspaceSymbolEntry>& symbols);
-    void semanticTokensReady(const QString& path, const QVector<SemanticToken>& tokens);
+    void semanticTokensReady(const QString& path, const SemanticTokenSet& tokens);
     void progressChanged(const QString& message, bool active);
     // The requests a document made before initialization were never sent, so it is told when the server can finally answer them.
     void initialized();

@@ -498,13 +498,13 @@ TEST(LanguageServerClientTest, ExchangesInitializationDiagnosticsAndCompletionsO
     QVector<WorkspaceSymbolEntry> workspaceSymbols;
     QVector<SourceLocation> highlights;
     QVector<SourceLocation> references;
-    QVector<SemanticToken> tokens;
+    SemanticTokenSet tokens;
     SignatureHelpInfo signatureHelp;
     // clang-format off
     QObject::connect(&client, &LanguageServerClient::documentSymbolsReady, &client, [&outline](const QString&, const QVector<DocumentSymbolNode>& symbols) { outline = symbols; });
     QObject::connect(&client, &LanguageServerClient::workspaceSymbolsReady, &client, [&workspaceSymbols](const QVector<WorkspaceSymbolEntry>& symbols) { workspaceSymbols = symbols; });
     QObject::connect(&client, &LanguageServerClient::documentHighlightsReady, &client, [&highlights](const QString&, const QVector<SourceLocation>& entries) { highlights = entries; });
-    QObject::connect(&client, &LanguageServerClient::semanticTokensReady, &client, [&tokens](const QString&, const QVector<SemanticToken>& entries) { tokens = entries; });
+    QObject::connect(&client, &LanguageServerClient::semanticTokensReady, &client, [&tokens](const QString&, const SemanticTokenSet& entries) { tokens = entries; });
     QObject::connect(&client, &LanguageServerClient::signatureHelpReady, &client, [&signatureHelp](const QString&, const SignatureHelpInfo& help) { signatureHelp = help; });
     // clang-format on
     client.requestDocumentSymbols(path);
@@ -524,11 +524,13 @@ TEST(LanguageServerClientTest, ExchangesInitializationDiagnosticsAndCompletionsO
     EXPECT_EQ(highlights.first().character, 4);
     EXPECT_EQ(highlights.first().path, path);
     ASSERT_EQ(tokens.size(), 2);
-    EXPECT_EQ(tokens.first().type, QStringLiteral("function"));
-    EXPECT_EQ(tokens.first().startCharacter, 4);
-    EXPECT_EQ(tokens.last().type, QStringLiteral("namespace"));
-    EXPECT_EQ(tokens.last().line, 1);
-    EXPECT_EQ(tokens.last().startCharacter, 2);
+    ASSERT_TRUE(tokens.contains(0));
+    ASSERT_TRUE(tokens.contains(1));
+    EXPECT_EQ(tokens.value(0).first().type, QStringLiteral("function"));
+    EXPECT_EQ(tokens.value(0).first().startCharacter, 4);
+    EXPECT_EQ(tokens.value(1).first().type, QStringLiteral("namespace"));
+    EXPECT_EQ(tokens.value(1).first().line, 1);
+    EXPECT_EQ(tokens.value(1).first().startCharacter, 2);
     EXPECT_EQ(signatureHelp.signatures.first(), QStringLiteral("main(int argc, char** argv)"));
     EXPECT_EQ(signatureHelp.activeParameter, 1);
 
@@ -2769,6 +2771,56 @@ TEST(LanguageRegistryTest, RefusesEveryMalformedCatalogItDeclaresARefusalFor) {
     Q_UNUSED(twice);
     ASSERT_FALSE(first.hasValue());
     EXPECT_TRUE(first.error().message.contains(QStringLiteral("plain text"))) << "the reported reason is " << first.error().message.toStdString();
+}
+
+// A language server answers the same tokens after every analysis, so an answer that changes nothing must touch nothing.
+TEST(CodeColorSchemeTest, AnswersAnUnchangedTokenSetWithoutTouchingTheDocument) {
+    // The counter outlives the highlighter, because destroying one lays the document out again and reaches this connection.
+    int invalidated = 0;
+    QStringList lines;
+
+    for (int index = 0; index < 400; ++index) {
+        lines.append(QStringLiteral("    const int value%1 = compute(alpha, beta + %1);").arg(index));
+    }
+
+    QTextDocument document;
+    document.setPlainText(lines.join(QLatin1Char('\n')));
+    CodeSyntaxHighlighter highlighter(&document, LanguageRegistry::languageForPath(QStringLiteral("x.cpp")), CodeColorSchemeCatalog::schemes().first());
+    highlighter.rehighlight();
+
+    // The answer is decoded again for every response, so each one is built rather than shared with the last.
+    // clang-format off
+    const auto answer = [&document](const QString& type) {
+        SemanticTokenSet built;
+
+        for (int line = 0; line < document.blockCount(); ++line) {
+            built[line].append({line, 10, 5, type});
+        }
+
+        return built;
+    };
+    // clang-format on
+
+    // clang-format off
+    QObject::connect(document.documentLayout(), &QAbstractTextDocumentLayout::update, &document, [&invalidated](const QRectF&) { ++invalidated; });
+    // clang-format on
+
+    highlighter.setSemanticTokens(answer(QStringLiteral("variable")));
+    EXPECT_GT(invalidated, 0) << "the first answer never reached the document";
+
+    invalidated = 0;
+    highlighter.setSemanticTokens(answer(QStringLiteral("variable")));
+    EXPECT_EQ(invalidated, 0) << "an answer carrying the same tokens invalidated the document again";
+
+    highlighter.setSemanticTokens(answer(QStringLiteral("parameter")));
+    EXPECT_GT(invalidated, 0) << "an answer carrying different tokens changed nothing";
+
+    // A type the catalog paints nothing for never reaches the document at all.
+    SemanticTokenSet unknown;
+    unknown[0].append({0, 10, 5, QStringLiteral("nobodyPaintsThis")});
+    invalidated = 0;
+    highlighter.setSemanticTokens(unknown);
+    EXPECT_GT(invalidated, 0) << "dropping every token left the document as it was";
 }
 
 } // namespace slotdeck::plugins::codeeditor

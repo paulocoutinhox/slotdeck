@@ -1,4 +1,6 @@
 #include "LanguageServerClient.h"
+#include "LanguageRegistry.h"
+#include <QtConcurrent>
 
 #include "CodeEditorState.h"
 
@@ -27,6 +29,7 @@ class LanguageServerClientHelper final {
     static QString hoverText(const QJsonValue& contents);
     static QString symbolQueryMethod(SymbolQueryKind kind);
     static SourceLocation locationOf(const QJsonObject& entry);
+    static SemanticTokenSet decodeSemanticTokens(const QJsonArray& data, const QStringList& types);
     static QVector<SourceLocation> locationsOf(const QJsonValue& result);
     static QVector<DocumentSymbolNode> symbolNodes(const QJsonArray& items, int depth);
     static QVector<LanguageDiagnostic> diagnosticsOf(const QString& path, const QJsonArray& items);
@@ -823,10 +826,9 @@ void LanguageServerClient::handleWorkspaceSymbolResponse(int requestId, const QJ
     emit workspaceSymbolsReady(symbols);
 }
 
-void LanguageServerClient::handleSemanticTokenResponse(int requestId, const QJsonObject& message) {
-    const QString path = m_semanticTokenRequests.take(requestId);
-    const QJsonArray data = message.value(QStringLiteral("result")).toObject().value(QStringLiteral("data")).toArray();
-    QVector<SemanticToken> tokens;
+SemanticTokenSet LanguageServerClientHelper::decodeSemanticTokens(const QJsonArray& data, const QStringList& types) {
+    const QMap<QString, HighlightRole>& painted = LanguageRegistry::semanticRoles();
+    SemanticTokenSet decoded;
     int line = 0;
     int start = 0;
 
@@ -836,12 +838,25 @@ void LanguageServerClient::handleSemanticTokenResponse(int requestId, const QJso
         const int type = data.at(index + 3).toInt();
         line += deltaLine;
         start = deltaLine == 0 ? start + deltaStart : deltaStart;
-        if (type >= 0 && type < m_capabilities.semanticTokenTypes.size()) {
-            tokens.append({line, start, data.at(index + 2).toInt(), m_capabilities.semanticTokenTypes.at(type)});
+
+        if (type < 0 || type >= types.size() || !painted.contains(types.at(type))) {
+            continue;
         }
+
+        decoded[line].append({line, start, data.at(index + 2).toInt(), types.at(type)});
     }
 
-    emit semanticTokensReady(path, tokens);
+    return decoded;
+}
+
+void LanguageServerClient::handleSemanticTokenResponse(int requestId, const QJsonObject& message) {
+    const QString path = m_semanticTokenRequests.take(requestId);
+    const QJsonArray data = message.value(QStringLiteral("result")).toObject().value(QStringLiteral("data")).toArray();
+    const QStringList types = m_capabilities.semanticTokenTypes;
+    // clang-format off
+    auto decoded = QtConcurrent::run([data, types]() { return LanguageServerClientHelper::decodeSemanticTokens(data, types); });
+    decoded.then(this, [this, path](const SemanticTokenSet& tokens) { emit semanticTokensReady(path, tokens); });
+    // clang-format on
 }
 
 void LanguageServerClient::handleDiagnosticResponse(int requestId, const QJsonObject& message) {

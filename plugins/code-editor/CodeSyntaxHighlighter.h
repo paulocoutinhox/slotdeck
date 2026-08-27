@@ -17,7 +17,7 @@ class CodeSyntaxHighlighter final : public QSyntaxHighlighter {
   public:
     CodeSyntaxHighlighter(QTextDocument* document, LanguageDefinition definition, const CodeColorScheme& scheme);
 
-    void setSemanticTokens(const QVector<SemanticToken>& tokens);
+    void setSemanticTokens(const SemanticTokenSet& tokens);
 
   protected:
     void highlightBlock(const QString& text) override;
@@ -35,7 +35,7 @@ class CodeSyntaxHighlighter final : public QSyntaxHighlighter {
     QVector<Rule> m_rules;
     QTextCharFormat m_commentFormat;
     QHash<QString, QTextCharFormat> m_semanticFormats;
-    QHash<int, QVector<SemanticToken>> m_semanticTokens;
+    SemanticTokenSet m_semanticTokens;
 };
 
 } // namespace slotdeck::plugins::codeeditor

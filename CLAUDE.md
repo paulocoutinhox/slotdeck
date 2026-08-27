@@ -1004,6 +1004,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A line is bounded by how much decoration it accumulates as well as by its length, because the line being edited is laid out again on every keystroke and one carrying hundreds of ranges costs far more than the same text plain.
 - That bound is placed by measurement rather than by taste, at roughly one range for every eight characters of dense code, so a line a reader really reads keeps its colours and a table of values written as one statement does not.
 - Semantic tokens repaint only the lines whose tokens changed, and repaint the whole document only when most of them did, because repainting every line on every answer costs the whole file at the rhythm of typing.
+- A server decides how many tokens it sends, so they are decoded and grouped by line away from the thread that draws, and only the finished grouping returns to it.
+- A token type nothing paints is dropped where the answer is decoded rather than carried to the thread that draws and dropped there.
 - Every language and every language server the editor knows lives in the catalog file the plugin carries as a resource, so a language is added by one entry of data and never by interface code.
 - The patterns a language needs beyond its keywords are declared with it in that file, so no language is named in the code that colours it.
 - A pattern declares the role it paints rather than a colour, and the roles are a closed set a code colour scheme resolves.
@@ -1515,7 +1517,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 379 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 380 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
@@ -1598,6 +1600,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A line dense enough to cost more than its colours keeps its text and loses them, measured as the decoration adding 680ms to three hundred keystrokes inside such a line before the bound and 66ms after it.
 - [x] Every malformed language catalog the code declares a refusal for is refused from text, covering eighteen shapes across the languages, the servers, the highlighting and the limits.
 - [x] A prompt carrying every character a shell acts on reaches a command line agent unchanged, and every malformed command line provider is refused from text.
+- [x] An answer of tens of thousands of semantic tokens is decoded and grouped off the interface thread, measured as seventeen and twenty nine milliseconds becoming two and four.
 - [x] A catalog wrong in more than one way is refused for the reason its reader hits first.
 - [x] Every one of the eight plugins answers a topic it does not implement by the one shared name, asked through its own interface rather than sampled.
 - [x] The terminal, the editor and the shared document open on one monospaced family, and a family the user chose still wins over it.
