@@ -2900,4 +2900,26 @@ TEST(CodeEditorWidgetTest, IndentsAndUnindentsEveryLineOfASelection) {
     EXPECT_EQ(editor.document()->findBlockByNumber(0).text(), QStringLiteral("alpha"));
 }
 
+// Both waits start at the last keystroke, so the analysis one has to be the longer or the server would be asked about text it does not hold.
+TEST(LanguageRegistryTest, RefusesAnAnalysisWaitThatDoesNotOutlastTheChangeWait) {
+    QFile file(QStringLiteral(":/slotdeck/code-editor/assets/languages.json"));
+    ASSERT_TRUE(file.open(QIODevice::ReadOnly));
+    const QByteArray text = file.readAll();
+    const QJsonObject original = QJsonDocument::fromJson(text).object();
+
+    EXPECT_GT(LanguageRegistry::limits().analysisDebounceMs, LanguageRegistry::limits().changeDebounceMs);
+
+    for (const int analysis : {LanguageRegistry::limits().changeDebounceMs, LanguageRegistry::limits().changeDebounceMs - 10}) {
+        QJsonObject limits = original.value(QStringLiteral("limits")).toObject();
+        limits.insert(QStringLiteral("analysisDebounceMs"), analysis);
+        QJsonObject catalog = original;
+        catalog.insert(QStringLiteral("limits"), limits);
+        utils::Result<void> rejected = utils::Result<void>::success();
+        const LanguageCatalog parsed = LanguageRegistry::parse(QJsonDocument(catalog).toJson(), rejected);
+        Q_UNUSED(parsed);
+        ASSERT_FALSE(rejected.hasValue()) << "an analysis wait of " << analysis << " was accepted";
+        EXPECT_EQ(rejected.error().code, std::string{"code_editor_catalog_invalid"});
+    }
+}
+
 } // namespace slotdeck::plugins::codeeditor

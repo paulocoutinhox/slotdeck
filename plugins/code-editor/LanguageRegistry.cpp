@@ -303,7 +303,8 @@ EditorLimits LanguageRegistryHelper::createLimits(const QJsonObject& catalog, ut
     limits.bottomPanelMinimumHeight = static_cast<int>(read(QStringLiteral("bottomPanelMinimumHeight"), 40, 2000));
     limits.bottomPanelInitialHeight = static_cast<int>(read(QStringLiteral("bottomPanelInitialHeight"), 40, 2000));
 
-    if (!valid || limits.bottomPanelInitialHeight < limits.bottomPanelMinimumHeight) {
+    // The analysis is asked for after the server already holds the change, because both waits start at the last keystroke.
+    if (!valid || limits.bottomPanelInitialHeight < limits.bottomPanelMinimumHeight || limits.analysisDebounceMs <= limits.changeDebounceMs) {
         reject(outcome, QStringLiteral("The catalog limits are invalid"), {});
         return EditorLimits{};
     }

@@ -1047,6 +1047,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A request made before the server finished initializing was never sent, so the document asks for its analysis again when the client announces that the server is ready, otherwise a slow start leaves a file with its diagnostics and without its outline.
 - A server declaring incremental synchronization receives only the ranges that changed and a server declaring full synchronization receives the complete text.
 - Editor changes are queued against the text the server already holds and leave in one debounced notification, and a reload replaces that copy instead of describing it as an edit.
+- The wait before telling the server and the wait before asking it are both measured from the last keystroke rather than stacked, so the analysis wait is declared longer than the change wait and a catalog that declares otherwise rejects the plugin.
 - A saved document notifies the server and carries its text only when the server asked to receive it.
 - A superseded completion or hover request is cancelled at the server before the next one is sent, so an answer never reaches a cursor that has already moved.
 - Completion inserts the text the server declares through its edit or its insert text over the range it names, never the label the user reads.
@@ -1519,7 +1520,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 388 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 389 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
@@ -1609,6 +1610,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A paste the reader refused writes nothing to the shell, a confirmed one reaches it, text that only wraps is never asked about and the setting turned off writes without asking, all driven through the key a reader presses.
 - [x] A selection is indented and unindented as whole lines, leaving a line nobody selected alone and answering a document resolved to tabs with a tab.
 - [x] A card dropped anywhere but Doing moves, dropped into Doing starts and dragged out while running stops and returns to the board.
+- [x] An analysis wait that does not outlast the change wait rejects the catalog, because both are measured from the last keystroke.
 - [x] A catalog wrong in more than one way is refused for the reason its reader hits first.
 - [x] Every one of the eight plugins answers a topic it does not implement by the one shared name, asked through its own interface rather than sampled.
 - [x] The terminal, the editor and the shared document open on one monospaced family, and a family the user chose still wins over it.

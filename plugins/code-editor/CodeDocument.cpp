@@ -194,7 +194,7 @@ CodeDocument::CodeDocument(const QString& path, const QString& rootPath, bool wo
     connect(&m_externalChangeTimer, &QTimer::timeout, this, [this]() { watchedFileChanged(); });
     // The platform can leave a watched file unreported, so coming back to the application looks at the file again.
     connect(qApp, &QGuiApplication::applicationStateChanged, this, [this](Qt::ApplicationState state) { if (state == Qt::ApplicationActive) { scheduleExternalChange(); } });
-    connect(&m_languageServerTimer, &QTimer::timeout, this, [this]() { synchronizeLanguageServer(); m_analysisTimer.start(); });
+    connect(&m_languageServerTimer, &QTimer::timeout, this, [this]() { synchronizeLanguageServer(); });
     connect(&m_analysisTimer, &QTimer::timeout, this, [this]() { requestAnalysis(); });
     connect(&m_highlightTimer, &QTimer::timeout, this, [this]() { if (m_languageServer != nullptr) { m_languageServer->requestDocumentHighlights(m_path, m_editor->textCursor().blockNumber(), m_editor->textCursor().positionInBlock()); } });
     connect(m_editor, &QPlainTextEdit::cursorPositionChanged, this, [this]() { m_highlightTimer.start(); });
@@ -632,7 +632,9 @@ void CodeDocument::documentChanged(int position, int removedCharacters, int adde
     added.setPosition(position + addedCharacters, QTextCursor::KeepAnchor);
     const QString addedText = added.selectedText().replace(QChar(QChar::ParagraphSeparator), QLatin1Char('\n'));
     m_pendingEdits.append({position, removedCharacters, addedText});
+    // Both waits are measured from the last keystroke rather than stacked, and the analysis one is the longer so the server already holds the change.
     m_languageServerTimer.start();
+    m_analysisTimer.start();
     requestCompletionOnTrigger(addedText);
     emit stateChanged();
 }
