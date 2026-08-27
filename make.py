@@ -223,6 +223,19 @@ def unprotected_lambdas() -> list[str]:
     return found
 
 
+def inherited_catalogs() -> list[str]:
+    found: list[str] = []
+
+    for path in sorted(ROOT.glob("plugins/*/*Translations.h")) + [ROOT / "src" / "plugins" / "CoreTranslations.h"]:
+        lines = path.read_text(encoding="utf-8").split("\n")
+
+        for number, line in enumerate(lines, 1):
+            if re.search(r"TranslationEntries \w+ = \w+\(\);", line):
+                found.append(f"{path.relative_to(ROOT)}:{number}")
+
+    return found
+
+
 def stray_comments() -> list[str]:
     found: list[str] = []
 
@@ -268,6 +281,11 @@ def task_lint(_: Context) -> None:
 
     if stray:
         raise RuntimeError("Every comment is a complete sentence sitting on what it explains:\n  " + "\n  ".join(stray))
+
+    inherited = inherited_catalogs()
+
+    if inherited:
+        raise RuntimeError("Every language declares the keys it spells, because a catalog built from another one cannot be told from one that forgot a sentence:\n  " + "\n  ".join(inherited))
 
     run([
         executable("cppcheck"),

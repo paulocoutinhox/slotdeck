@@ -9,45 +9,7 @@ inline TranslationEntries english() {
 }
 
 inline TranslationEntries portuguese() {
-    TranslationEntries entries = english();
-    entries[QStringLiteral("slotdeck.settings.title")] = QStringLiteral("Configurações");
-    entries[QStringLiteral("slotdeck.settings.search")] = QStringLiteral("Buscar configurações");
-    entries[QStringLiteral("slotdeck.settings.no-results")] = QStringLiteral("Nenhuma configuração corresponde à busca atual");
-    entries[QStringLiteral("slotdeck.application.title")] = QStringLiteral("Aplicativo");
-    entries[QStringLiteral("slotdeck.application.general")] = QStringLiteral("Geral");
-    entries[QStringLiteral("slotdeck.application.language")] = QStringLiteral("Idioma");
-    entries[QStringLiteral("slotdeck.window.title")] = QStringLiteral("SlotDeck");
-    entries[QStringLiteral("slotdeck.window.loading")] = QStringLiteral("Carregando");
-    entries[QStringLiteral("slotdeck.application.language-save-error")] = QStringLiteral("Não foi possível alterar o idioma do aplicativo");
-    entries[QStringLiteral("slotdeck.application.version")] = QStringLiteral("Versão");
-    entries[QStringLiteral("slotdeck.application.theme")] = QStringLiteral("Tema");
-    entries[QStringLiteral("slotdeck.application.theme-save-error")] = QStringLiteral("Não foi possível alterar o tema do aplicativo");
-    entries[QStringLiteral("slotdeck.application.theme-green")] = QStringLiteral("Verde");
-    entries[QStringLiteral("slotdeck.application.theme-blue")] = QStringLiteral("Azul");
-    entries[QStringLiteral("slotdeck.application.theme-red")] = QStringLiteral("Vermelho");
-    entries[QStringLiteral("slotdeck.application.english")] = QStringLiteral("Inglês");
-    entries[QStringLiteral("slotdeck.application.portuguese")] = QStringLiteral("Português");
-    entries[QStringLiteral("slotdeck.configuration.title")] = QStringLiteral("Configuração");
-    entries[QStringLiteral("slotdeck.configuration.import")] = QStringLiteral("Importar configuração");
-    entries[QStringLiteral("slotdeck.configuration.import-error")] = QStringLiteral("Não foi possível importar a configuração");
-    entries[QStringLiteral("slotdeck.configuration.export")] = QStringLiteral("Exportar configuração");
-    entries[QStringLiteral("slotdeck.configuration.import-title")] = QStringLiteral("Importar configuração do SlotDeck");
-    entries[QStringLiteral("slotdeck.configuration.export-title")] = QStringLiteral("Exportar configuração do SlotDeck");
-    entries[QStringLiteral("slotdeck.configuration.file-filter")] = QStringLiteral("Configuração do SlotDeck (*.sqlite3)");
-    entries[QStringLiteral("slotdeck.configuration.confirm-title")] = QStringLiteral("Substituir a configuração atual?");
-    entries[QStringLiteral("slotdeck.configuration.confirm-message")] = QStringLiteral("A configuração importada substituirá todas as configurações do aplicativo e dos plugins");
-    entries[QStringLiteral("slotdeck.configuration.confirm-detail")] = QStringLiteral("O SlotDeck será reiniciado imediatamente após a validação da configuração");
-    entries[QStringLiteral("slotdeck.configuration.export-success")] = QStringLiteral("A configuração foi exportada com sucesso");
-    entries[QStringLiteral("slotdeck.actions.cancel")] = QStringLiteral("Cancelar");
-    entries[QStringLiteral("slotdeck.exit.title")] = QStringLiteral("Fechar o SlotDeck?");
-    entries[QStringLiteral("slotdeck.exit.message")] = QStringLiteral("Terminais, servidores, abas do navegador e execuções de tarefas de IA abertos serão encerrados antes de fechar o aplicativo");
-    entries[QStringLiteral("slotdeck.exit.action")] = QStringLiteral("Fechar o SlotDeck");
-    entries[QStringLiteral("slotdeck.recovery.title")] = QStringLiteral("Área de trabalho recuperada");
-    entries[QStringLiteral("slotdeck.recovery.message")] = QStringLiteral("A sessão anterior não foi encerrada corretamente e seu estado salvo foi restaurado");
-    entries[QStringLiteral("slotdeck.database.title")] = QStringLiteral("Dados do Aplicativo");
-    entries[QStringLiteral("slotdeck.database.replaced")] = QStringLiteral("Os dados guardados não puderam ser lidos, então um banco novo foi criado e o antigo ficou em %1");
-    entries[QStringLiteral("slotdeck.database.rebuilt")] = QStringLiteral("Os dados guardados destes recursos não puderam ser lidos e foram criados de novo: %1");
-    return entries;
+    return {{QStringLiteral("slotdeck.settings.title"), QStringLiteral("Configurações")}, {QStringLiteral("slotdeck.settings.search"), QStringLiteral("Buscar configurações")}, {QStringLiteral("slotdeck.settings.no-results"), QStringLiteral("Nenhuma configuração corresponde à busca atual")}, {QStringLiteral("slotdeck.application.title"), QStringLiteral("Aplicativo")}, {QStringLiteral("slotdeck.application.general"), QStringLiteral("Geral")}, {QStringLiteral("slotdeck.application.language"), QStringLiteral("Idioma")}, {QStringLiteral("slotdeck.application.language-save-error"), QStringLiteral("Não foi possível alterar o idioma do aplicativo")}, {QStringLiteral("slotdeck.application.version"), QStringLiteral("Versão")}, {QStringLiteral("slotdeck.application.theme"), QStringLiteral("Tema")}, {QStringLiteral("slotdeck.application.theme-save-error"), QStringLiteral("Não foi possível alterar o tema do aplicativo")}, {QStringLiteral("slotdeck.application.theme-green"), QStringLiteral("Verde")}, {QStringLiteral("slotdeck.application.theme-blue"), QStringLiteral("Azul")}, {QStringLiteral("slotdeck.application.theme-red"), QStringLiteral("Vermelho")}, {QStringLiteral("slotdeck.application.english"), QStringLiteral("Inglês")}, {QStringLiteral("slotdeck.application.portuguese"), QStringLiteral("Português")}, {QStringLiteral("slotdeck.configuration.title"), QStringLiteral("Configuração")}, {QStringLiteral("slotdeck.configuration.import"), QStringLiteral("Importar configuração")}, {QStringLiteral("slotdeck.configuration.import-error"), QStringLiteral("Não foi possível importar a configuração")}, {QStringLiteral("slotdeck.configuration.export"), QStringLiteral("Exportar configuração")}, {QStringLiteral("slotdeck.configuration.import-title"), QStringLiteral("Importar configuração do SlotDeck")}, {QStringLiteral("slotdeck.configuration.export-title"), QStringLiteral("Exportar configuração do SlotDeck")}, {QStringLiteral("slotdeck.configuration.file-filter"), QStringLiteral("Configuração do SlotDeck (*.sqlite3)")}, {QStringLiteral("slotdeck.configuration.confirm-title"), QStringLiteral("Substituir a configuração atual?")}, {QStringLiteral("slotdeck.configuration.confirm-message"), QStringLiteral("A configuração importada substituirá todas as configurações do aplicativo e dos plugins")}, {QStringLiteral("slotdeck.configuration.confirm-detail"), QStringLiteral("O SlotDeck será reiniciado imediatamente após a validação da configuração")}, {QStringLiteral("slotdeck.configuration.export-success"), QStringLiteral("A configuração foi exportada com sucesso")}, {QStringLiteral("slotdeck.actions.cancel"), QStringLiteral("Cancelar")}, {QStringLiteral("slotdeck.exit.title"), QStringLiteral("Fechar o SlotDeck?")}, {QStringLiteral("slotdeck.exit.message"), QStringLiteral("Terminais, servidores, abas do navegador e execuções de tarefas de IA abertos serão encerrados antes de fechar o aplicativo")}, {QStringLiteral("slotdeck.exit.action"), QStringLiteral("Fechar o SlotDeck")}, {QStringLiteral("slotdeck.recovery.title"), QStringLiteral("Área de trabalho recuperada")}, {QStringLiteral("slotdeck.recovery.message"), QStringLiteral("A sessão anterior não foi encerrada corretamente e seu estado salvo foi restaurado")}, {QStringLiteral("slotdeck.database.title"), QStringLiteral("Dados do Aplicativo")}, {QStringLiteral("slotdeck.database.replaced"), QStringLiteral("Os dados guardados não puderam ser lidos, então um banco novo foi criado e o antigo ficou em %1")}, {QStringLiteral("slotdeck.database.rebuilt"), QStringLiteral("Os dados guardados destes recursos não puderam ser lidos e foram criados de novo: %1")}, {QStringLiteral("slotdeck.window.title"), QStringLiteral("SlotDeck")}, {QStringLiteral("slotdeck.window.loading"), QStringLiteral("Carregando")}};
 }
 
 inline TranslationCatalog catalog() {

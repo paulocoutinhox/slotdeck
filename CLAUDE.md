@@ -199,6 +199,9 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Every plugin catalog contains an English `en` locale.
 - Every plugin catalog contains every language exposed by the application language selector, which is English and Portuguese.
 - Every language spells every key the English catalog declares, including a product name that reads the same in both, because a catalog that leans on the fallback cannot be told apart from one that forgot the sentence.
+- A language declares its own entries rather than starting from another language, because a catalog built by copying and overriding contains every key by construction and a case that reads it back can never fail.
+- The lint command refuses a catalog built from another one, because that is the only place the difference between a declared sentence and an inherited one is still visible.
+- A key belongs to the catalog of its language rather than to the function that assembles them, so the assembly names the two languages and nothing else.
 - One concept is named by one word in each language, so the grouping surface every plugin calls a workspace is called an espaço de trabalho in all of them.
 - Every translated key in another locale also exists in the English catalog.
 - Locale identifiers are lowercase and use hyphens.
@@ -1189,6 +1192,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Headers contain no comments describing methods, members or artificial sections.
 - A comment sits on the declaration it explains, so a comment followed by a blank line explains nothing and does not exist in the project.
 - The lint command refuses a comment separated from what it explains, a comment dividing a sentence with a semicolon and a comment that does not end its sentence, across the sources and the suite alike.
+- The lint command refuses a translation catalog whose language is built from another one, because no case reading the finished map can tell that apart.
 - Complex methods use short intent comments only at important responsibility boundaries.
 - Validation, mutation, side effects and returns are visually separated.
 - Methods have a visually clear beginning, middle and end.
@@ -1491,6 +1495,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A turn of several calls presents each result inside the card of the call it answers.
 - [x] A picture a tool read reaches the model in the request that follows the call.
 - [x] A command line agent is offered neither model discovery nor extra parameters, and coming back to a provider reached over a wire restores both.
+- [x] Every one of the nine catalogs declares both languages itself, so the case that reads them back can fail, and the five provider names that were only inherited are declared.
 - [x] The view follows the reader instead of dragging them to the end of every message that arrives.
 - [x] AI tasks are grouped into renameable workspace tabs and rendered across the To Do, Doing, Blocked, Review and Done columns.
 - [x] AI task cards keep their own margin, use the filled play symbol and expose Play, Stop, Edit and Remove.

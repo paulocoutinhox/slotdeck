@@ -9,46 +9,7 @@ inline TranslationEntries english() {
 }
 
 inline TranslationEntries portuguese() {
-    TranslationEntries entries = english();
-    entries[QStringLiteral("browser.plugin.title")] = QStringLiteral("Navegador");
-    entries[QStringLiteral("browser.navigation.web")] = QStringLiteral("Navegador");
-    entries[QStringLiteral("browser.settings.general")] = QStringLiteral("Geral");
-    entries[QStringLiteral("browser.settings.homepage")] = QStringLiteral("Página inicial");
-    entries[QStringLiteral("browser.actions.new-tab")] = QStringLiteral("Nova aba");
-    entries[QStringLiteral("browser.actions.close-tab")] = QStringLiteral("Fechar aba");
-    entries[QStringLiteral("browser.actions.back")] = QStringLiteral("Voltar");
-    entries[QStringLiteral("browser.actions.forward")] = QStringLiteral("Avançar");
-    entries[QStringLiteral("browser.actions.reload")] = QStringLiteral("Recarregar");
-    entries[QStringLiteral("browser.actions.stop")] = QStringLiteral("Parar");
-    entries[QStringLiteral("browser.actions.home")] = QStringLiteral("Início");
-    entries[QStringLiteral("browser.actions.cancel")] = QStringLiteral("Cancelar");
-    entries[QStringLiteral("browser.actions.save")] = QStringLiteral("Salvar");
-    entries[QStringLiteral("browser.actions.edit")] = QStringLiteral("Editar");
-    entries[QStringLiteral("browser.actions.remove")] = QStringLiteral("Remover");
-    entries[QStringLiteral("browser.address.placeholder")] = QStringLiteral("Digite um endereço da web");
-    entries[QStringLiteral("browser.tabs.new")] = QStringLiteral("Nova aba");
-    entries[QStringLiteral("browser.tabs.empty")] = QStringLiteral("Todas as abas estão fechadas");
-    entries[QStringLiteral("browser.bookmarks.title")] = QStringLiteral("Favoritos");
-    entries[QStringLiteral("browser.bookmarks.toggle")] = QStringLiteral("Mostrar favoritos");
-    entries[QStringLiteral("browser.bookmarks.add-group")] = QStringLiteral("Adicionar grupo");
-    entries[QStringLiteral("browser.bookmarks.edit-group")] = QStringLiteral("Editar grupo");
-    entries[QStringLiteral("browser.bookmarks.add-bookmark")] = QStringLiteral("Adicionar favorito");
-    entries[QStringLiteral("browser.bookmarks.edit-bookmark")] = QStringLiteral("Editar favorito");
-    entries[QStringLiteral("browser.bookmarks.name")] = QStringLiteral("Nome");
-    entries[QStringLiteral("browser.bookmarks.address")] = QStringLiteral("Endereço da web");
-    entries[QStringLiteral("browser.bookmarks.group")] = QStringLiteral("Grupo");
-    entries[QStringLiteral("browser.bookmarks.ungrouped")] = QStringLiteral("Sem grupo");
-    entries[QStringLiteral("browser.bookmarks.open-current")] = QStringLiteral("Abrir aqui");
-    entries[QStringLiteral("browser.bookmarks.open-new")] = QStringLiteral("Abrir em nova aba");
-    entries[QStringLiteral("browser.bookmarks.remove-bookmark")] = QStringLiteral("Remover favorito");
-    entries[QStringLiteral("browser.bookmarks.remove-bookmark-question")] = QStringLiteral("Remover este favorito da sua lista salva?");
-    entries[QStringLiteral("browser.bookmarks.remove-group")] = QStringLiteral("Remover grupo");
-    entries[QStringLiteral("browser.bookmarks.remove-group-question")] = QStringLiteral("Remover este grupo? Seus favoritos ficarão sem grupo");
-    entries[QStringLiteral("browser.error.invalid-address")] = QStringLiteral("O endereço da web é inválido");
-    entries[QStringLiteral("browser.error.invalid-bookmark")] = QStringLiteral("As informações do favorito são inválidas");
-    entries[QStringLiteral("browser.error.operation")] = QStringLiteral("A operação do navegador não pôde ser concluída");
-    entries[QStringLiteral("browser.error.persistence")] = QStringLiteral("A sessão do navegador não pôde ser salva");
-    return entries;
+    return {{QStringLiteral("browser.plugin.title"), QStringLiteral("Navegador")}, {QStringLiteral("browser.navigation.web"), QStringLiteral("Navegador")}, {QStringLiteral("browser.settings.general"), QStringLiteral("Geral")}, {QStringLiteral("browser.settings.homepage"), QStringLiteral("Página inicial")}, {QStringLiteral("browser.actions.new-tab"), QStringLiteral("Nova aba")}, {QStringLiteral("browser.actions.close-tab"), QStringLiteral("Fechar aba")}, {QStringLiteral("browser.actions.back"), QStringLiteral("Voltar")}, {QStringLiteral("browser.actions.forward"), QStringLiteral("Avançar")}, {QStringLiteral("browser.actions.reload"), QStringLiteral("Recarregar")}, {QStringLiteral("browser.actions.stop"), QStringLiteral("Parar")}, {QStringLiteral("browser.actions.home"), QStringLiteral("Início")}, {QStringLiteral("browser.actions.cancel"), QStringLiteral("Cancelar")}, {QStringLiteral("browser.actions.save"), QStringLiteral("Salvar")}, {QStringLiteral("browser.actions.edit"), QStringLiteral("Editar")}, {QStringLiteral("browser.actions.remove"), QStringLiteral("Remover")}, {QStringLiteral("browser.address.placeholder"), QStringLiteral("Digite um endereço da web")}, {QStringLiteral("browser.tabs.new"), QStringLiteral("Nova aba")}, {QStringLiteral("browser.tabs.empty"), QStringLiteral("Todas as abas estão fechadas")}, {QStringLiteral("browser.bookmarks.title"), QStringLiteral("Favoritos")}, {QStringLiteral("browser.bookmarks.toggle"), QStringLiteral("Mostrar favoritos")}, {QStringLiteral("browser.bookmarks.add-group"), QStringLiteral("Adicionar grupo")}, {QStringLiteral("browser.bookmarks.edit-group"), QStringLiteral("Editar grupo")}, {QStringLiteral("browser.bookmarks.add-bookmark"), QStringLiteral("Adicionar favorito")}, {QStringLiteral("browser.bookmarks.edit-bookmark"), QStringLiteral("Editar favorito")}, {QStringLiteral("browser.bookmarks.name"), QStringLiteral("Nome")}, {QStringLiteral("browser.bookmarks.address"), QStringLiteral("Endereço da web")}, {QStringLiteral("browser.bookmarks.group"), QStringLiteral("Grupo")}, {QStringLiteral("browser.bookmarks.ungrouped"), QStringLiteral("Sem grupo")}, {QStringLiteral("browser.bookmarks.open-current"), QStringLiteral("Abrir aqui")}, {QStringLiteral("browser.bookmarks.open-new"), QStringLiteral("Abrir em nova aba")}, {QStringLiteral("browser.bookmarks.remove-bookmark"), QStringLiteral("Remover favorito")}, {QStringLiteral("browser.bookmarks.remove-bookmark-question"), QStringLiteral("Remover este favorito da sua lista salva?")}, {QStringLiteral("browser.bookmarks.remove-group"), QStringLiteral("Remover grupo")}, {QStringLiteral("browser.bookmarks.remove-group-question"), QStringLiteral("Remover este grupo? Seus favoritos ficarão sem grupo")}, {QStringLiteral("browser.error.invalid-address"), QStringLiteral("O endereço da web é inválido")}, {QStringLiteral("browser.error.invalid-bookmark"), QStringLiteral("As informações do favorito são inválidas")}, {QStringLiteral("browser.error.operation"), QStringLiteral("A operação do navegador não pôde ser concluída")}, {QStringLiteral("browser.error.persistence"), QStringLiteral("A sessão do navegador não pôde ser salva")}};
 }
 
 inline TranslationCatalog catalog() {
