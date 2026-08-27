@@ -318,7 +318,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Every value the document does not carry, carries in a shape the owner cannot use or carries outside the range the owner accepts is the declared default, because nothing stored may keep the reader from opening the application.
 - A key nobody declares changes nothing, so a document written by another version of the product still opens.
 - An entry of a stored collection that the owner cannot use is left out and every other entry still loads.
-- The shared `slotdeck::plugins::SettingsReader` is the only implementation of that contract, covering the text, the integer, the boolean, the object, the object list and the text list, so a container of the wrong type is the declared default exactly like a scalar of the wrong type.
+- The shared `slotdeck::plugins` settings readers are the only implementation of that contract, covering the text, the integer, the boolean, the object, the object list and the text list, so a container of the wrong type is the declared default exactly like a scalar of the wrong type.
+- `SettingsReader` is the convenience over those readers for an owner that ignores each result, so it carries a method only while an owner reads that shape through it.
 - A reference that names nothing is cleared rather than kept, because every later reader resolves it.
 - The core reads its own settings document through those same readers, because a shell that reads its stored values loosely accepts what it refuses from every plugin.
 - Core owns only lifecycle state, the settings documents and plugin schema versions.
@@ -1179,7 +1180,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Includes are direct, minimal, grouped and ordered consistently, so every file includes the standard header of every standard symbol it names instead of receiving it through another header.
 - A header nothing in the file needs is removed, and the compiler decides that rather than a reading, because a type reached through a chain of calls is needed complete without ever being named.
 - Every function call remains complete on one physical line.
-- Every declaration, expression, assignment and return statement remains complete on one physical line.
+- Every declaration, expression, assignment and return statement remains complete on one physical line, and a mapping table protected from the formatter is written on one line like every other one.
 - Arguments, parameters, chained calls, conditions and operators are never wrapped across lines.
 - The formatter uses an effectively unlimited column width and must not introduce line wrapping.
 - Each independent execution occupies its own complete line.
@@ -1579,6 +1580,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] The monospace role resolves a family whose glyphs really share one advance, proven against every built-in theme.
 - [x] A code span and a fenced block carry that family while the prose around them does not, read back from the document rather than from a style sheet it never received.
 - [x] Every platform reaches the declared family, proven after Windows reported a resolved name where macOS reports the generic one.
+- [x] Every reader of the settings contract is fed the hostile documents, including the text list that reads the arguments and roots of a stored server.
 - [x] Plain text carries no format range of its own, measured as forty percent of the ranges a source line used to carry for no visible difference.
 - [x] A line dense enough to cost more than its colours keeps its text and loses them, while the longest line this project really writes keeps every colour it had.
 - [x] Every malformed language catalog the code declares a refusal for is refused from text, covering eighteen shapes across the languages, the servers, the highlighting and the limits.

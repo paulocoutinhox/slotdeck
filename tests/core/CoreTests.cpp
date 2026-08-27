@@ -2093,6 +2093,8 @@ TEST(SettingsReaderTest, LeavesEveryDeclaredDefaultStandingForAnyHostileDocument
         QString name = QStringLiteral("declared");
         QJsonObject nested{{QStringLiteral("kept"), true}};
         QVector<QJsonObject> entries{QJsonObject{{QStringLiteral("kept"), true}}};
+        QStringList names{QStringLiteral("kept")};
+        std::ignore = plugins::readSettingsTextList(object, QStringLiteral("names"), names);
         reader.readBool(QStringLiteral("flag"), flag);
         reader.readInteger(QStringLiteral("count"), count);
         reader.readText(QStringLiteral("name"), name);
@@ -2107,6 +2109,7 @@ TEST(SettingsReaderTest, LeavesEveryDeclaredDefaultStandingForAnyHostileDocument
         EXPECT_TRUE(usableCount || count == 7) << document.toStdString();
         EXPECT_TRUE(usableName || name == QStringLiteral("declared")) << document.toStdString();
         EXPECT_TRUE(object.value(QStringLiteral("nested")).isObject() || nested.value(QStringLiteral("kept")).toBool()) << document.toStdString();
+        EXPECT_TRUE(object.value(QStringLiteral("names")).isArray() || names == QStringList{QStringLiteral("kept")}) << document.toStdString();
     }
 
     // A deeply nested document is read without reaching past what it carries.

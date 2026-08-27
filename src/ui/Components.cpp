@@ -895,11 +895,8 @@ const QStringList& monospacedFontFamilies() {
 const QStringList& preferredMonospacedFontFamilies() {
     // clang-format off
     static const QStringList families{
-        QStringLiteral("Menlo"), QStringLiteral("SF Mono"), QStringLiteral("Monaco"),
-        QStringLiteral("Cascadia Mono"), QStringLiteral("Cascadia Code"), QStringLiteral("Consolas"),
-        QStringLiteral("DejaVu Sans Mono"), QStringLiteral("Liberation Mono"), QStringLiteral("Noto Sans Mono"), QStringLiteral("Ubuntu Mono"),
-        QStringLiteral("JetBrains Mono"), QStringLiteral("Fira Mono"), QStringLiteral("Source Code Pro"), QStringLiteral("Hack"), QStringLiteral("Inconsolata"),
-        QStringLiteral("Courier New")};
+        QStringLiteral("Menlo"), QStringLiteral("SF Mono"), QStringLiteral("Monaco"), QStringLiteral("Cascadia Mono"), QStringLiteral("Cascadia Code"), QStringLiteral("Consolas"), QStringLiteral("DejaVu Sans Mono"), QStringLiteral("Liberation Mono"), QStringLiteral("Noto Sans Mono"), QStringLiteral("Ubuntu Mono"), QStringLiteral("JetBrains Mono"), QStringLiteral("Fira Mono"), QStringLiteral("Source Code Pro"), QStringLiteral("Hack"), QStringLiteral("Inconsolata"), QStringLiteral("Courier New")
+    };
     // clang-format on
     return families;
 }

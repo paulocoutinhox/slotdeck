@@ -169,9 +169,6 @@ class SettingsReader final {
     void readObjectList(const QString& key, QVector<QJsonObject>& value) {
         std::ignore = readSettingsObjectList(m_document, key, value);
     }
-    void readTextList(const QString& key, QStringList& value) {
-        std::ignore = readSettingsTextList(m_document, key, value);
-    }
 
   private:
     QJsonObject m_document;
