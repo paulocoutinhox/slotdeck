@@ -150,14 +150,27 @@ bool AiCommandRunner::running() const {
     return m_process != nullptr;
 }
 
-void AiCommandRunner::start(const QString& command, const QString& workdir, int timeoutSeconds) {
-    if (m_process != nullptr) {
-        reportFailure({"ai_command_busy", "The runner is already running a command", {}});
+void AiCommandRunner::startProgram(const QString& program, const QStringList& arguments, const QString& workdir, int timeoutSeconds) {
+    if (program.trimmed().isEmpty()) {
+        reportFailure({"ai_command_invalid", "The program is required", {}});
         return;
     }
 
+    launch(program, arguments, workdir, timeoutSeconds);
+}
+
+void AiCommandRunner::start(const QString& command, const QString& workdir, int timeoutSeconds) {
     if (command.trimmed().isEmpty()) {
         reportFailure({"ai_command_invalid", "The command is required", {}});
+        return;
+    }
+
+    launch(AiCommandRunnerHelper::shellExecutable(), AiCommandRunnerHelper::shellArguments(command), workdir, timeoutSeconds);
+}
+
+void AiCommandRunner::launch(const QString& program, const QStringList& arguments, const QString& workdir, int timeoutSeconds) {
+    if (m_process != nullptr) {
+        reportFailure({"ai_command_busy", "The runner is already running a command", {}});
         return;
     }
 
@@ -192,7 +205,7 @@ void AiCommandRunner::start(const QString& command, const QString& workdir, int 
         m_timeout.start(timeoutSeconds * 1000);
     }
 
-    m_process->start(AiCommandRunnerHelper::shellExecutable(), AiCommandRunnerHelper::shellArguments(command));
+    m_process->start(program, arguments);
 }
 
 void AiCommandRunner::cancel() {

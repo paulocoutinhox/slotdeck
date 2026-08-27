@@ -1139,7 +1139,7 @@ TEST(AiPluginTest, PlacesTheInstructionsWhereTheModelAcceptsThem) {
 
     FakeChatClient* client = nullptr;
     // clang-format off
-    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    AiPlugin plugin([&client](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
@@ -1230,7 +1230,7 @@ TEST(AiPluginTest, TellsTheAgentWhatThisRunCanActuallyDo) {
 
     FakeChatClient* client = nullptr;
     // clang-format off
-    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    AiPlugin plugin([&client](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
@@ -1798,7 +1798,7 @@ TEST(AiPluginTest, StartsTheAgentFromInstructionsThatDeclareItsBoundaryAndItsSki
 
     FakeChatClient* client = nullptr;
     // clang-format off
-    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    AiPlugin plugin([&client](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
@@ -1847,7 +1847,7 @@ TEST(AiPluginTest, KeepsTheAssistantTextOfEveryIterationInsteadOfOnlyTheLast) {
 
     FakeChatClient* client = nullptr;
     // clang-format off
-    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    AiPlugin plugin([&client](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
@@ -1884,7 +1884,7 @@ TEST(AiPluginTest, ReachesATerminalStateForEveryRunOfALongSequenceOfTurnsAndStop
 
     FakeChatClient* client = nullptr;
     // clang-format off
-    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    AiPlugin plugin([&client](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
 

@@ -7,6 +7,8 @@ qt_add_library(
     AiAgentSettingsView.h
     AiChatClient.cpp
     AiChatClient.h
+    AiCliChatClient.cpp
+    AiCliChatClient.h
     AiCommandRunner.cpp
     AiCommandRunner.h
     AiConnectionDialog.cpp

@@ -1,5 +1,7 @@
 #include "AiPlugin.h"
 
+#include "AiCliChatClient.h"
+
 #include "AiAgentPrompt.h"
 
 #include "AiAgentSettingsView.h"
@@ -152,7 +154,13 @@ utils::Result<TaskSchedule> AiPluginHelper::advanceSchedule(TaskSchedule schedul
 }
 
 // clang-format off
-AiPlugin::AiPlugin() : AiPlugin([](AiRequestGate& gate) { return std::unique_ptr<AiChatClient>(new AiHttpChatClient(gate)); }) {}
+AiPlugin::AiPlugin() : AiPlugin([](AiRequestGate& gate, const ModelConnection& connection) {
+    const ProviderDescriptor* provider = findProvider(connection.providerId);
+    if (provider != nullptr && provider->protocol == WireProtocol::CommandLine) {
+        return std::unique_ptr<AiChatClient>(new AiCliChatClient());
+    }
+    return std::unique_ptr<AiChatClient>(new AiHttpChatClient(gate));
+}) {}
 // clang-format on
 
 AiPlugin::AiPlugin(ChatClientFactory clientFactory) : m_clientFactory(std::move(clientFactory)) {}
@@ -1501,7 +1509,7 @@ void AiPlugin::startAgentExecution(const AiTask& task, const QString& executionI
         return;
     }
 
-    AiChatClient* client = m_clientFactory(m_gate).release();
+    AiChatClient* client = m_clientFactory(m_gate, connection.value()).release();
     client->setParent(this);
 
     const std::shared_ptr<ActiveExecution> execution = m_active.value(taskId);
@@ -1635,7 +1643,7 @@ void AiPlugin::continueAgent(const QString& taskId) {
     // clang-format off
     const auto translate = [this](const QString& key) { return m_host->translate(key); };
     // clang-format on
-    position->client->send({position->connection, connectionAddress(position->connection), shapeForProtocol(position->connection, fitted.messages), m_tools->schemas()}, translate);
+    position->client->send({position->connection, connectionAddress(position->connection), shapeForProtocol(position->connection, fitted.messages), declaredTools(position->connection), position->sandboxRoot}, translate);
 }
 
 // The answer and the tool declarations occupy the window beside the conversation, so both are reserved before anything is fitted into it.
@@ -1673,7 +1681,7 @@ void AiPlugin::summarizeDroppedTurns(const QString& taskId, const FittedConversa
     const QString transcript = QString::fromUtf8(QJsonDocument(fitConversation(dropped, summaryLimit).messages).toJson(QJsonDocument::Compact));
     const QJsonArray request{QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), instruction + QStringLiteral("\n\n") + transcript}}};
 
-    auto* client = m_clientFactory(m_gate).release();
+    auto* client = m_clientFactory(m_gate, connection).release();
     client->setParent(this);
     position->summaryClient = client;
     m_phases.insert(taskId, ExecutionPhase::Compacting);
@@ -1685,7 +1693,7 @@ void AiPlugin::summarizeDroppedTurns(const QString& taskId, const FittedConversa
     connect(client, &AiChatClient::failed, this, [this, taskId, executionId, client, fitted](const utils::Error& error) { releaseSummaryClient(taskId, client); appendLog(executionId, ExecutionLogLevel::Warning, ExecutionLogKind::Compacted, error.message); applySummary(taskId, executionId, fitted, {}); });
     const auto translate = [this](const QString& key) { return m_host->translate(key); };
     // clang-format on
-    client->send({connection, connectionAddress(connection), request, {}}, translate);
+    client->send({connection, connectionAddress(connection), request, {}, {}}, translate);
 }
 
 // The wait is over once the request really leaves, so the card goes back to saying what it was doing before it waited.
@@ -1750,7 +1758,7 @@ void AiPlugin::applySummary(const QString& taskId, const QString& executionId, c
     // clang-format off
     const auto translate = [this](const QString& key) { return m_host->translate(key); };
     // clang-format on
-    position->client->send({position->connection, connectionAddress(position->connection), shapeForProtocol(position->connection, messages), m_tools->schemas()}, translate);
+    position->client->send({position->connection, connectionAddress(position->connection), shapeForProtocol(position->connection, messages), declaredTools(position->connection), position->sandboxRoot}, translate);
 }
 
 void AiPlugin::handleToolCalls(const QString& taskId, const QString& content, const QVector<ToolCall>& calls) {
@@ -1846,6 +1854,12 @@ void AiPlugin::dispatchPendingTools(const QString& taskId, const QString& execut
 }
 
 // A tool that answers after its run was stopped belongs to that run, so its result never joins the one the card started next.
+QVector<ToolSchema> AiPlugin::declaredTools(const ModelConnection& connection) const {
+    const ProviderDescriptor* provider = findProvider(connection.providerId);
+
+    return provider != nullptr && provider->protocol == WireProtocol::CommandLine ? QVector<ToolSchema>{} : m_tools->schemas();
+}
+
 void AiPlugin::completeToolCall(const QString& taskId, const QString& executionId, const QString& name, ToolResult result) {
     const std::shared_ptr<ActiveExecution> position = m_active.value(taskId);
 
@@ -1993,14 +2007,14 @@ void AiPlugin::runSampling(const QJsonObject& parameters, int maximumTokens, Mcp
         setOutputBudget(connection, maximumTokens);
     }
 
-    auto* client = m_clientFactory(m_gate).release();
+    auto* client = m_clientFactory(m_gate, connection).release();
     client->setParent(this);
     // clang-format off
     connect(client, &AiChatClient::finished, this, [client, reply, modelId = connection.modelId](const QString& content, const QVector<ToolCall>&, ChatUsage, const QString&) { reply(utils::Result<QJsonObject>::success({{QStringLiteral("role"), QStringLiteral("assistant")}, {QStringLiteral("model"), modelId}, {QStringLiteral("content"), QJsonObject{{QStringLiteral("type"), QStringLiteral("text")}, {QStringLiteral("text"), content}}}})); client->deleteLater(); });
     connect(client, &AiChatClient::failed, this, [client, reply](const utils::Error& error) { reply(utils::Result<QJsonObject>::failure(error)); client->deleteLater(); });
     const auto translate = [this](const QString& key) { return m_host->translate(key); };
     // clang-format on
-    client->send({connection, connectionAddress(connection), parameters.value(QStringLiteral("messages")).toArray(), {}}, translate);
+    client->send({connection, connectionAddress(connection), parameters.value(QStringLiteral("messages")).toArray(), {}, {}}, translate);
 }
 
 void AiPlugin::refreshToolConfiguration() {

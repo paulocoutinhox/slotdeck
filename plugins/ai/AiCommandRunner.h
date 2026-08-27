@@ -19,6 +19,8 @@ class AiCommandRunner final : public QObject {
     ~AiCommandRunner() override;
 
     void start(const QString& command, const QString& workdir, int timeoutSeconds);
+    // A prompt reaches an agent exactly as written only when no shell reads it, so a program is started with its arguments.
+    void startProgram(const QString& program, const QStringList& arguments, const QString& workdir, int timeoutSeconds);
     void cancel();
     [[nodiscard]] bool running() const;
 
@@ -28,6 +30,7 @@ class AiCommandRunner final : public QObject {
     void failed(const utils::Error& error);
 
   private:
+    void launch(const QString& program, const QStringList& arguments, const QString& workdir, int timeoutSeconds);
     void readOutput();
     void stopProcess();
     void completeProcess(int exitCode, QProcess::ExitStatus status);

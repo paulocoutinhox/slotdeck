@@ -288,6 +288,14 @@
         ]
       }
     ],
+    "antigravity-cli": [
+      {
+        "context": 1000000,
+        "id": "antigravity-cli",
+        "output": 128000,
+        "traits": []
+      }
+    ],
     "cerebras": [
       {
         "context": 131072,
@@ -358,6 +366,22 @@
           "reasoning",
           "system-prompt"
         ]
+      }
+    ],
+    "claude-cli": [
+      {
+        "context": 1000000,
+        "id": "claude-cli",
+        "output": 128000,
+        "traits": []
+      }
+    ],
+    "codex-cli": [
+      {
+        "context": 1000000,
+        "id": "codex-cli",
+        "output": 128000,
+        "traits": []
       }
     ],
     "deepinfra": [
@@ -1834,6 +1858,14 @@
         ]
       }
     ],
+    "grok-cli": [
+      {
+        "context": 1000000,
+        "id": "grok-cli",
+        "output": 128000,
+        "traits": []
+      }
+    ],
     "groq": [
       {
         "context": 8192,
@@ -1947,6 +1979,14 @@
           "system-prompt",
           "vision"
         ]
+      }
+    ],
+    "kimi-cli": [
+      {
+        "context": 1000000,
+        "id": "kimi-cli",
+        "output": 128000,
+        "traits": []
       }
     ],
     "mistral": [

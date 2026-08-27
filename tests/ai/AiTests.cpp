@@ -1,3 +1,4 @@
+#include "AiCliChatClient.h"
 #include "AiConversationView.h"
 #include "AiTestSupport.h"
 #include "TestTranslations.h"
@@ -274,8 +275,20 @@ TEST(AiProviderCatalogTest, DeclaresEveryProviderWithConsistentDescriptors) {
     for (const auto& provider : catalog) {
         EXPECT_FALSE(provider.id.isEmpty());
         EXPECT_TRUE(provider.titleKey.startsWith(QStringLiteral("ai.provider.")));
-        EXPECT_FALSE(provider.baseUrl.isEmpty());
-        EXPECT_FALSE(provider.parameters.isEmpty());
+
+        // A command line agent is invoked rather than requested, so it declares a program instead of an address and takes no parameter.
+        if (provider.protocol == WireProtocol::CommandLine) {
+            EXPECT_TRUE(provider.baseUrl.isEmpty()) << provider.id.toStdString();
+            EXPECT_TRUE(provider.parameters.isEmpty()) << provider.id.toStdString();
+            EXPECT_FALSE(provider.requiresApiKey) << provider.id.toStdString();
+            EXPECT_FALSE(provider.commandLine.program.isEmpty()) << provider.id.toStdString();
+            EXPECT_TRUE(provider.commandLine.arguments.contains(QString::fromLatin1(commandLinePromptPlaceholder))) << provider.id.toStdString();
+        } else {
+            EXPECT_FALSE(provider.baseUrl.isEmpty()) << provider.id.toStdString();
+            EXPECT_FALSE(provider.parameters.isEmpty()) << provider.id.toStdString();
+            EXPECT_TRUE(provider.commandLine.program.isEmpty()) << provider.id.toStdString();
+        }
+
         EXPECT_FALSE(identifiers.contains(provider.id)) << provider.id.toStdString();
         identifiers.insert(provider.id);
 
@@ -576,15 +589,18 @@ TEST(AiProviderCatalogTest, LoadsEveryModelDeclaredByTheCatalogFile) {
     EXPECT_TRUE(recent->traits.contains(ModelTrait::Vision));
     EXPECT_GT(recent->contextWindow, 200000);
 
-    // Nothing is offered that cannot be run, so every declared model calls tools and so does every model a provider opens with.
+    // Nothing reached over a wire is offered that cannot be run, while a command line agent runs its own tools and declares none.
     for (const auto& provider : providerCatalog()) {
+        const bool overAWire = provider.protocol != WireProtocol::CommandLine;
+
         for (const auto& model : provider.models) {
-            EXPECT_TRUE(model.traits.contains(ModelTrait::FunctionCalling)) << provider.id.toStdString() << " / " << model.id.toStdString();
+            EXPECT_EQ(model.traits.contains(ModelTrait::FunctionCalling), overAWire) << provider.id.toStdString() << " / " << model.id.toStdString();
         }
+
         for (const auto& preferred : provider.preferredModels) {
             const ModelDescriptor* model = findModel(provider, preferred);
             ASSERT_NE(model, nullptr) << provider.id.toStdString() << " / " << preferred.toStdString();
-            EXPECT_TRUE(model->traits.contains(ModelTrait::FunctionCalling)) << provider.id.toStdString() << " / " << preferred.toStdString();
+            EXPECT_EQ(model->traits.contains(ModelTrait::FunctionCalling), overAWire) << provider.id.toStdString() << " / " << preferred.toStdString();
         }
     }
 
@@ -846,7 +862,7 @@ TEST(AiPluginTest, RunsTasksThroughTheProviderApiAndRecordsTheExecution) {
 
     FakeChatClient* client = nullptr;
     // clang-format off
-    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    AiPlugin plugin([&client](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(plugin.defaultConnection().has_value());
@@ -880,7 +896,7 @@ TEST(AiPluginTest, ReturnsFailedTasksToTodoAndKeepsTheProviderError) {
 
     FakeChatClient* client = nullptr;
     // clang-format off
-    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    AiPlugin plugin([&client](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
@@ -907,7 +923,7 @@ TEST(AiPluginTest, StopsARunningTaskAndCancelsItsRequest) {
 
     FakeChatClient* client = nullptr;
     // clang-format off
-    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    AiPlugin plugin([&client](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
@@ -938,7 +954,7 @@ TEST(AiPluginTest, KeepsTasksQueuedUntilTheParallelLimitFreesCapacity) {
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.saveConnections({AiTestsHelper::testConnection()}, connectionKey(AiTestsHelper::testConnection()))).hasValue());
@@ -977,7 +993,7 @@ TEST(AiPluginTest, DispatchesADueScheduleAndKeepsSayingWhenItRan) {
 
     FakeChatClient* client = nullptr;
     // clang-format off
-    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    AiPlugin plugin([&client](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
     // clang-format on
     const auto started = plugin.initialize(host);
     ASSERT_TRUE(started.hasValue()) << qPrintable(started.error().code) << " " << qPrintable(started.error().detail);
@@ -1041,7 +1057,7 @@ TEST(AiPluginTest, RunsEachTaskOnTheProviderAndModelItDeclares) {
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
 
@@ -1086,7 +1102,7 @@ TEST(AiPluginTest, SummarizesTheTurnsThatNoLongerFitInsteadOfLosingThem) {
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.saveConnections({AiTestsHelper::testConnection()}, connectionKey(AiTestsHelper::testConnection()))).hasValue());
@@ -1170,7 +1186,7 @@ TEST(AiPluginTest, RunsATaskOnItsOwnConnectionEvenWhenTheDefaultMoves) {
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
 
@@ -1213,7 +1229,7 @@ TEST(AiPluginTest, KeepsTwoEditsOfOneTurnFromLandingOnTheSameFileTogether) {
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.saveConnections({AiTestsHelper::testConnection()}, connectionKey(AiTestsHelper::testConnection()))).hasValue());
@@ -1273,7 +1289,7 @@ TEST(AiPluginTest, DiscardsAToolResultThatBelongsToARunTheCardAlreadyStopped) {
     // clang-format off
     host.writeFileHandler = [&writes](const QString&, const QByteArray&) { auto promise = std::make_shared<QPromise<utils::Result<void>>>(); promise->start(); writes.append(promise); return promise->future(); };
     QVector<FakeChatClient*> clients;
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.saveConnections({AiTestsHelper::testConnection()}, connectionKey(AiTestsHelper::testConnection()))).hasValue());
@@ -1322,7 +1338,7 @@ TEST(AiPluginTest, FitsTheConversationToTheModelTheRunDeclaresAndNotToALaterSele
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.saveConnections({AiTestsHelper::testConnection()}, connectionKey(AiTestsHelper::testConnection()))).hasValue());
@@ -1373,7 +1389,7 @@ TEST(AiTasksViewTest, OffersTheWorkingDirectoryToTheEditorAndTheWebServerOnlyWhe
     AiTestsHelper::installAiRows(host, {workspace}, {located, homeless}, {});
 
     // clang-format off
-    AiPlugin plugin([](AiRequestGate&) { return std::make_unique<FakeChatClient>(); });
+    AiPlugin plugin([](AiRequestGate&, const ModelConnection&) { return std::make_unique<FakeChatClient>(); });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     std::unique_ptr<QWidget> view(plugin.createNavigationView(QStringLiteral("tasks"), nullptr));
@@ -1440,7 +1456,7 @@ TEST(AiTasksViewTest, StopsTheScheduleFromTheCardAndTakesTheActionAwayWithIt) {
     AiTestsHelper::installAiRows(host, {workspace}, {scheduled, plain}, {});
 
     // clang-format off
-    AiPlugin plugin([](AiRequestGate&) { return std::make_unique<FakeChatClient>(); });
+    AiPlugin plugin([](AiRequestGate&, const ModelConnection&) { return std::make_unique<FakeChatClient>(); });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     std::unique_ptr<QWidget> view(plugin.createNavigationView(QStringLiteral("tasks"), nullptr));
@@ -1494,7 +1510,7 @@ TEST(AiTasksViewTest, KeepsTheCardAliveWhileItsTaskMovesUnderAnOpenDialog) {
 
     FakeChatClient* client = nullptr;
     // clang-format off
-    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    AiPlugin plugin([&client](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     std::unique_ptr<QWidget> view(plugin.createNavigationView(QStringLiteral("tasks"), nullptr));
@@ -1667,7 +1683,7 @@ TEST(AiPluginTest, TakesBackATurnItCouldNotWriteAndStopsTheRunThatProducedIt) {
 
     FakeChatClient* client = nullptr;
     // clang-format off
-    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    AiPlugin plugin([&client](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
 
@@ -1699,7 +1715,7 @@ TEST(AiPluginTest, KeepsTheConversationAndClaimsAMessageTypedWhileTheTurnIsRunni
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
 
@@ -1787,7 +1803,7 @@ TEST(AiTasksViewTest, EditsATaskNobodyRanYetAndOpensTheSurfaceOfEveryOtherOne) {
     AiTestsHelper::installExecutionRows(host, {}, {});
 
     // clang-format off
-    AiPlugin plugin([](AiRequestGate&) { return std::make_unique<FakeChatClient>(); });
+    AiPlugin plugin([](AiRequestGate&, const ModelConnection&) { return std::make_unique<FakeChatClient>(); });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     std::unique_ptr<QWidget> view(plugin.createNavigationView(QStringLiteral("tasks"), nullptr));
@@ -1851,7 +1867,7 @@ TEST(AiTasksViewTest, RendersTheBoardWithStatusBadgesAndTheInformationAction) {
 
     FakeChatClient* client = nullptr;
     // clang-format off
-    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    AiPlugin plugin([&client](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     std::unique_ptr<QWidget> view(plugin.createNavigationView(QStringLiteral("tasks"), nullptr));
@@ -2105,7 +2121,7 @@ TEST(AiConversationViewTest, ReadsAsAChatWithSidedBubblesGroupsAndTheTimeOnTheLi
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
@@ -2290,7 +2306,7 @@ TEST(AiConversationViewTest, ReadsEveryRoleAsMarkdownAndAnswersEachCallInsideIts
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
@@ -2381,7 +2397,7 @@ TEST(AiConversationViewTest, FollowsTheReaderInsteadOfDraggingThemToTheEndOfEver
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
 
@@ -2454,7 +2470,7 @@ TEST(AiTaskSurfaceTest, WritesTheLogOfARunWhileItRunsWithoutMovingTheReader) {
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
 
@@ -2518,7 +2534,7 @@ TEST(AiPluginTest, AnswersAToolCallItCouldNotReadInsteadOfEndingTheRun) {
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
@@ -2657,7 +2673,7 @@ TEST(AiPluginTest, SendsAgainThePictureAStoredResultCarries) {
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.loadConversation(task.id)).hasValue());
@@ -2691,7 +2707,7 @@ TEST(AiPluginTest, KeepsARunAliveWhileAnotherOneStartsUnderTheSignalItIsEmitting
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
 
@@ -2915,7 +2931,7 @@ TEST(AiPluginTest, DispatchesOneDueOccurrenceOnceWhileItsQueueRowIsStillBeingWri
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     // clang-format off
@@ -2981,7 +2997,7 @@ TEST(AiPluginTest, GivesTheProtocolItsShapeOnTheTurnThatFollowsACompaction) {
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.loadConversation(task.id)).hasValue());
@@ -3065,6 +3081,112 @@ TEST(AiTranslationsTest, ReachesEveryKeyItBuildsFromAnEnumOrFromTheCatalog) {
 TEST(AiTranslationsTest, SpellsEveryKeyInEveryLanguageTheSelectorOffers) {
     slotdeck::plugins::ai::AiPlugin plugin;
     slotdeck::test::expectCompleteCatalog(QStringLiteral("ai"), plugin.translations());
+}
+
+// A command line agent is invoked rather than requested, so the catalog holds it to what that means.
+TEST(AiProviderCatalogTest, RefusesEveryMalformedCommandLineProviderItDeclaresARefusalFor) {
+    QFile providersFile(QStringLiteral(":/slotdeck/ai/assets/providers.json"));
+    ASSERT_TRUE(providersFile.open(QIODevice::ReadOnly));
+    const QJsonObject shipped = QJsonDocument::fromJson(providersFile.readAll()).object();
+    const QByteArray models = QJsonDocument(QJsonObject{{QStringLiteral("providers"), QJsonObject{{QStringLiteral("claude-cli"), QJsonArray{QJsonObject{{QStringLiteral("id"), QStringLiteral("claude-cli")}, {QStringLiteral("context"), 1000000}, {QStringLiteral("output"), 128000}, {QStringLiteral("traits"), QJsonArray{}}}}}}}}).toJson(QJsonDocument::Compact);
+
+    // clang-format off
+    const auto onlyThis = [&shipped](const QJsonObject& replacement) {
+        QJsonObject copy = shipped;
+        copy.insert(QStringLiteral("providers"), QJsonArray{replacement});
+        return QJsonDocument(copy).toJson(QJsonDocument::Compact);
+    };
+    const auto declared = [&shipped](const QString& id) {
+        QJsonObject found;
+        for (const auto& value : shipped.value(QStringLiteral("providers")).toArray()) {
+            if (value.toObject().value(QStringLiteral("id")).toString() == id) {
+                found = value.toObject();
+            }
+        }
+        return found;
+    };
+    // clang-format on
+
+    const QJsonObject sound = declared(QStringLiteral("claude-cli"));
+    ASSERT_FALSE(sound.isEmpty());
+    ASSERT_TRUE(loadAiCatalog(onlyThis(sound), models).hasValue());
+
+    QVector<QPair<QString, QJsonObject>> malformed;
+
+    QJsonObject noCommand = sound;
+    noCommand.remove(QStringLiteral("command"));
+    malformed.append({QStringLiteral("no program at all"), noCommand});
+
+    QJsonObject emptyProgram = sound;
+    emptyProgram.insert(QStringLiteral("command"), QJsonObject{{QStringLiteral("program"), QString{}}, {QStringLiteral("arguments"), QJsonArray{QStringLiteral("{prompt}")}}});
+    malformed.append({QStringLiteral("an empty program"), emptyProgram});
+
+    QJsonObject notAnObject = sound;
+    notAnObject.insert(QStringLiteral("command"), QStringLiteral("claude -p"));
+    malformed.append({QStringLiteral("a program that is not a program"), notAnObject});
+
+    QJsonObject unknownField = sound;
+    unknownField.insert(QStringLiteral("command"), QJsonObject{{QStringLiteral("program"), QStringLiteral("claude")}, {QStringLiteral("arguments"), QJsonArray{QStringLiteral("{prompt}")}}, {QStringLiteral("shell"), true}});
+    malformed.append({QStringLiteral("a command field nobody declares"), unknownField});
+
+    QJsonObject emptyArgument = sound;
+    emptyArgument.insert(QStringLiteral("command"), QJsonObject{{QStringLiteral("program"), QStringLiteral("claude")}, {QStringLiteral("arguments"), QJsonArray{QStringLiteral("{prompt}"), QString{}}}});
+    malformed.append({QStringLiteral("an empty argument"), emptyArgument});
+
+    QJsonObject noPrompt = sound;
+    noPrompt.insert(QStringLiteral("command"), QJsonObject{{QStringLiteral("program"), QStringLiteral("claude")}, {QStringLiteral("arguments"), QJsonArray{QStringLiteral("--quiet")}}});
+    malformed.append({QStringLiteral("a provider that never passes the prompt"), noPrompt});
+
+    QJsonObject withAddress = sound;
+    withAddress.insert(QStringLiteral("baseUrl"), QStringLiteral("https://example.com"));
+    malformed.append({QStringLiteral("a command line provider declaring an address"), withAddress});
+
+    QJsonObject withCredential = sound;
+    withCredential.insert(QStringLiteral("requiresApiKey"), true);
+    withCredential.insert(QStringLiteral("apiKeyVariable"), QStringLiteral("SOMETHING"));
+    malformed.append({QStringLiteral("a command line provider requiring a credential"), withCredential});
+
+    for (const auto& shape : malformed) {
+        const auto rejected = loadAiCatalog(onlyThis(shape.second), models);
+        ASSERT_FALSE(rejected.hasValue()) << shape.first.toStdString() << " was accepted";
+        EXPECT_EQ(rejected.error().code, QStringLiteral("ai_catalog_invalid")) << shape.first.toStdString();
+    }
+
+    QJsonObject wireWithProgram = declared(QStringLiteral("openai"));
+    ASSERT_FALSE(wireWithProgram.isEmpty());
+    wireWithProgram.insert(QStringLiteral("command"), QJsonObject{{QStringLiteral("program"), QStringLiteral("openai")}, {QStringLiteral("arguments"), QJsonArray{QStringLiteral("{prompt}")}}});
+    EXPECT_FALSE(loadAiCatalog(onlyThis(wireWithProgram), models).hasValue()) << "a provider reached over a wire declared a program";
+}
+
+// The prompt reaches the agent as written, because no shell reads the arguments it is given.
+TEST(AiCliChatClientTest, PassesAPromptAShellWouldHaveActedOnExactlyAsItIsWritten) {
+    const ProviderDescriptor* provider = findProvider(QStringLiteral("claude-cli"));
+    ASSERT_NE(provider, nullptr);
+    EXPECT_EQ(provider->protocol, WireProtocol::CommandLine);
+
+    const QString hostile = QStringLiteral("say \"$HOME\" && rm -rf / ; `whoami` | tee $(id) 'quoted'\nsecond line\ttabbed\\backslash");
+    const QStringList arguments = commandLineArguments(provider->commandLine, hostile, QStringLiteral("/tmp/project"));
+
+    EXPECT_TRUE(arguments.contains(hostile)) << "the prompt was altered on its way to the agent";
+    EXPECT_EQ(arguments.count(hostile), 1);
+    EXPECT_FALSE(arguments.contains(QString::fromLatin1(commandLinePromptPlaceholder)));
+    EXPECT_EQ(arguments.size(), provider->commandLine.arguments.size());
+    EXPECT_EQ(arguments.at(0), QStringLiteral("-p"));
+    EXPECT_EQ(arguments.at(1), hostile);
+
+    const ProviderDescriptor* codex = findProvider(QStringLiteral("codex-cli"));
+    ASSERT_NE(codex, nullptr);
+    const QStringList placed = commandLineArguments(codex->commandLine, hostile, QStringLiteral("/tmp/project"));
+    EXPECT_TRUE(placed.contains(QStringLiteral("/tmp/project")));
+    EXPECT_TRUE(placed.contains(hostile));
+    EXPECT_FALSE(placed.contains(QString::fromLatin1(commandLineWorkdirPlaceholder)));
+
+    const QJsonArray messages{QJsonObject{{QStringLiteral("role"), QStringLiteral("system")}, {QStringLiteral("content"), QStringLiteral("be brief")}}, QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QStringLiteral("first")}}, QJsonObject{{QStringLiteral("role"), QStringLiteral("assistant")}, {QStringLiteral("content"), QStringLiteral("answered")}}, QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QString{}}}};
+    const QString rendered = renderConversationPrompt(messages);
+    EXPECT_TRUE(rendered.contains(QStringLiteral("be brief")));
+    EXPECT_TRUE(rendered.contains(QStringLiteral("first")));
+    EXPECT_TRUE(rendered.contains(QStringLiteral("answered")));
+    EXPECT_LT(rendered.indexOf(QStringLiteral("be brief")), rendered.indexOf(QStringLiteral("first")));
 }
 
 } // namespace slotdeck::plugins::ai

@@ -30,6 +30,8 @@ struct ChatRequest final {
     QString address;
     QJsonArray messages;
     QVector<ToolSchema> tools;
+    // A command line agent runs where the task says, so the request carries that directory.
+    QString workdir{};
 };
 
 [[nodiscard]] QJsonObject buildRequestBody(const ProviderDescriptor& provider, const ChatRequest& request, const std::function<QString(const QString&)>& translate);

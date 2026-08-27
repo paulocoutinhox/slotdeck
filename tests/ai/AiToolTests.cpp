@@ -637,7 +637,7 @@ TEST(AiPluginTest, DispatchesTheRestoredQueueAsSoonAsItLoads) {
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
 
@@ -668,7 +668,7 @@ TEST(AiPluginTest, WritesTheFileTheAgentAsksForAndFinishesOnTheAnswerThatFollows
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
@@ -717,7 +717,7 @@ TEST(AiPluginTest, SaysWhichToolTheRunIsCallingWhileItIsCallingIt) {
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     EXPECT_TRUE(plugin.executionDetail(task.id).isEmpty());
@@ -755,7 +755,7 @@ TEST(AiPluginTest, KeepsWhatArrivedWhenTheProviderCutTheAnswerAndNamesTheBudgetA
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
@@ -911,7 +911,7 @@ TEST(AiPluginTest, RefusesToRunATaskWhoseAgentIsNoLongerConfigured) {
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
 
@@ -939,7 +939,7 @@ TEST(AiPluginTest, FailsAQueuedTaskWhoseConnectionIsGoneInsteadOfLeavingItWaitin
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
 
@@ -1071,7 +1071,7 @@ TEST(AiPluginTest, RecordsEverySentAndReceivedExchangeNewestFirst) {
 
     FakeChatClient* client = nullptr;
     // clang-format off
-    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    AiPlugin plugin([&client](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     EXPECT_EQ(plugin.executionPhase(task.id), ExecutionPhase::Idle);
@@ -1348,7 +1348,7 @@ TEST(AiPluginTest, CarriesThePictureAToolReadIntoTheRequestThatFollowsIt) {
 
     QVector<FakeChatClient*> clients;
     // clang-format off
-    AiPlugin plugin([&clients](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
+    AiPlugin plugin([&clients](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); clients.append(created.get()); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
@@ -1650,7 +1650,7 @@ TEST(AiPluginTest, RunsTheAgentUntilItStopsAskingForToolsAndStopsAtTheIterationL
 
     FakeChatClient* client = nullptr;
     // clang-format off
-    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    AiPlugin plugin([&client](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
@@ -1686,7 +1686,7 @@ TEST(AiPluginTest, EndsTheAgentAtItsIterationLimitWithTheReasonRatherThanWithAFa
 
     FakeChatClient* client = nullptr;
     // clang-format off
-    AiPlugin plugin([&client](AiRequestGate&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
+    AiPlugin plugin([&client](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return created; });
     // clang-format on
     ASSERT_TRUE(plugin.initialize(host).hasValue());
     ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());

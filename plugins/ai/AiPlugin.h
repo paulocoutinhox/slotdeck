@@ -23,7 +23,8 @@ namespace slotdeck::plugins::ai {
 
 enum class TaskRunState { Idle, Waiting, Running };
 
-using ChatClientFactory = std::function<std::unique_ptr<AiChatClient>(AiRequestGate&)>;
+// The transport a connection speaks through is decided by the protocol its provider declares.
+using ChatClientFactory = std::function<std::unique_ptr<AiChatClient>(AiRequestGate&, const ModelConnection&)>;
 
 class AiPlugin final : public QObject, public PluginInterface {
     Q_OBJECT
@@ -174,6 +175,8 @@ class AiPlugin final : public QObject, public PluginInterface {
     [[nodiscard]] static QJsonArray shapeForProtocol(const ModelConnection& connection, const QJsonArray& messages);
     [[nodiscard]] QJsonArray projectConversation(const QJsonObject& instructions, const ModelConnection& connection, const QVector<ConversationMessage>& conversation, const QHash<QString, ToolResult>& images, QVector<qint64>* sequences = nullptr) const;
     [[nodiscard]] QStringList readContextFiles(const QString& workdir) const;
+    // A command line agent runs its own tools, so it is never handed ours.
+    [[nodiscard]] QVector<ToolSchema> declaredTools(const ModelConnection& connection) const;
     [[nodiscard]] const ModelDescriptor* findModelDescriptor(const ModelConnection& connection) const;
     [[nodiscard]] qint64 reservedContextTokens(const ModelConnection& connection) const;
     void startCommandExecution(const AiTask& task, const QString& executionId);

@@ -24,6 +24,7 @@ class AiProviderCatalogHelper final {
     static QByteArray resourceContents(const QString& path);
     static std::optional<ModelTrait> traitFromIdentifier(const QString& identifier);
     static std::optional<WireProtocol> protocolFromIdentifier(const QString& identifier);
+    static utils::Result<CommandLineDescriptor> commandLineDescriptor(const QJsonObject& document, const QString& providerId);
     static std::optional<ParameterType> parameterTypeFromIdentifier(const QString& identifier);
     static utils::Result<QSet<ModelTrait>> traitSet(const QJsonValue& value, const QString& detail);
     static utils::Result<QStringList> stringList(const QJsonValue& value, const QString& detail);
@@ -34,7 +35,7 @@ class AiProviderCatalogHelper final {
     static utils::Result<QVector<ParameterDescriptor>> parameterSet(const QJsonValue& value, const QString& providerId);
     static utils::Result<ProviderDescriptor> provider(const QJsonObject& document);
     static utils::Result<AiLimits> limits(const QJsonObject& document);
-    static utils::Result<QVector<ModelDescriptor>> importedModels(const QJsonArray& entries, const QString& providerId);
+    static utils::Result<QVector<ModelDescriptor>> importedModels(const QJsonArray& entries, const QString& providerId, bool reachedOverAWire);
     static utils::Result<void> mergeImportedModels(QVector<ProviderDescriptor>& providers, const QByteArray& modelsDocument);
     static LoadedAiCatalog load();
     static const LoadedAiCatalog& loadedCatalog();
@@ -108,8 +109,40 @@ std::optional<WireProtocol> AiProviderCatalogHelper::protocolFromIdentifier(cons
     if (identifier == QStringLiteral("openai-compatible")) {
         return WireProtocol::OpenAiCompatible;
     }
+    if (identifier == QStringLiteral("command-line")) {
+        return WireProtocol::CommandLine;
+    }
 
     return std::nullopt;
+}
+
+// The prompt and the working directory are declared where they go, so neither is spliced into a string a shell would read.
+utils::Result<CommandLineDescriptor> AiProviderCatalogHelper::commandLineDescriptor(const QJsonObject& document, const QString& providerId) {
+    const QJsonObject declared = document.value(QStringLiteral("command")).toObject();
+
+    if (!document.value(QStringLiteral("command")).isObject() || !hasExactKeys(declared, {QStringLiteral("program"), QStringLiteral("arguments")})) {
+        return utils::Result<CommandLineDescriptor>::failure(invalid(QStringLiteral("A command line provider declares no program to run"), providerId));
+    }
+
+    CommandLineDescriptor commandLine;
+
+    if (!readSettingsText(declared, QStringLiteral("program"), commandLine.program) || commandLine.program.isEmpty() || !declared.value(QStringLiteral("arguments")).isArray()) {
+        return utils::Result<CommandLineDescriptor>::failure(invalid(QStringLiteral("A command line provider declares no program to run"), providerId));
+    }
+
+    for (const auto& value : declared.value(QStringLiteral("arguments")).toArray()) {
+        if (!value.isString() || value.toString().isEmpty()) {
+            return utils::Result<CommandLineDescriptor>::failure(invalid(QStringLiteral("A command line provider declares an empty argument"), providerId));
+        }
+
+        commandLine.arguments.append(value.toString());
+    }
+
+    if (!commandLine.arguments.contains(commandLinePromptPlaceholder)) {
+        return utils::Result<CommandLineDescriptor>::failure(invalid(QStringLiteral("A command line provider never passes the prompt"), providerId));
+    }
+
+    return utils::Result<CommandLineDescriptor>::success(commandLine);
 }
 
 std::optional<ParameterType> AiProviderCatalogHelper::parameterTypeFromIdentifier(const QString& identifier) {
@@ -127,6 +160,9 @@ std::optional<ParameterType> AiProviderCatalogHelper::parameterTypeFromIdentifie
 }
 
 utils::Result<QSet<ModelTrait>> AiProviderCatalogHelper::traitSet(const QJsonValue& value, const QString& detail) {
+    if (value.isUndefined()) {
+        return utils::Result<QSet<ModelTrait>>::success({});
+    }
     if (!value.isArray()) {
         return utils::Result<QSet<ModelTrait>>::failure(invalid(QStringLiteral("The declared trait set is not a list"), detail));
     }
@@ -165,7 +201,11 @@ utils::Result<QStringList> AiProviderCatalogHelper::stringList(const QJsonValue&
     return utils::Result<QStringList>::success(values);
 }
 
+// A field a provider does not carry is the declared default, so a command line agent declares only what applies to it.
 utils::Result<QMap<QString, QString>> AiProviderCatalogHelper::stringMap(const QJsonValue& value, const QString& detail) {
+    if (value.isUndefined()) {
+        return utils::Result<QMap<QString, QString>>::success({});
+    }
     if (!value.isObject()) {
         return utils::Result<QMap<QString, QString>>::failure(invalid(QStringLiteral("The declared map is not a map"), detail));
     }
@@ -316,7 +356,7 @@ utils::Result<QVector<ParameterDescriptor>> AiProviderCatalogHelper::parameterSe
 }
 
 utils::Result<ProviderDescriptor> AiProviderCatalogHelper::provider(const QJsonObject& document) {
-    const QSet<QString> known{QStringLiteral("id"), QStringLiteral("title"), QStringLiteral("protocol"), QStringLiteral("baseUrl"), QStringLiteral("addressConfigurable"), QStringLiteral("apiKeyVariable"), QStringLiteral("requiresApiKey"), QStringLiteral("userDefinedTraits"), QStringLiteral("preferredModels"), QStringLiteral("requestMaxRetries"), QStringLiteral("streamIdleTimeoutMs"), QStringLiteral("headers"), QStringLiteral("queryParameters"), QStringLiteral("parameters")};
+    const QSet<QString> known{QStringLiteral("id"), QStringLiteral("title"), QStringLiteral("protocol"), QStringLiteral("baseUrl"), QStringLiteral("addressConfigurable"), QStringLiteral("apiKeyVariable"), QStringLiteral("requiresApiKey"), QStringLiteral("userDefinedTraits"), QStringLiteral("preferredModels"), QStringLiteral("requestMaxRetries"), QStringLiteral("streamIdleTimeoutMs"), QStringLiteral("headers"), QStringLiteral("queryParameters"), QStringLiteral("parameters"), QStringLiteral("command")};
 
     if (!hasKnownKeys(document, known)) {
         return utils::Result<ProviderDescriptor>::failure(invalid(QStringLiteral("A declared provider carries an unknown value"), {}));
@@ -326,9 +366,8 @@ utils::Result<ProviderDescriptor> AiProviderCatalogHelper::provider(const QJsonO
     QString protocol;
     const bool typed = readSettingsText(document, QStringLiteral("id"), descriptor.id) && readSettingsText(document, QStringLiteral("title"), descriptor.titleKey) && readSettingsText(document, QStringLiteral("protocol"), protocol) && readSettingsText(document, QStringLiteral("baseUrl"), descriptor.baseUrl) && readSettingsText(document, QStringLiteral("apiKeyVariable"), descriptor.apiKeyVariable) && readSettingsBool(document, QStringLiteral("addressConfigurable"), descriptor.addressConfigurable) && readSettingsBool(document, QStringLiteral("requiresApiKey"), descriptor.requiresApiKey) && readSettingsInteger(document, QStringLiteral("requestMaxRetries"), descriptor.requestMaxRetries) && readSettingsInteger(document, QStringLiteral("streamIdleTimeoutMs"), descriptor.streamIdleTimeoutMs);
     const auto parsedProtocol = protocolFromIdentifier(protocol);
-    const QUrl address(descriptor.baseUrl);
 
-    if (!typed || descriptor.id.isEmpty() || descriptor.titleKey.isEmpty() || !parsedProtocol.has_value() || !address.isValid() || address.scheme().isEmpty() || descriptor.requestMaxRetries < 0 || descriptor.requestMaxRetries > 10 || descriptor.streamIdleTimeoutMs < 1000 || descriptor.streamIdleTimeoutMs > 600000) {
+    if (!typed || descriptor.id.isEmpty() || descriptor.titleKey.isEmpty() || !parsedProtocol.has_value() || descriptor.requestMaxRetries < 0 || descriptor.requestMaxRetries > 10 || descriptor.streamIdleTimeoutMs < 1000 || descriptor.streamIdleTimeoutMs > 600000) {
         return utils::Result<ProviderDescriptor>::failure(invalid(QStringLiteral("A declared provider is invalid"), descriptor.id));
     }
     // A provider that requires a credential names the variable that credential officially lives in.
@@ -337,12 +376,30 @@ utils::Result<ProviderDescriptor> AiProviderCatalogHelper::provider(const QJsonO
     }
 
     descriptor.protocol = *parsedProtocol;
+
+    if (descriptor.protocol == WireProtocol::CommandLine) {
+        const auto commandLine = commandLineDescriptor(document, descriptor.id);
+
+        if (!commandLine.hasValue()) {
+            return utils::Result<ProviderDescriptor>::failure(commandLine.error());
+        }
+
+        descriptor.commandLine = commandLine.value();
+    } else {
+        const QUrl address(descriptor.baseUrl);
+
+        if (!address.isValid() || address.scheme().isEmpty() || document.contains(QStringLiteral("command"))) {
+            return utils::Result<ProviderDescriptor>::failure(invalid(QStringLiteral("A provider reached over a wire declares no address or declares a program"), descriptor.id));
+        }
+    }
+
     const auto traits = traitSet(document.value(QStringLiteral("userDefinedTraits")), descriptor.id);
 
     if (!traits.hasValue()) {
         return utils::Result<ProviderDescriptor>::failure(traits.error());
     }
-    if (!traits.value().contains(ModelTrait::FunctionCalling)) {
+    // A command line agent runs its own tools, so it is the one provider that declares none.
+    if (descriptor.protocol != WireProtocol::CommandLine && !traits.value().contains(ModelTrait::FunctionCalling)) {
         return utils::Result<ProviderDescriptor>::failure(invalid(QStringLiteral("A provider declares a user-defined model that calls no tool"), descriptor.id));
     }
 
@@ -351,7 +408,7 @@ utils::Result<ProviderDescriptor> AiProviderCatalogHelper::provider(const QJsonO
     const auto preferred = stringList(document.value(QStringLiteral("preferredModels")), descriptor.id);
     const auto headers = stringMap(document.value(QStringLiteral("headers")), descriptor.id);
     const auto queries = stringMap(document.value(QStringLiteral("queryParameters")), descriptor.id);
-    const auto parameters = parameterSet(document.value(QStringLiteral("parameters")), descriptor.id);
+    const auto parameters = descriptor.protocol == WireProtocol::CommandLine ? utils::Result<QVector<ParameterDescriptor>>::success({}) : parameterSet(document.value(QStringLiteral("parameters")), descriptor.id);
 
     if (!preferred.hasValue() || !headers.hasValue() || !queries.hasValue() || !parameters.hasValue()) {
         return utils::Result<ProviderDescriptor>::failure(!preferred.hasValue() ? preferred.error() : (!headers.hasValue() ? headers.error() : (!queries.hasValue() ? queries.error() : parameters.error())));
@@ -361,6 +418,11 @@ utils::Result<ProviderDescriptor> AiProviderCatalogHelper::provider(const QJsonO
     descriptor.httpHeaders = headers.value();
     descriptor.queryParameters = queries.value();
     descriptor.parameters = parameters.value();
+
+    if (descriptor.protocol == WireProtocol::CommandLine && (!descriptor.parameters.isEmpty() || descriptor.requiresApiKey || descriptor.addressConfigurable || !descriptor.baseUrl.isEmpty())) {
+        return utils::Result<ProviderDescriptor>::failure(invalid(QStringLiteral("A command line provider declares an address, a credential or a parameter"), descriptor.id));
+    }
+
     return utils::Result<ProviderDescriptor>::success(descriptor);
 }
 
@@ -409,7 +471,7 @@ utils::Result<AiLimits> AiProviderCatalogHelper::limits(const QJsonObject& docum
 }
 
 // The model list is data, so a model is added by one line in the catalog file and never by interface code.
-utils::Result<QVector<ModelDescriptor>> AiProviderCatalogHelper::importedModels(const QJsonArray& entries, const QString& providerId) {
+utils::Result<QVector<ModelDescriptor>> AiProviderCatalogHelper::importedModels(const QJsonArray& entries, const QString& providerId, bool reachedOverAWire) {
     QVector<ModelDescriptor> models;
 
     for (const auto& value : entries) {
@@ -430,8 +492,8 @@ utils::Result<QVector<ModelDescriptor>> AiProviderCatalogHelper::importedModels(
             return utils::Result<QVector<ModelDescriptor>>::failure(traits.error());
         }
         model.traits = traits.value();
-        // A model that calls no tool cannot run a task, so the catalog never offers one.
-        if (!model.traits.contains(ModelTrait::FunctionCalling)) {
+        // A model reached over a wire that calls no tool cannot run a task, while a command line agent runs its own.
+        if (reachedOverAWire && !model.traits.contains(ModelTrait::FunctionCalling)) {
             return utils::Result<QVector<ModelDescriptor>>::failure(invalid(QStringLiteral("A catalog model declares no tool calling"), model.id));
         }
         models.append(model);
@@ -463,7 +525,7 @@ utils::Result<void> AiProviderCatalogHelper::mergeImportedModels(QVector<Provide
             return utils::Result<void>::failure(invalid(QStringLiteral("The AI model catalog entry is not a list"), entry.key()));
         }
 
-        const auto imported = importedModels(entry.value().toArray(), entry.key());
+        const auto imported = importedModels(entry.value().toArray(), entry.key(), position->protocol != WireProtocol::CommandLine);
         if (!imported.hasValue()) {
             return utils::Result<void>::failure(imported.error());
         }

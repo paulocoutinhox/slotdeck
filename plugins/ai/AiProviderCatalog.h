@@ -14,7 +14,16 @@
 
 namespace slotdeck::plugins::ai {
 
-enum class WireProtocol { OpenAiCompatible, Anthropic };
+enum class WireProtocol { OpenAiCompatible, Anthropic, CommandLine };
+
+inline constexpr auto commandLinePromptPlaceholder = "{prompt}";
+inline constexpr auto commandLineWorkdirPlaceholder = "{workdir}";
+
+// A command line agent runs its own tools and answers plain text, so it is invoked rather than requested.
+struct CommandLineDescriptor final {
+    QString program;
+    QStringList arguments;
+};
 
 enum class ModelTrait { Sampling, Reasoning, FunctionCalling, Vision, SystemPrompt };
 
@@ -65,6 +74,7 @@ struct ProviderDescriptor final {
     bool addressConfigurable{false};
     QString apiKeyVariable;
     bool requiresApiKey{true};
+    CommandLineDescriptor commandLine;
     QSet<ModelTrait> userDefinedModelTraits;
     QVector<ModelDescriptor> models;
     QVector<ParameterDescriptor> parameters;

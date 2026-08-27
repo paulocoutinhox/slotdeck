@@ -1950,6 +1950,121 @@
           ]
         }
       ]
+    },
+    {
+      "id": "grok-cli",
+      "title": "ai.provider.grok-cli",
+      "protocol": "command-line",
+      "command": {
+        "program": "grok",
+        "arguments": [
+          "--no-auto-update",
+          "--cwd",
+          "{workdir}",
+          "--always-approve",
+          "--max-turns",
+          "100",
+          "-p",
+          "{prompt}",
+          "--output-format",
+          "plain"
+        ]
+      },
+      "requiresApiKey": false,
+      "userDefinedTraits": [],
+      "preferredModels": [
+        "grok-cli"
+      ]
+    },
+    {
+      "id": "claude-cli",
+      "title": "ai.provider.claude-cli",
+      "protocol": "command-line",
+      "command": {
+        "program": "claude",
+        "arguments": [
+          "-p",
+          "{prompt}",
+          "--dangerously-skip-permissions",
+          "--max-turns",
+          "100",
+          "--no-session-persistence",
+          "--output-format",
+          "text"
+        ]
+      },
+      "requiresApiKey": false,
+      "userDefinedTraits": [],
+      "preferredModels": [
+        "claude-cli"
+      ]
+    },
+    {
+      "id": "codex-cli",
+      "title": "ai.provider.codex-cli",
+      "protocol": "command-line",
+      "command": {
+        "program": "codex",
+        "arguments": [
+          "exec",
+          "--yolo",
+          "--ephemeral",
+          "--color",
+          "never",
+          "--cd",
+          "{workdir}",
+          "{prompt}"
+        ]
+      },
+      "requiresApiKey": false,
+      "userDefinedTraits": [],
+      "preferredModels": [
+        "codex-cli"
+      ]
+    },
+    {
+      "id": "antigravity-cli",
+      "title": "ai.provider.antigravity-cli",
+      "protocol": "command-line",
+      "command": {
+        "program": "agy",
+        "arguments": [
+          "-p",
+          "{prompt}",
+          "--dangerously-skip-permissions",
+          "--output-format",
+          "text",
+          "--print-timeout",
+          "1h"
+        ]
+      },
+      "requiresApiKey": false,
+      "userDefinedTraits": [],
+      "preferredModels": [
+        "antigravity-cli"
+      ]
+    },
+    {
+      "id": "kimi-cli",
+      "title": "ai.provider.kimi-cli",
+      "protocol": "command-line",
+      "command": {
+        "program": "kimi",
+        "arguments": [
+          "--work-dir",
+          "{workdir}",
+          "--prompt",
+          "{prompt}",
+          "--quiet",
+          "--max-steps-per-turn",
+          "100"
+        ]
+      },
+      "requiresApiKey": false,
+      "userDefinedTraits": [],
+      "preferredModels": [
+        "kimi-cli"
+      ]
     }
   ]
 }
