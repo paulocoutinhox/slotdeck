@@ -85,7 +85,9 @@ CodeWorkspaceView::CodeWorkspaceView(CodeWorkspaceState state, QVector<ResolvedL
     problemsLayout->setSpacing(0);
     problemsLayout->addWidget(m_problemFilter);
     problemsLayout->addWidget(m_problems, 1);
+    // clang-format off
     connect(m_problemFilter, &QLineEdit::textChanged, this, [this]() { refreshProblems(); });
+    // clang-format on
     m_problems->setRootIsDecorated(false);
     m_problems->setAlternatingRowColors(true);
     m_problems->setFrameShape(QFrame::NoFrame);

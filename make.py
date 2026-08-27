@@ -169,7 +169,92 @@ def task_format_check(_: Context) -> None:
         run([executable("clang-format"), "--dry-run", "--Werror", *files])
 
 
+LAMBDA_PATTERN = re.compile(r"\[([^\]\[]*)\]\s*(\([^)]*\))?\s*(mutable\s*)?(->\s*[A-Za-z_:<>, ]+)?\s*\{")
+CAPTURE_PATTERN = re.compile(r"[&=]?\s*[A-Za-z_&=, .*]*")
+TEXT_LITERAL_PATTERN = re.compile(r"\"(?:[^\"\\]|\\.)*\"|'(?:[^'\\]|\\.)*'")
+
+
+def unprotected_lambdas() -> list[str]:
+    found: list[str] = []
+
+    for directory in ("src", "plugins", "tests"):
+        for path in sorted((ROOT / directory).rglob("*")):
+            if path.suffix not in (".cpp", ".h"):
+                continue
+
+            protected = False
+
+            for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):
+                stripped = line.strip()
+
+                if stripped == "// clang-format off":
+                    protected = True
+                    continue
+
+                if stripped == "// clang-format on":
+                    protected = False
+                    continue
+
+                if protected or stripped.startswith("//"):
+                    continue
+
+                for match in LAMBDA_PATTERN.finditer(TEXT_LITERAL_PATTERN.sub('""', line)):
+                    capture = match.group(1)
+
+                    if capture and not CAPTURE_PATTERN.fullmatch(capture):
+                        continue
+
+                    found.append(f"{path.relative_to(ROOT)}:{number}")
+
+    return found
+
+
+def stray_comments() -> list[str]:
+    found: list[str] = []
+
+    for directory in ("src", "plugins", "tests"):
+        for path in sorted((ROOT / directory).rglob("*")):
+            if path.suffix not in (".cpp", ".h"):
+                continue
+
+            lines = path.read_text(encoding="utf-8").split("\n")
+
+            for number, line in enumerate(lines, 1):
+                stripped = line.strip()
+
+                if not stripped.startswith("//") or stripped.startswith("// clang-format"):
+                    continue
+
+                body = stripped[2:].strip()
+
+                if not body:
+                    continue
+
+                where = f"{path.relative_to(ROOT)}:{number}"
+
+                if number < len(lines) and not lines[number].strip():
+                    found.append(f"{where} explains nothing, because a blank line follows it")
+
+                if ";" in body[:-1]:
+                    found.append(f"{where} divides a sentence with a semicolon")
+
+                if not body.endswith("."):
+                    found.append(f"{where} does not end its sentence")
+
+    return found
+
+
 def task_lint(_: Context) -> None:
+    unguarded = unprotected_lambdas()
+
+    if unguarded:
+        raise RuntimeError("Every lambda is formatted by hand, so these need clang-format markers:\n  " + "\n  ".join(unguarded))
+
+    stray = stray_comments()
+
+    if stray:
+        raise RuntimeError("Every comment is a complete sentence sitting on what it explains:\n  " + "\n  ".join(stray))
+
     run([
         executable("cppcheck"),
         "--enable=warning,performance,portability",

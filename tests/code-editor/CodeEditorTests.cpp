@@ -2495,11 +2495,13 @@ TEST(CodeColorSchemeTest, RefusesEveryMalformedCatalogItDeclaresARefusalFor) {
     ASSERT_TRUE(outcome.hasValue());
 
     const QJsonObject original = QJsonDocument::fromJson(text).object();
+    // clang-format off
     const auto rebuild = [&original](const QJsonObject& scheme) {
         QJsonObject catalog = original;
         catalog.insert(QStringLiteral("schemes"), QJsonArray{scheme});
         return QJsonDocument(catalog).toJson();
     };
+    // clang-format on
     const QJsonObject sound = original.value(QStringLiteral("schemes")).toArray().first().toObject();
 
     QVector<QPair<QString, QByteArray>> malformed;
@@ -2650,6 +2652,7 @@ TEST(CodeColorSchemeTest, BoundsWhatOneLineMayBeDecoratedWith) {
     const int bound = LanguageRegistry::limits().maximumHighlightedMatchesPerLine;
     ASSERT_GT(bound, 0);
 
+    // clang-format off
     const auto rangesOf = [&](const QString& line) {
         QTextDocument document;
         document.setPlainText(line);
@@ -2657,6 +2660,7 @@ TEST(CodeColorSchemeTest, BoundsWhatOneLineMayBeDecoratedWith) {
         highlighter.rehighlight();
         return static_cast<int>(document.begin().layout()->formats().size());
     };
+    // clang-format on
 
     EXPECT_GT(rangesOf(QStringLiteral("    const int total = compute(alpha, beta + 3, \"literal\");")), 3) << "an ordinary line lost its colours";
 
@@ -2682,11 +2686,14 @@ TEST(LanguageRegistryTest, RefusesEveryMalformedCatalogItDeclaresARefusalFor) {
     ASSERT_TRUE(sound.hasValue());
 
     const QJsonObject original = QJsonDocument::fromJson(text).object();
+    // clang-format off
     const auto rebuild = [&original](const QString& key, const QJsonValue& value) {
         QJsonObject catalog = original;
         catalog.insert(key, value);
         return QJsonDocument(catalog).toJson();
     };
+    // clang-format on
+    // clang-format off
     const auto rebuildHighlighting = [&original](const QString& key, const QJsonValue& value) {
         QJsonObject highlighting = original.value(QStringLiteral("highlighting")).toObject();
         highlighting.insert(key, value);
@@ -2694,6 +2701,7 @@ TEST(LanguageRegistryTest, RefusesEveryMalformedCatalogItDeclaresARefusalFor) {
         catalog.insert(QStringLiteral("highlighting"), highlighting);
         return QJsonDocument(catalog).toJson();
     };
+    // clang-format on
     const QJsonObject sample = original.value(QStringLiteral("languages")).toArray().first().toObject();
 
     QVector<QPair<QString, QByteArray>> malformed;

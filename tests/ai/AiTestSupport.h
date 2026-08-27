@@ -198,17 +198,12 @@ class FakeChatClient : public AiChatClient {
     bool m_running{false};
 };
 
-// The command tests speak the shell of the running platform, because the runner starts the native one.
-// The wait is short because a stopped command is detached, so anything the platform leaves behind must not outlive the case that started it.
-// The Windows wait uses ping because timeout refuses to run when the console input is redirected, which is how a test runner starts it.
-
-// Gives the host a real filesystem so a tool that touches storage is exercised end to end.
-
-// A reader only receives the columns its own statement names, so a column it forgot to select stays missing here too.
-
 class AiTestsHelper final {
   public:
+    // The wait is short because a stopped command is detached, so nothing the platform leaves behind outlives the case that started it.
+    // The Windows wait uses ping because timeout refuses to run when the console input is redirected, which is how a test runner starts it.
     static QString sleepingCommand(int seconds);
+    // The command tests speak the shell of the running platform, because the runner starts the native one.
     static QString printWorkingDirectoryCommand();
     static QString failingCommand();
     static ModelConnection testConnection();
@@ -221,6 +216,7 @@ class AiTestsHelper final {
         std::shared_ptr<QVector<ExecutionLogEntry>> logs;
     };
     static RecordedRuns installExecutionRows(test::TestPluginHost& host, const QVector<TaskExecution>& executions, const QVector<ExecutionLogEntry>& logs);
+    // A reader only receives the columns its own statement names, so a column it forgot to select stays missing here too.
     static persistence::DatabaseRows selectedColumns(const QString& statement, const persistence::DatabaseRows& rows);
     static QJsonObject settingsDocument(const QVector<ModelConnection>& connections, const QString& defaultConnectionKey, const QVector<AiAgent>& agents = {AiTestsHelper::testAgent()});
     static AiAgent testAgent();

@@ -427,7 +427,9 @@ void AiToolRegistry::discoverSkills(const QString& sandboxRoot, const AiSkillCat
 
 // A call is read as the tool it is, so a declared one is named by the catalog and a published one by the server that published it.
 ToolPresentation AiToolRegistry::presentation(const QString& toolName, const QJsonObject& arguments) const {
+    // clang-format off
     const auto declared = std::find_if(m_schemas.cbegin(), m_schemas.cend(), [&toolName](const ToolSchema& schema) { return schema.name == toolName; });
+    // clang-format on
 
     if (declared == m_schemas.cend()) {
         return {AiToolRegistryHelper::readableToolName(toolName), {}};

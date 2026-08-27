@@ -741,7 +741,9 @@ utils::Result<QVector<ConversationMessage>> AiTaskRepositoryHelper::parseConvers
         messages.append(std::move(message));
     }
 
+    // clang-format off
     std::sort(messages.begin(), messages.end(), [](const ConversationMessage& left, const ConversationMessage& right) { return left.sequence < right.sequence; });
+    // clang-format on
     return utils::Result<QVector<ConversationMessage>>::success(messages);
 }
 

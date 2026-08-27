@@ -1168,6 +1168,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Comments explain context or intent and never narrate literal behavior.
 - Headers contain no comments describing methods, members or artificial sections.
 - A comment sits on the declaration it explains, so a comment followed by a blank line explains nothing and does not exist in the project.
+- The lint command refuses a comment separated from what it explains, a comment dividing a sentence with a semicolon and a comment that does not end its sentence, across the sources and the suite alike.
 - Complex methods use short intent comments only at important responsibility boundaries.
 - Validation, mutation, side effects and returns are visually separated.
 - Methods have a visually clear beginning, middle and end.
@@ -1198,6 +1199,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Protection applies to inline lambdas, local lambda variables, predicates, threads and nested lambdas.
 - A complex lambda passed to a function is assigned to a named local variable first so the function call remains complete on one physical line.
 - The formatter must never rewrite a C++ lambda.
+- The lint command refuses a lambda without its markers and names every one it finds, because a rule audited by habit is a rule that drifts.
+- That audit strips string literals before it matches, so a literal spelling brackets and braces is not read as a lambda.
 
 ## Automated testing standard
 
@@ -1268,7 +1271,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 6. Add every visible string to the owning translation catalog.
 7. Protect and manually format every lambda.
 8. Run formatting and formatting verification.
-9. Audit lambda guards and comments.
+9. Audit lambda guards and comments, which the lint command does.
 10. Compile every target with warnings as errors.
 11. Add or update focused GoogleTest cases for every changed success, error and boundary contract.
 12. Run Cppcheck warning, performance and portability analysis.
@@ -1286,7 +1289,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The native run command is `python3 make.py run`.
 - The formatting command is `python3 make.py format`.
 - The verification command is `python3 make.py format-check`.
-- The lint command is `python3 make.py lint`.
+- The lint command is `python3 make.py lint` and it audits the lambda guards and the comments before running Cppcheck.
 - The sanitizer command is `python3 make.py sanitize`.
 - The registered test command is `python3 make.py test`.
 - The coverage report command is `python3 make.py coverage`.

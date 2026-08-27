@@ -1185,6 +1185,7 @@ TEST(AiTaskRepositoryTest, RoundTripsAConversationAndRejectsAStoredMessageNobody
     EXPECT_EQ(host.databaseTransactions.first().size(), 3);
 
     // The stored rows are read back in the order they were written, whatever order the page returned them in.
+    // clang-format off
     host.queryHandler = [](const QString& statement, const QVariantList&) {
         persistence::DatabaseRows rows;
 
@@ -1196,6 +1197,7 @@ TEST(AiTaskRepositoryTest, RoundTripsAConversationAndRejectsAStoredMessageNobody
         rows.append({{QStringLiteral("id"), QStringLiteral("message-1")}, {QStringLiteral("task_id"), QStringLiteral("task-1")}, {QStringLiteral("sequence"), 1}, {QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QStringLiteral("Review the repository")}, {QStringLiteral("tool_calls"), QStringLiteral("[]")}, {QStringLiteral("tool_call_id"), QString{}}, {QStringLiteral("summarized_until"), 0}, {QStringLiteral("created_at_utc"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)}});
         return utils::Result<persistence::DatabaseRows>::success(rows);
     };
+    // clang-format on
     const auto read = test::awaitFuture(repository.conversation(QStringLiteral("task-1"), 0, 100));
     ASSERT_TRUE(read.hasValue());
     ASSERT_EQ(read.value().size(), 2);

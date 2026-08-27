@@ -208,6 +208,7 @@ QVector<LanguageServerDefinition> LanguageRegistryHelper::createLanguageServers(
             valid = valid && !candidate.executableName.isEmpty();
             definition.candidates.append(candidate);
         }
+        // clang-format off
         const auto declaresLanguage = [&languages, &definition]() {
             for (const auto& language : languages) {
                 if (language.id == definition.languageId) {
@@ -217,6 +218,7 @@ QVector<LanguageServerDefinition> LanguageRegistryHelper::createLanguageServers(
 
             return false;
         };
+        // clang-format on
 
         if (!valid || definition.candidates.isEmpty() || !declaresLanguage()) {
             reject(outcome, QStringLiteral("A catalog language server is invalid"), definition.languageId);
@@ -237,7 +239,9 @@ utils::Result<void>& LanguageRegistry::mutableCatalogError() {
 
 // Both lists are read from the same file, so asking for the outcome builds whichever of them has not been built yet.
 const utils::Result<void>& LanguageRegistry::catalogError() {
+    // clang-format off
     static const bool built = [] { return !parsedCatalog().languages.isEmpty(); }();
+    // clang-format on
     Q_UNUSED(built);
     return mutableCatalogError();
 }
@@ -266,6 +270,7 @@ EditorLimits LanguageRegistryHelper::createLimits(const QJsonObject& catalog, ut
     const QJsonObject declared = catalog.value(QStringLiteral("limits")).toObject();
     EditorLimits limits;
     bool valid = true;
+    // clang-format off
     const auto read = [&declared, &valid](const QString& key, int minimum, int maximum) {
         const QJsonValue value = declared.value(key);
 
@@ -276,6 +281,7 @@ EditorLimits LanguageRegistryHelper::createLimits(const QJsonObject& catalog, ut
 
         return value.toInteger();
     };
+    // clang-format on
 
     limits.maximumFileBytes = read(QStringLiteral("maximumFileBytes"), 1024, 64 * 1024 * 1024);
     limits.maximumHighlightedLineLength = static_cast<int>(read(QStringLiteral("maximumHighlightedLineLength"), 80, 100000));

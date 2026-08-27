@@ -205,7 +205,9 @@ utils::Result<void>& CodeColorSchemeCatalog::mutableCatalogError() {
 }
 
 const utils::Result<void>& CodeColorSchemeCatalog::catalogError() {
+    // clang-format off
     static const bool built = [] { return !schemes().isEmpty(); }();
+    // clang-format on
     Q_UNUSED(built);
     return mutableCatalogError();
 }
