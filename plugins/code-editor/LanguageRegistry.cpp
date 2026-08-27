@@ -299,6 +299,7 @@ EditorLimits LanguageRegistryHelper::createLimits(const QJsonObject& catalog, ut
     limits.maximumReferences = static_cast<int>(read(QStringLiteral("maximumReferences"), 10, 100000));
     limits.maximumWorkspaceFiles = static_cast<int>(read(QStringLiteral("maximumWorkspaceFiles"), 100, 1000000));
     limits.maximumProblems = static_cast<int>(read(QStringLiteral("maximumProblems"), 10, 100000));
+    limits.maximumCompletions = static_cast<int>(read(QStringLiteral("maximumCompletions"), 10, 100000));
     limits.bottomPanelMinimumHeight = static_cast<int>(read(QStringLiteral("bottomPanelMinimumHeight"), 40, 2000));
     limits.bottomPanelInitialHeight = static_cast<int>(read(QStringLiteral("bottomPanelInitialHeight"), 40, 2000));
 

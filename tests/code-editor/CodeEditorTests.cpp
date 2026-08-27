@@ -2823,4 +2823,38 @@ TEST(CodeColorSchemeTest, AnswersAnUnchangedTokenSetWithoutTouchingTheDocument) 
     EXPECT_GT(invalidated, 0) << "dropping every token left the document as it was";
 }
 
+// A server decides how many candidates it answers, so what reaches the reader is bounded like every other list it sends.
+TEST(LanguageServerClientTest, BoundsHowManyCandidatesAServerMayAnswerWith) {
+    QTemporaryDir root;
+    ASSERT_TRUE(root.isValid());
+    const QString path = QDir(root.path()).filePath(QStringLiteral("main.cpp"));
+    ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(path, QByteArrayLiteral("int main() {}\n")));
+
+    LanguageServerClient client({QStringLiteral("cpp"), QCoreApplication::applicationFilePath(), {QStringLiteral("--slotdeck-test-lsp-many-completions")}}, root.path());
+    QVector<CompletionProposal> proposals;
+    bool answered = false;
+    // clang-format off
+    QObject::connect(&client, &LanguageServerClient::completionsReady, &client, [&proposals, &answered](const QString&, const QVector<CompletionProposal>& entries) { proposals = entries; answered = true; });
+    // clang-format on
+
+    client.start();
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&client]() { return client.ready(); }));
+    // clang-format on
+    client.openDocument(path, QStringLiteral("int main() {}\n"), QStringLiteral("cpp"));
+    client.requestCompletion(path, 0, 4);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&answered]() { return answered; }));
+    // clang-format on
+
+    const int bound = LanguageRegistry::limits().maximumCompletions;
+    ASSERT_GT(bound, 0);
+    EXPECT_EQ(proposals.size(), bound) << "a server answering forty thousand candidates reached the reader with all of them";
+
+    // What survives the bound is what the server ranked first, because the order it declares is the one that matters.
+    EXPECT_EQ(proposals.first().label, QStringLiteral("candidate0"));
+    EXPECT_EQ(proposals.at(1).label, QStringLiteral("candidate1"));
+    client.stop();
+}
+
 } // namespace slotdeck::plugins::codeeditor

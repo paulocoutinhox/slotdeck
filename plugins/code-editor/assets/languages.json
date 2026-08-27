@@ -1287,6 +1287,7 @@
     "maximumReferences": 1000,
     "maximumWorkspaceFiles": 20000,
     "maximumProblems": 1000,
+    "maximumCompletions": 500,
     "bottomPanelMinimumHeight": 120,
     "bottomPanelInitialHeight": 220
   }

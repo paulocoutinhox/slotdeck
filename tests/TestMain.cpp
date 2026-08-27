@@ -23,7 +23,7 @@
 
 QString languageServerDocumentUri;
 
-enum class LanguageServerFixture { Normal, InvalidProtocol, Crashing, Silent, SlowStart, Malformed, DeepOutline };
+enum class LanguageServerFixture { Normal, InvalidProtocol, Crashing, Silent, SlowStart, Malformed, ManyCompletions, DeepOutline };
 
 class TestMainHelper final {
   public:
@@ -305,6 +305,14 @@ int TestMainHelper::runLanguageServerFixture(LanguageServerFixture mode, int sha
             const QString includedUri = uri.left(uri.lastIndexOf(QLatin1Char('/'))) + QStringLiteral("/included.h");
             TestMainHelper::sendLanguageServerMessage({{QStringLiteral("jsonrpc"), QStringLiteral("2.0")}, {QStringLiteral("method"), QStringLiteral("textDocument/publishDiagnostics")}, {QStringLiteral("params"), QJsonObject{{QStringLiteral("uri"), includedUri}, {QStringLiteral("diagnostics"), QJsonArray{QJsonObject{{QStringLiteral("range"), QJsonObject{{QStringLiteral("start"), QJsonObject{{QStringLiteral("line"), 6}, {QStringLiteral("character"), 0}}}, {QStringLiteral("end"), QJsonObject{{QStringLiteral("line"), 6}, {QStringLiteral("character"), 3}}}}}, {QStringLiteral("severity"), 1}, {QStringLiteral("message"), QStringLiteral("Fixture header diagnostic")}}}}}}});
             TestMainHelper::sendLanguageServerMessage({{QStringLiteral("jsonrpc"), QStringLiteral("2.0")}, {QStringLiteral("method"), QStringLiteral("textDocument/publishDiagnostics")}, {QStringLiteral("params"), QJsonObject{{QStringLiteral("uri"), uri}, {QStringLiteral("diagnostics"), QJsonArray{QJsonObject{{QStringLiteral("range"), QJsonObject{{QStringLiteral("start"), QJsonObject{{QStringLiteral("line"), 0}, {QStringLiteral("character"), 0}}}, {QStringLiteral("end"), QJsonObject{{QStringLiteral("line"), 0}, {QStringLiteral("character"), 3}}}}}, {QStringLiteral("severity"), 2}, {QStringLiteral("message"), QStringLiteral("Fixture diagnostic")}}}}}}});
+        } else if (method == QStringLiteral("textDocument/completion") && mode == LanguageServerFixture::ManyCompletions) {
+            QJsonArray many;
+
+            for (int index = 0; index < 40000; ++index) {
+                many.append(QJsonObject{{QStringLiteral("label"), QStringLiteral("candidate%1").arg(index)}, {QStringLiteral("sortText"), QStringLiteral("%1").arg(index, 6, 10, QLatin1Char('0'))}, {QStringLiteral("insertText"), QStringLiteral("candidate%1").arg(index)}});
+            }
+
+            TestMainHelper::sendLanguageServerMessage({{QStringLiteral("jsonrpc"), QStringLiteral("2.0")}, {QStringLiteral("id"), message.value(QStringLiteral("id"))}, {QStringLiteral("result"), many}});
         } else if (method == QStringLiteral("textDocument/completion")) {
             const QJsonObject range{{QStringLiteral("start"), QJsonObject{{QStringLiteral("line"), 0}, {QStringLiteral("character"), 4}}}, {QStringLiteral("end"), QJsonObject{{QStringLiteral("line"), 0}, {QStringLiteral("character"), 6}}}};
             const QJsonObject edited{{QStringLiteral("label"), QStringLiteral("push_back(const value_type &value)")}, {QStringLiteral("sortText"), QStringLiteral("0000")}, {QStringLiteral("textEdit"), QJsonObject{{QStringLiteral("range"), range}, {QStringLiteral("newText"), QStringLiteral("push_back")}}}};
@@ -345,6 +353,9 @@ int main(int argc, char** argv) {
     }
     if (TestMainHelper::hasArgument(argc, argv, "--slotdeck-test-lsp-silent")) {
         return TestMainHelper::runLanguageServerFixture(LanguageServerFixture::Silent);
+    }
+    if (TestMainHelper::hasArgument(argc, argv, "--slotdeck-test-lsp-many-completions")) {
+        return TestMainHelper::runLanguageServerFixture(LanguageServerFixture::ManyCompletions);
     }
     if (TestMainHelper::hasArgument(argc, argv, "--slotdeck-test-lsp-slow-start")) {
         return TestMainHelper::runLanguageServerFixture(LanguageServerFixture::SlowStart);

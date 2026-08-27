@@ -30,6 +30,7 @@ class LanguageServerClientHelper final {
     static QString symbolQueryMethod(SymbolQueryKind kind);
     static SourceLocation locationOf(const QJsonObject& entry);
     static SemanticTokenSet decodeSemanticTokens(const QJsonArray& data, const QStringList& types);
+    static QVector<CompletionProposal> decodeCompletions(const QJsonArray& items, int bound);
     static QVector<SourceLocation> locationsOf(const QJsonValue& result);
     static QVector<DocumentSymbolNode> symbolNodes(const QJsonArray& items, int depth);
     static QVector<LanguageDiagnostic> diagnosticsOf(const QString& path, const QJsonArray& items);
@@ -721,16 +722,8 @@ void LanguageServerClient::handleInitializeResponse(const QJsonObject& message) 
     return;
 }
 
-void LanguageServerClient::handleCompletionResponse(int requestId, const QJsonObject& message) {
-    const QString path = m_completionRequests.take(requestId);
-
-    if (message.contains(QStringLiteral("error"))) {
-        emit serverLog(message.value(QStringLiteral("error")).toObject().value(QStringLiteral("message")).toString(QStringLiteral("The language server rejected completion")));
-        return;
-    }
-
-    const QJsonValue result = message.value(QStringLiteral("result"));
-    const QJsonArray items = result.isArray() ? result.toArray() : result.toObject().value(QStringLiteral("items")).toArray();
+// A server decides how many candidates it sends, so they are read away from the thread that draws and bounded before they reach it.
+QVector<CompletionProposal> LanguageServerClientHelper::decodeCompletions(const QJsonArray& items, int bound) {
     QVector<CompletionProposal> proposals;
 
     for (const auto& value : items) {
@@ -761,7 +754,32 @@ void LanguageServerClient::handleCompletionResponse(int requestId, const QJsonOb
     // clang-format off
     std::stable_sort(proposals.begin(), proposals.end(), [](const CompletionProposal& first, const CompletionProposal& second) { return first.sortText < second.sortText; });
     // clang-format on
-    emit completionsReady(path, proposals);
+    // clang-format off
+    std::stable_sort(proposals.begin(), proposals.end(), [](const CompletionProposal& first, const CompletionProposal& second) { return first.sortText < second.sortText; });
+    // clang-format on
+
+    if (proposals.size() > bound) {
+        proposals.resize(bound);
+    }
+
+    return proposals;
+}
+
+void LanguageServerClient::handleCompletionResponse(int requestId, const QJsonObject& message) {
+    const QString path = m_completionRequests.take(requestId);
+
+    if (message.contains(QStringLiteral("error"))) {
+        emit serverLog(message.value(QStringLiteral("error")).toObject().value(QStringLiteral("message")).toString(QStringLiteral("The language server refused the completion request")));
+        return;
+    }
+
+    const QJsonValue result = message.value(QStringLiteral("result"));
+    const QJsonArray items = result.isArray() ? result.toArray() : result.toObject().value(QStringLiteral("items")).toArray();
+    const int bound = LanguageRegistry::limits().maximumCompletions;
+    // clang-format off
+    auto decoded = QtConcurrent::run([items, bound]() { return LanguageServerClientHelper::decodeCompletions(items, bound); });
+    decoded.then(this, [this, path](const QVector<CompletionProposal>& proposals) { emit completionsReady(path, proposals); });
+    // clang-format on
 }
 
 void LanguageServerClient::handleCompletionDocumentationResponse(int requestId, const QJsonObject& message) {

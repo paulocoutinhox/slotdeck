@@ -70,6 +70,7 @@ struct EditorLimits final {
     int maximumReferences{0};
     int maximumWorkspaceFiles{0};
     int maximumProblems{0};
+    int maximumCompletions{0};
     int bottomPanelMinimumHeight{0};
     int bottomPanelInitialHeight{0};
 };

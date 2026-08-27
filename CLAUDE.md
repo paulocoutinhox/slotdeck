@@ -1078,6 +1078,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A document that loses its language server also loses the marks that server left in the text.
 - Semantic tokens repaint the text over the pattern highlighter, because the server knows what a name really is while a pattern only guessed from its shape.
 - Completion is a filtering proposal list that keeps the server order, presents the detail beside the label, shows the documentation of the highlighted row and resolves that documentation when the server offers it.
+- A server decides how many candidates it answers, so they are read away from the thread that draws and bounded before they reach it, keeping the ones that server ranked first.
 - The proposal list owns the acceptance and navigation keys while it is open, so accepting a proposal never writes a line break instead.
 - Signature help answers the trigger characters the server declares and presents the active signature while the call is being written.
 - The indexing progress the server reports is presented in the workspace status bar and disappears when the work ends.
@@ -1517,7 +1518,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 380 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 381 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
@@ -1601,6 +1602,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Every malformed language catalog the code declares a refusal for is refused from text, covering eighteen shapes across the languages, the servers, the highlighting and the limits.
 - [x] A prompt carrying every character a shell acts on reaches a command line agent unchanged, and every malformed command line provider is refused from text.
 - [x] An answer of tens of thousands of semantic tokens is decoded and grouped off the interface thread, measured as seventeen and twenty nine milliseconds becoming two and four.
+- [x] A server answering forty thousand completion candidates reaches the reader with the bound it declares rather than with all of them.
 - [x] A catalog wrong in more than one way is refused for the reason its reader hits first.
 - [x] Every one of the eight plugins answers a topic it does not implement by the one shared name, asked through its own interface rather than sampled.
 - [x] The terminal, the editor and the shared document open on one monospaced family, and a family the user chose still wins over it.
