@@ -1519,7 +1519,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 385 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 388 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
@@ -1606,6 +1606,9 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A server answering forty thousand completion candidates reaches the reader with the bound it declares rather than with all of them.
 - [x] A command line agent is started as a real process against a fixture, running where the task declares and reading a prompt carrying every character a shell acts on.
 - [x] A command task runs a real process for both endings, moving to Done on a zero exit code and back to the board with its reason on any other, and the directory it ran in is proven by a command that only succeeds beside a file that directory holds.
+- [x] A paste the reader refused writes nothing to the shell, a confirmed one reaches it, text that only wraps is never asked about and the setting turned off writes without asking, all driven through the key a reader presses.
+- [x] A selection is indented and unindented as whole lines, leaving a line nobody selected alone and answering a document resolved to tabs with a tab.
+- [x] A card dropped anywhere but Doing moves, dropped into Doing starts and dragged out while running stops and returns to the board.
 - [x] A catalog wrong in more than one way is refused for the reason its reader hits first.
 - [x] Every one of the eight plugins answers a topic it does not implement by the one shared name, asked through its own interface rather than sampled.
 - [x] The terminal, the editor and the shared document open on one monospaced family, and a family the user chose still wins over it.

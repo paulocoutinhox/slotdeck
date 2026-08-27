@@ -1693,6 +1693,74 @@ TEST(TerminalFontTests, SizesEveryCellToWhatItsFontAsksForRatherThanPastIt) {
     }
 }
 
+// A shell runs every line a plain paste delivers, so the confirmation is what stands between the clipboard and the shell.
+TEST(TerminalWidgetTests, AsksBeforePastingTextThatWouldRunAndWritesNothingWhenRefused) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    test::TestPluginHost host;
+    plugins::terminalplugin::TerminalWorkspaceRepository repository(host);
+    QList<FakePtyBackend*> backends;
+    // clang-format off
+    terminalcore::PtyBackendFactory factory = [&backends]() {
+        auto backend = std::make_unique<FakePtyBackend>();
+        backends.append(backend.get());
+        return backend;
+    };
+    // clang-format on
+    workspace::WorkspaceManager manager(repository, host, directory.path(), *terminalcore::terminalTheme(QStringLiteral("balanced")), std::move(factory));
+    ASSERT_TRUE(manager.initialize().hasValue());
+    auto* session = qobject_cast<terminalcore::TerminalSession*>(manager.sessionObject(manager.currentFocusedSessionId()));
+    ASSERT_NE(session, nullptr);
+    ASSERT_FALSE(backends.isEmpty());
+
+    ui::TerminalWidget widget(host);
+    widget.setSession(session);
+    widget.setConfirmMultilinePaste(true);
+    QApplication::clipboard()->setText(QStringLiteral("rm -rf /\n"));
+    backends.first()->writes.clear();
+
+    // clang-format off
+    const auto written = [&backends]() {
+        QByteArray joined;
+        for (const auto& chunk : backends.first()->writes) {
+            joined.append(chunk);
+        }
+        return joined;
+    };
+    // clang-format on
+
+    // A paste the reader refused reaches nothing.
+    host.confirmation = false;
+    QTest::keyClick(&widget, Qt::Key_Insert, Qt::ShiftModifier);
+    EXPECT_TRUE(written().isEmpty()) << "text the reader refused was written to the shell: " << written().toStdString();
+
+    // The same paste confirmed reaches the shell.
+    host.confirmation = true;
+    QTest::keyClick(&widget, Qt::Key_Insert, Qt::ShiftModifier);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&written]() { return written().contains(QByteArrayLiteral("rm -rf /")); }));
+    // clang-format on
+
+    // Text that merely wraps is not text that runs, so nothing is asked about it.
+    backends.first()->writes.clear();
+    host.confirmation = false;
+    QApplication::clipboard()->setText(QStringLiteral("just words"));
+    QTest::keyClick(&widget, Qt::Key_Insert, Qt::ShiftModifier);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&written]() { return written().contains(QByteArrayLiteral("just words")); }));
+    // clang-format on
+
+    // With the confirmation off, what would run is written without asking.
+    backends.first()->writes.clear();
+    widget.setConfirmMultilinePaste(false);
+    QApplication::clipboard()->setText(QStringLiteral("rm -rf /\n"));
+    QTest::keyClick(&widget, Qt::Key_Insert, Qt::ShiftModifier);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&written]() { return written().contains(QByteArrayLiteral("rm -rf /")); }));
+    // clang-format on
+    widget.setSession(nullptr);
+}
+
 } // namespace slotdeck
 
 TEST(TerminalTranslationsTest, SpellsEveryKeyInEveryLanguageTheSelectorOffers) {

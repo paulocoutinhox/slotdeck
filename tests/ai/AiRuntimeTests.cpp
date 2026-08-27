@@ -2283,4 +2283,46 @@ TEST(AiPluginTest, FailsACommandTaskThatEndedBadlyAndKeepsWhatItPrinted) {
     Q_UNUSED(runs);
 }
 
+// Moving a card is how the board is used, so where it is dropped decides whether a run starts, stops or the card simply moves.
+TEST(AiPluginTest, StartsStopsOrMovesACardByWhereItIsDropped) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    const AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+    AiTestsHelper::installExecutionRows(host, {}, {});
+
+    FakeChatClient* client = nullptr;
+    // clang-format off
+    AiPlugin plugin([&client](AiRequestGate&, const ModelConnection&) { auto created = std::make_unique<FakeChatClient>(); client = created.get(); return std::unique_ptr<AiChatClient>(std::move(created)); });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    ASSERT_EQ(plugin.tasks().first().column, TaskColumn::Todo);
+
+    // A card dropped anywhere but Doing while nothing runs simply moves.
+    ASSERT_TRUE(test::awaitFuture(plugin.moveTask(task.id, TaskColumn::Blocked)).hasValue());
+    EXPECT_EQ(plugin.tasks().first().column, TaskColumn::Blocked);
+    EXPECT_EQ(plugin.runState(task.id), TaskRunState::Idle);
+
+    // A card dropped into Doing starts it.
+    ASSERT_TRUE(test::awaitFuture(plugin.moveTask(task.id, TaskColumn::Doing)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&client]() { return client != nullptr && client->sendCalls == 1; }));
+    // clang-format on
+    EXPECT_NE(plugin.runState(task.id), TaskRunState::Idle);
+
+    // A card dragged out of Doing while it runs stops it and returns it to the board.
+    ASSERT_TRUE(test::awaitFuture(plugin.moveTask(task.id, TaskColumn::Review)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&plugin, &task]() { return plugin.runState(task.id) == TaskRunState::Idle; }));
+    // clang-format on
+    EXPECT_EQ(plugin.tasks().first().column, TaskColumn::Todo) << "a card stopped by being dragged did not return to the board";
+
+    // A card nobody declares is refused by name.
+    const auto unknown = test::awaitFuture(plugin.moveTask(QStringLiteral("nobody-declares-this"), TaskColumn::Done));
+    ASSERT_FALSE(unknown.hasValue());
+    EXPECT_EQ(unknown.error().code, QStringLiteral("ai_tasks_task_unknown"));
+}
+
 } // namespace slotdeck::plugins::ai

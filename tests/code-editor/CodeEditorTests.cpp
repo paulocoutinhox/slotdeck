@@ -2857,4 +2857,47 @@ TEST(LanguageServerClientTest, BoundsHowManyCandidatesAServerMayAnswerWith) {
     client.stop();
 }
 
+// A selection is indented and unindented as whole lines, because that is what the reader selected.
+TEST(CodeEditorWidgetTest, IndentsAndUnindentsEveryLineOfASelection) {
+    test::TestPluginHost host;
+    CodeEditorWidget editor(host.theme(), CodeColorSchemeCatalog::schemes().first());
+    editor.setIndentation(IndentStyle::Space, 4);
+    editor.setPlainText(QStringLiteral("first\nsecond\nthird\n"));
+
+    QTextCursor selection(editor.document()->findBlockByNumber(0));
+    selection.setPosition(editor.document()->findBlockByNumber(1).position() + 2, QTextCursor::KeepAnchor);
+    editor.setTextCursor(selection);
+
+    QTest::keyClick(&editor, Qt::Key_Tab);
+    EXPECT_EQ(editor.document()->findBlockByNumber(0).text(), QStringLiteral("    first"));
+    EXPECT_EQ(editor.document()->findBlockByNumber(1).text(), QStringLiteral("    second"));
+    EXPECT_EQ(editor.document()->findBlockByNumber(2).text(), QStringLiteral("third")) << "a line the reader never selected was indented";
+
+    QTest::keyClick(&editor, Qt::Key_Backtab);
+    EXPECT_EQ(editor.document()->findBlockByNumber(0).text(), QStringLiteral("first"));
+    EXPECT_EQ(editor.document()->findBlockByNumber(1).text(), QStringLiteral("second"));
+
+    // A line with nothing to give back keeps what it has.
+    QTest::keyClick(&editor, Qt::Key_Backtab);
+    EXPECT_EQ(editor.document()->findBlockByNumber(0).text(), QStringLiteral("first"));
+
+    // With nothing selected the key writes the indentation the document resolved rather than moving lines.
+    QTextCursor caret(editor.document()->findBlockByNumber(2));
+    caret.movePosition(QTextCursor::EndOfBlock);
+    editor.setTextCursor(caret);
+    QTest::keyClick(&editor, Qt::Key_Tab);
+    EXPECT_EQ(editor.document()->findBlockByNumber(2).text(), QStringLiteral("third    "));
+
+    // A document resolved to tabs gives back a tab.
+    editor.setIndentation(IndentStyle::Tab, 4);
+    editor.setPlainText(QStringLiteral("alpha\nbeta\n"));
+    QTextCursor tabbed(editor.document()->findBlockByNumber(0));
+    tabbed.setPosition(editor.document()->findBlockByNumber(1).position() + 1, QTextCursor::KeepAnchor);
+    editor.setTextCursor(tabbed);
+    QTest::keyClick(&editor, Qt::Key_Tab);
+    EXPECT_EQ(editor.document()->findBlockByNumber(0).text(), QStringLiteral("\talpha"));
+    QTest::keyClick(&editor, Qt::Key_Backtab);
+    EXPECT_EQ(editor.document()->findBlockByNumber(0).text(), QStringLiteral("alpha"));
+}
+
 } // namespace slotdeck::plugins::codeeditor
