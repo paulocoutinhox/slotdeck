@@ -18,6 +18,7 @@ namespace slotdeck::persistence {
 class ConfigurationTransferHelper final {
   public:
     static utils::Result<void> copyAtomically(const QString& sourcePath, const QString& destinationPath);
+    static utils::Result<void> replaceDatabase(const QString& sourcePath, const QString& destinationPath);
     static QString fileIdentity(const QString& filePath);
     static utils::Result<void> validateDatabase(const QString& filePath, const QHash<QString, int>& pluginSchemaVersions);
     static utils::Result<void> createSnapshot(const QString& databasePath, const QString& destinationPath);
@@ -51,6 +52,24 @@ utils::Result<void> ConfigurationTransferHelper::copyAtomically(const QString& s
     }
 
     return destination.commit() ? utils::Result<void>::success() : utils::Result<void>::failure(utils::Error{"configuration_commit_failed", "The configuration file could not be committed", destination.errorString()});
+}
+
+// A database is replaced together with the log that belongs to it, because a log left beside its replacement is replayed over what arrived.
+utils::Result<void> ConfigurationTransferHelper::replaceDatabase(const QString& sourcePath, const QString& destinationPath) {
+    const auto copied = copyAtomically(sourcePath, destinationPath);
+
+    if (!copied.hasValue()) {
+        return copied;
+    }
+
+    for (const auto& suffix : {QStringLiteral("-wal"), QStringLiteral("-shm")}) {
+        const QString sidecar = destinationPath + suffix;
+        if (QFileInfo::exists(sidecar) && !QFile::remove(sidecar)) {
+            return utils::Result<void>::failure({"configuration_log_remove_failed", "The log of the replaced configuration database could not be removed", sidecar});
+        }
+    }
+
+    return utils::Result<void>::success();
 }
 
 QString ConfigurationTransferHelper::fileIdentity(const QString& filePath) {
@@ -202,7 +221,7 @@ utils::Result<bool> ConfigurationTransfer::beginPendingImport(const QString& dat
         if (!backupValidation.hasValue()) {
             return utils::Result<bool>::failure(backupValidation.error());
         }
-        const auto recovery = ConfigurationTransferHelper::copyAtomically(backupPath, databasePath);
+        const auto recovery = ConfigurationTransferHelper::replaceDatabase(backupPath, databasePath);
         if (!recovery.hasValue()) {
             return utils::Result<bool>::failure(recovery.error());
         }
@@ -234,7 +253,7 @@ utils::Result<bool> ConfigurationTransfer::beginPendingImport(const QString& dat
         return utils::Result<bool>::failure(backup.error());
     }
 
-    const auto result = ConfigurationTransferHelper::copyAtomically(pendingPath, databasePath);
+    const auto result = ConfigurationTransferHelper::replaceDatabase(pendingPath, databasePath);
 
     if (!result.hasValue()) {
         QFile::remove(backupPath);
@@ -260,7 +279,7 @@ utils::Result<void> ConfigurationTransfer::rollbackPendingImport(const QString& 
         return utils::Result<void>::failure({"configuration_backup_missing", "The configuration backup is unavailable", backupPath});
     }
 
-    const auto restore = ConfigurationTransferHelper::copyAtomically(backupPath, databasePath);
+    const auto restore = ConfigurationTransferHelper::replaceDatabase(backupPath, databasePath);
 
     if (!restore.hasValue()) {
         return restore;

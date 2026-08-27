@@ -356,6 +356,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A successful import requests an orderly shutdown, releases every database connection and process lock, then starts a new process.
 - That shutdown is deferred out of the request that asked for it, because the surface asking is one of the things it destroys and the object carrying the request is another.
 - The new process atomically replaces the current database from the staged import before opening any application connection.
+- That replacement discards the write-ahead log of the database it replaces, because a log a crash left behind is replayed over the database that arrived and hands the reader back the data the import was meant to replace.
+- Every path that puts one database in the place of another goes through the one replacement that does this, covering the applied import, the recovery of an interrupted one and the rollback of a rejected one.
 - Invalid or interrupted imports preserve the current database and return an explicit error.
 - Import recovery removes a rejected pending database before deleting its backup so a cleanup failure cannot reapply the rejected database on the next launch.
 - Import and export transfer the single database containing core preferences, plugin schemas and plugin-owned persistent state.
@@ -1500,6 +1502,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A command line agent is offered neither model discovery nor extra parameters, and coming back to a provider reached over a wire restores both.
 - [x] Every one of the nine catalogs declares both languages itself, so the case that reads them back can fail, and the five provider names that were only inherited are declared.
 - [x] A window whose reservation leaves no room fits the conversation down to the instructions and the task, and a model that declares no window still passes it whole.
+- [x] An import applied over a database whose log a crash left behind reads what the import brought, proven by a case that reads back the previous value without the replacement that discards it.
 - [x] The view follows the reader instead of dragging them to the end of every message that arrives.
 - [x] AI tasks are grouped into renameable workspace tabs and rendered across the To Do, Doing, Blocked, Review and Done columns.
 - [x] AI task cards keep their own margin, use the filled play symbol and expose Play, Stop, Edit and Remove.

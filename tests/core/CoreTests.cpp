@@ -260,6 +260,52 @@ TEST(ConfigurationTransferTest, ExportsStagesAndAppliesACompleteDatabaseSnapshot
     EXPECT_EQ(rows.value().first().value(QStringLiteral("value")).toString(), QStringLiteral("saved"));
 }
 
+// A log belongs to the database that wrote it, so one a crash left behind must never be replayed over what an import brought.
+TEST(ConfigurationTransferTest, DiscardsTheLogOfTheDatabaseAnImportReplaces) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const QString sourcePath = directory.filePath(QStringLiteral("source.sqlite3"));
+    const QString exportPath = directory.filePath(QStringLiteral("export.sqlite3"));
+    const QString pendingPath = directory.filePath(QStringLiteral("pending.sqlite3"));
+    const QString currentPath = directory.filePath(QStringLiteral("current.sqlite3"));
+    const QString backupPath = directory.filePath(QStringLiteral("backup.sqlite3"));
+    const QString capturedLog = directory.filePath(QStringLiteral("captured.log"));
+    const QString currentLog = currentPath + QStringLiteral("-wal");
+    const QHash<QString, int> schemaVersions;
+
+    {
+        persistence::StateStore source(sourcePath);
+        ASSERT_TRUE(source.initialize().hasValue());
+        ASSERT_TRUE(source.saveSettings(QStringLiteral("slotdeck"), {{QStringLiteral("language"), QStringLiteral("pt")}}).hasValue());
+        const auto exported = test::awaitFuture(persistence::ConfigurationTransfer::exportDatabase(sourcePath, exportPath));
+        ASSERT_TRUE(exported.hasValue()) << exported.error().message.toStdString();
+    }
+
+    // The current database is left as a crash leaves one, with its newest commits still in the log beside it.
+    {
+        persistence::StateStore current(currentPath);
+        ASSERT_TRUE(current.initialize().hasValue());
+        ASSERT_TRUE(current.saveSettings(QStringLiteral("slotdeck"), {{QStringLiteral("language"), QStringLiteral("en")}}).hasValue());
+        ASSERT_TRUE(QFileInfo::exists(currentLog));
+        ASSERT_TRUE(QFile::copy(currentLog, capturedLog));
+    }
+
+    QFile::remove(currentLog);
+    ASSERT_TRUE(QFile::copy(capturedLog, currentLog));
+    const auto staged = test::awaitFuture(persistence::ConfigurationTransfer::stageImport(exportPath, pendingPath, schemaVersions));
+    ASSERT_TRUE(staged.hasValue()) << staged.error().message.toStdString();
+    const auto applied = persistence::ConfigurationTransfer::beginPendingImport(currentPath, pendingPath, backupPath, schemaVersions);
+    ASSERT_TRUE(applied.hasValue()) << applied.error().code.toStdString() << " " << applied.error().detail.toStdString();
+    EXPECT_TRUE(applied.value());
+
+    // Nothing of the replaced database is left beside the one that arrived.
+    EXPECT_FALSE(QFileInfo::exists(currentLog));
+
+    persistence::StateStore imported(currentPath);
+    ASSERT_TRUE(imported.initialize().hasValue());
+    EXPECT_EQ(imported.settings(QStringLiteral("slotdeck")).value(QStringLiteral("language")).toString(), QStringLiteral("pt"));
+}
+
 TEST(ConfigurationTransferTest, RestoresThePreviousDatabaseWhenAnAppliedImportIsRejected) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());
