@@ -7,6 +7,8 @@
 #include <QJsonObject>
 #include <QStandardPaths>
 
+#include <utility>
+
 namespace slotdeck::plugins::ai {
 
 class AiCliChatClientHelper final {
@@ -90,7 +92,9 @@ QString renderConversationPrompt(const QJsonArray& messages) {
     return rendered.join(QStringLiteral("\n\n"));
 }
 
-AiCliChatClient::AiCliChatClient(QObject* parent) : AiChatClient(parent) {
+AiCliChatClient::AiCliChatClient(QObject* parent) : AiCliChatClient(resolveCommandLineProgram, parent) {}
+
+AiCliChatClient::AiCliChatClient(CommandLineResolver resolver, QObject* parent) : AiChatClient(parent), m_resolver(std::move(resolver)) {
     // clang-format off
     connect(&m_runner, &AiCommandRunner::outputReceived, this, [this](const QString& text) { emit contentReceived(text); });
     connect(&m_runner, &AiCommandRunner::finished, this, [this](int exitCode, const QString& output) { completeRun(exitCode, output); });
@@ -111,7 +115,7 @@ void AiCliChatClient::send(const ChatRequest& request, const std::function<QStri
         return;
     }
 
-    const QString program = resolveCommandLineProgram(provider->commandLine.program);
+    const QString program = m_resolver(provider->commandLine.program);
 
     if (program.isEmpty()) {
         emit failed({"ai_cli_program_missing", translate(QStringLiteral("ai.error.cli-program-missing")), provider->commandLine.program});

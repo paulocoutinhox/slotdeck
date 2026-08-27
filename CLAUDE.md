@@ -642,6 +642,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Such a provider declares the program to run and the arguments to run it with, as data like every other provider, and the argument list declares where the prompt goes and where the working directory goes.
 - The program is started with an argument vector rather than a command line, so a prompt carrying quotes, newlines, dollars, backticks or semicolons reaches the agent exactly as it was written.
 - The program is found by its name alone, resolved against the executable path of the running system and then against the install directories that platform declares, because a window opened by the desktop does not inherit the path a shell has.
+- Which executable a name resolves to is a property of the running system, so the transport receives that resolution and a deterministic run is given one of its own.
 - A program that is not installed is an explicit failure naming it, and a task with no working directory cannot run a command line agent.
 - The process runs in the directory the task declares, whether or not that provider also takes it as an argument.
 - A command line agent runs its own tools, so none is declared to it and its run is one turn that ends when the program does.
@@ -1518,7 +1519,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 381 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 383 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
@@ -1603,6 +1604,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A prompt carrying every character a shell acts on reaches a command line agent unchanged, and every malformed command line provider is refused from text.
 - [x] An answer of tens of thousands of semantic tokens is decoded and grouped off the interface thread, measured as seventeen and twenty nine milliseconds becoming two and four.
 - [x] A server answering forty thousand completion candidates reaches the reader with the bound it declares rather than with all of them.
+- [x] A command line agent is started as a real process against a fixture, running where the task declares and reading a prompt carrying every character a shell acts on.
 - [x] A catalog wrong in more than one way is refused for the reason its reader hits first.
 - [x] Every one of the eight plugins answers a topic it does not implement by the one shared name, asked through its own interface rather than sampled.
 - [x] The terminal, the editor and the shared document open on one monospaced family, and a family the user chose still wins over it.

@@ -3189,4 +3189,85 @@ TEST(AiCliChatClientTest, PassesAPromptAShellWouldHaveActedOnExactlyAsItIsWritte
     EXPECT_LT(rendered.indexOf(QStringLiteral("be brief")), rendered.indexOf(QStringLiteral("first")));
 }
 
+// The transport starts a real program, so it is exercised against one rather than only through the arguments it would build.
+TEST(AiCliChatClientTest, RunsTheProgramWhereTheTaskSaysAndAnswersWithWhatItPrinted) {
+    QTemporaryDir project;
+    ASSERT_TRUE(project.isValid());
+    const QString workdir = QFileInfo(project.path()).canonicalFilePath();
+    // clang-format off
+    const auto resolver = [](const QString&) { return QCoreApplication::applicationFilePath(); };
+    // clang-format on
+    qputenv("SLOTDECK_TEST_CLI_AGENT", QByteArrayLiteral("1"));
+    AiCliChatClient client(resolver, nullptr);
+
+    QString answered;
+    utils::Error failure;
+    bool finished = false;
+    // clang-format off
+    QObject::connect(&client, &AiChatClient::finished, &client, [&answered, &finished](const QString& content, const QVector<ToolCall>&, ChatUsage, const QString&) { answered = content; finished = true; });
+    QObject::connect(&client, &AiChatClient::failed, &client, [&failure, &finished](const utils::Error& error) { failure = error; finished = true; });
+    const auto translate = [](const QString& key) { return key; };
+    // clang-format on
+
+    ModelConnection connection;
+    connection.providerId = QStringLiteral("claude-cli");
+    connection.modelId = QStringLiteral("claude-cli");
+    const QString prompt = QStringLiteral("say \"$HOME\" && rm -rf / ; `whoami`\nsecond line");
+    ChatRequest request;
+    request.connection = connection;
+    request.messages = QJsonArray{QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), prompt}}};
+    request.workdir = workdir;
+
+    client.send(request, translate);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&finished]() { return finished; }));
+    // clang-format on
+    ASSERT_TRUE(failure.code.isEmpty()) << failure.code.toStdString() << " " << failure.message.toStdString();
+
+    // The agent ran where the task said and read the prompt exactly as it was written.
+    EXPECT_TRUE(answered.contains(QStringLiteral("directory: ") + workdir)) << answered.toStdString();
+    EXPECT_TRUE(answered.contains(prompt.section(QLatin1Char('\n'), 0, 0))) << answered.toStdString();
+    EXPECT_FALSE(client.running());
+    qunsetenv("SLOTDECK_TEST_CLI_AGENT");
+}
+
+// A program that is not installed is named rather than answered with nothing.
+TEST(AiCliChatClientTest, RefusesToRunWhatIsNotInstalledAndWhatHasNowhereToRun) {
+    // clang-format off
+    const auto missing = [](const QString&) { return QString{}; };
+    // clang-format on
+    AiCliChatClient client(missing, nullptr);
+
+    utils::Error failure;
+    // clang-format off
+    QObject::connect(&client, &AiChatClient::failed, &client, [&failure](const utils::Error& error) { failure = error; });
+    const auto translate = [](const QString& key) { return key; };
+    // clang-format on
+
+    ModelConnection connection;
+    connection.providerId = QStringLiteral("claude-cli");
+    connection.modelId = QStringLiteral("claude-cli");
+    ChatRequest request;
+    request.connection = connection;
+    request.messages = QJsonArray{QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QStringLiteral("anything")}}};
+    request.workdir = QDir::tempPath();
+
+    client.send(request, translate);
+    EXPECT_EQ(failure.code, QStringLiteral("ai_cli_program_missing"));
+    EXPECT_EQ(failure.detail, QStringLiteral("claude"));
+
+    // A task with no working directory has nowhere to run an agent.
+    failure = {};
+    request.workdir.clear();
+    client.send(request, translate);
+    EXPECT_EQ(failure.code, QStringLiteral("ai_cli_workdir_required"));
+
+    // A connection naming a provider reached over a wire is not a command line agent.
+    failure = {};
+    request.workdir = QDir::tempPath();
+    request.connection.providerId = QStringLiteral("openai");
+    client.send(request, translate);
+    EXPECT_EQ(failure.code, QStringLiteral("ai_cli_provider_invalid"));
+}
+
 } // namespace slotdeck::plugins::ai

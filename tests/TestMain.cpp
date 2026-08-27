@@ -1,11 +1,13 @@
 #include "BuildInfo.h"
 
 #include <QApplication>
+#include <QDir>
 #include <QFontDatabase>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QStandardPaths>
+#include <QTextStream>
 
 #include <gtest/gtest.h>
 
@@ -353,6 +355,22 @@ int main(int argc, char** argv) {
     }
     if (TestMainHelper::hasArgument(argc, argv, "--slotdeck-test-lsp-silent")) {
         return TestMainHelper::runLanguageServerFixture(LanguageServerFixture::Silent);
+    }
+    // A command line agent reads the prompt it was given and answers with it, which is what one really does.
+    if (qEnvironmentVariableIsSet("SLOTDECK_TEST_CLI_AGENT")) {
+        QString prompt;
+
+        for (int index = 1; index + 1 < argc; ++index) {
+            if (std::string_view(argv[index]) == "-p") {
+                prompt = QString::fromLocal8Bit(argv[index + 1]);
+            }
+        }
+
+        QTextStream out(stdout);
+        out << QStringLiteral("directory: %1\n").arg(QDir::currentPath());
+        out << QStringLiteral("prompt: %1\n").arg(prompt);
+        out.flush();
+        return prompt.isEmpty() ? 3 : 0;
     }
     if (TestMainHelper::hasArgument(argc, argv, "--slotdeck-test-lsp-many-completions")) {
         return TestMainHelper::runLanguageServerFixture(LanguageServerFixture::ManyCompletions);
