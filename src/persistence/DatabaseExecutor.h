@@ -37,7 +37,7 @@ class DatabaseExecutor final : public QObject {
 
   private:
     QThread m_workerThread;
-    DatabaseWorker* m_worker{nullptr};
+    std::unique_ptr<DatabaseWorker> m_worker;
 };
 
 } // namespace slotdeck::persistence

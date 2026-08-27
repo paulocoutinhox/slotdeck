@@ -99,7 +99,7 @@ template <> QFuture<utils::Result<void>> DatabaseExecutorHelper::submit(Database
     return future;
 }
 
-DatabaseExecutor::DatabaseExecutor(QString filePath, QObject* parent) : QObject(parent), m_worker(new DatabaseWorker(std::move(filePath))) {
+DatabaseExecutor::DatabaseExecutor(QString filePath, QObject* parent) : QObject(parent), m_worker(std::make_unique<DatabaseWorker>(std::move(filePath))) {
     m_worker->moveToThread(&m_workerThread);
     m_workerThread.setObjectName(QStringLiteral("slotdeckDatabase"));
     m_workerThread.start();
@@ -107,49 +107,47 @@ DatabaseExecutor::DatabaseExecutor(QString filePath, QObject* parent) : QObject(
 
 DatabaseExecutor::~DatabaseExecutor() {
     if (!m_workerThread.isRunning()) {
-        delete m_worker;
         return;
     }
 
     QThread* ownerThread = thread();
     // clang-format off
-    QMetaObject::invokeMethod(m_worker, [this, ownerThread]() {
+    QMetaObject::invokeMethod(m_worker.get(), [this, ownerThread]() {
         m_worker->close();
         m_worker->moveToThread(ownerThread);
         m_workerThread.quit();
     }, Qt::QueuedConnection);
     // clang-format on
     m_workerThread.wait();
-    delete m_worker;
 }
 
 QFuture<utils::Result<void>> DatabaseExecutor::saveSettings(const QString& ownerId, const QJsonObject& document) {
     // clang-format off
-    return DatabaseExecutorHelper::submit<void>(m_worker, [ownerId, document](StateStore& stateStore) { return stateStore.saveSettings(ownerId, document); });
+    return DatabaseExecutorHelper::submit<void>(m_worker.get(), [ownerId, document](StateStore& stateStore) { return stateStore.saveSettings(ownerId, document); });
     // clang-format on
 }
 
 QFuture<utils::Result<void>> DatabaseExecutor::exportConfiguration(const QString& destinationPath) {
     // clang-format off
-    return DatabaseExecutorHelper::submit<void>(m_worker, [destinationPath](StateStore& stateStore) { return ConfigurationTransfer::exportDatabaseNow(stateStore.filePath(), destinationPath); });
+    return DatabaseExecutorHelper::submit<void>(m_worker.get(), [destinationPath](StateStore& stateStore) { return ConfigurationTransfer::exportDatabaseNow(stateStore.filePath(), destinationPath); });
     // clang-format on
 }
 
 QFuture<utils::Result<void>> DatabaseExecutor::executePluginDatabase(const QString& pluginId, const QString& statement, const QVariantList& bindings) {
     // clang-format off
-    return DatabaseExecutorHelper::submit<void>(m_worker, [pluginId, statement, bindings](StateStore& stateStore) { return stateStore.executePluginDatabase(pluginId, statement, bindings); });
+    return DatabaseExecutorHelper::submit<void>(m_worker.get(), [pluginId, statement, bindings](StateStore& stateStore) { return stateStore.executePluginDatabase(pluginId, statement, bindings); });
     // clang-format on
 }
 
 QFuture<utils::Result<void>> DatabaseExecutor::executePluginDatabaseTransaction(const QString& pluginId, const QVector<DatabaseStatement>& statements) {
     // clang-format off
-    return DatabaseExecutorHelper::submit<void>(m_worker, [pluginId, statements](StateStore& stateStore) { return stateStore.executePluginDatabaseTransaction(pluginId, statements); });
+    return DatabaseExecutorHelper::submit<void>(m_worker.get(), [pluginId, statements](StateStore& stateStore) { return stateStore.executePluginDatabaseTransaction(pluginId, statements); });
     // clang-format on
 }
 
 QFuture<utils::Result<DatabaseRows>> DatabaseExecutor::queryPluginDatabase(const QString& pluginId, const QString& statement, const QVariantList& bindings) {
     // clang-format off
-    return DatabaseExecutorHelper::submit<DatabaseRows>(m_worker, [pluginId, statement, bindings](StateStore& stateStore) { return stateStore.queryPluginDatabase(pluginId, statement, bindings); });
+    return DatabaseExecutorHelper::submit<DatabaseRows>(m_worker.get(), [pluginId, statement, bindings](StateStore& stateStore) { return stateStore.queryPluginDatabase(pluginId, statement, bindings); });
     // clang-format on
 }
 

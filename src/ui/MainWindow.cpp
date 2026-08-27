@@ -204,15 +204,15 @@ void MainWindow::createActions() {
 }
 
 utils::Result<void> MainWindow::createInterface(const QString& preferredModeId) {
-    auto* central = new QWidget(this);
-    auto* root = new QHBoxLayout(central);
+    auto central = std::make_unique<QWidget>();
+    auto* root = new QHBoxLayout(central.get());
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
-    m_modeBar = new ModeBar(central);
+    m_modeBar = new ModeBar(central.get());
     root->addWidget(m_modeBar);
-    root->addWidget(verticalDivider(central));
+    root->addWidget(verticalDivider(central.get()));
 
-    m_contentStack = new QStackedWidget(central);
+    m_contentStack = new QStackedWidget(central.get());
     root->addWidget(m_contentStack, 1);
 
     QString initialMode;
@@ -221,7 +221,6 @@ utils::Result<void> MainWindow::createInterface(const QString& preferredModeId) 
         const QString id = MainWindowHelper::modeId(contribution.pluginId, contribution.item.id);
         auto* view = m_pluginManager.createNavigationView(contribution.pluginId, contribution.item.id, m_contentStack);
         if (view == nullptr) {
-            delete central;
             resetInterfacePointers();
             m_views.clear();
             return utils::Result<void>::failure({"plugin_navigation_view_failed", "A plugin navigation view could not be created", id});
@@ -238,7 +237,6 @@ utils::Result<void> MainWindow::createInterface(const QString& preferredModeId) 
     auto* settingsView = new SettingsView(m_pluginManager, m_coreSettings, m_contentStack);
 
     if (!settingsView->isValid()) {
-        delete central;
         resetInterfacePointers();
         m_views.clear();
         return utils::Result<void>::failure({"plugin_settings_view_failed", "The settings interface could not be created", {}});
@@ -254,13 +252,12 @@ utils::Result<void> MainWindow::createInterface(const QString& preferredModeId) 
     // clang-format on
 
     if (initialMode.isEmpty()) {
-        delete central;
         resetInterfacePointers();
         m_views.clear();
         return utils::Result<void>::failure({"plugin_navigation_primary_missing", "A primary plugin navigation view is required", {}});
     }
 
-    setCentralWidget(central);
+    setCentralWidget(central.release());
     m_toasts->raise();
     selectMode(m_views.contains(preferredModeId) ? preferredModeId : initialMode);
     return utils::Result<void>::success();

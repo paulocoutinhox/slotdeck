@@ -386,6 +386,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Plugin targets may consume core interface headers and shared visual primitives.
 - Domain values do not depend on UI or persistence behavior.
 - Ownership uses values, references, RAII and smart pointers.
+- A widget or a worker a failure path must release is held by an owning pointer and handed over on success, because a delete written by hand is one a later early return forgets.
+- A Qt object parented to another is owned by that parent and is never also held by a smart pointer.
 - Raw Qt pointers are non-owning QObject references and deferred work uses `QPointer`.
 
 ## Terminal plugin invariants
@@ -989,7 +991,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Writing in a chosen encoding rewrites the file whole even when nothing was typed, because the bytes on disk are what changed.
 - A mark is stripped from the bytes only when the file really starts with it, because an encoding chosen by hand names no mark those bytes have to carry.
 - A line longer than the highlighting bound keeps its text and loses only its colors, because running every pattern over generated content costs more than the colors are worth.
-- A line is bounded by how much decoration it accumulates as well as by its length, because a text edit that does not wrap re-measures the widest line in the document on every keystroke, so one long decorated line is paid for while typing anywhere in that file.
+- A line is bounded by how much decoration it accumulates as well as by its length, because the line being edited is laid out again on every keystroke and one carrying hundreds of ranges costs far more than the same text plain.
 - That bound is placed by measurement rather than by taste, at roughly one range for every eight characters of dense code, so a line a reader really reads keeps its colours and a table of values written as one statement does not.
 - Semantic tokens repaint only the lines whose tokens changed, and repaint the whole document only when most of them did, because repainting every line on every answer costs the whole file at the rhythm of typing.
 - Every language and every language server the editor knows lives in the catalog file the plugin carries as a resource, so a language is added by one entry of data and never by interface code.
@@ -1583,7 +1585,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Every platform reaches the declared family, proven after Windows reported a resolved name where macOS reports the generic one.
 - [x] Every reader of the settings contract is fed the hostile documents, including the text list that reads the arguments and roots of a stored server.
 - [x] Plain text carries no format range of its own, measured as forty percent of the ranges a source line used to carry for no visible difference.
-- [x] A line dense enough to cost more than its colours keeps its text and loses them, measured as three hundred keystrokes falling from 1224ms to 672ms in a file carrying such lines.
+- [x] A line dense enough to cost more than its colours keeps its text and loses them, measured as the decoration adding 680ms to three hundred keystrokes inside such a line before the bound and 66ms after it.
 - [x] Every malformed language catalog the code declares a refusal for is refused from text, covering eighteen shapes across the languages, the servers, the highlighting and the limits.
 - [x] A catalog wrong in more than one way is refused for the reason its reader hits first.
 - [x] Every one of the eight plugins answers a topic it does not implement by the one shared name, asked through its own interface rather than sampled.
