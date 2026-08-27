@@ -786,6 +786,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The conversation is fitted to the context window of the selected model before every turn, estimated from the serialized message size.
 - The fitting aims at a share of what remains rather than at the whole of it, because an estimate made from the size of the text underestimates what the model really counts, so a turn compacts under pressure instead of at the moment it overflows.
 - The window has to hold the answer and the tool declarations as well as the conversation, so the output budget and the serialized tools are reserved before anything is fitted into what is left.
+- A model that declares no window bounds nothing, and a window whose reservation leaves no room bounds everything, so the two are answered apart instead of by one number that would mean both.
+- A budget asking for everything a model allows is what most of the catalog declares as its whole window, so a run reaching that is fitted down to the instructions and the task rather than sent whole to a model with no room for it.
 - The request that summarizes what was dropped is fitted the same way, because what no longer fits can be larger than the window itself.
 - Fitting drops whole turns from the oldest end, because an assistant turn carrying tool calls is invalid without the results that answer it, and never drops the instructions or the task itself.
 - The middle of an older tool result is shortened before any turn is dropped, because that is the cheapest space in the conversation and it costs no model call.
@@ -1148,6 +1150,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - An icon taken from a published set is reproduced as painted geometry rather than shipped as a file, so it follows the active theme like every other one, and the comment above it records where the shape comes from.
 - Every icon is stroked in the colour its caller passes and covers the same pixels whatever that colour is, so a theme changes the colour of a glyph and never its shape.
 - The complete icon set is answered by one accessor, so a new icon is covered by the cases that render and compare every one of them rather than by a list kept by hand.
+- The lint command refuses an accessor that disagrees with the icon enumeration, because the painter is held to every icon by the compiler while that list is not.
 - No two icons draw the same thing, because an icon names the destination it opens and two destinations drawn alike are one destination to the reader.
 - One action draws one glyph everywhere it appears, so editing is the same mark on a card, on a bookmark, on a connection and on a server row.
 - The plain addition mark belongs to the thing a surface is mostly for, so on the board it adds a task and the workspace carries the mark of a board instead.
@@ -1496,6 +1499,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A picture a tool read reaches the model in the request that follows the call.
 - [x] A command line agent is offered neither model discovery nor extra parameters, and coming back to a provider reached over a wire restores both.
 - [x] Every one of the nine catalogs declares both languages itself, so the case that reads them back can fail, and the five provider names that were only inherited are declared.
+- [x] A window whose reservation leaves no room fits the conversation down to the instructions and the task, and a model that declares no window still passes it whole.
 - [x] The view follows the reader instead of dragging them to the end of every message that arrives.
 - [x] AI tasks are grouped into renameable workspace tabs and rendered across the To Do, Doing, Blocked, Review and Done columns.
 - [x] AI task cards keep their own margin, use the filled play symbol and expose Play, Stop, Edit and Remove.

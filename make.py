@@ -223,6 +223,20 @@ def unprotected_lambdas() -> list[str]:
     return found
 
 
+def unlisted_icons() -> list[str]:
+    declaration = (ROOT / "src" / "ui" / "Icons.h").read_text(encoding="utf-8")
+    accessor = (ROOT / "src" / "ui" / "Icons.cpp").read_text(encoding="utf-8")
+    body = re.search(r"enum class IconName[^{]*\{(.*?)\};", declaration, re.S)
+    listing = re.search(r"allIconNames\(\)[^{]*\{(.*?)\n\}", accessor, re.S)
+
+    if body is None or listing is None:
+        raise RuntimeError("The icon enumeration and its accessor could not be read")
+
+    declared = [match.group(1) for match in re.finditer(r"(\w+)", body.group(1))]
+    listed = re.findall(r"IconName::(\w+)", listing.group(1))
+    return sorted(set(declared).symmetric_difference(listed))
+
+
 def inherited_catalogs() -> list[str]:
     found: list[str] = []
 
@@ -281,6 +295,11 @@ def task_lint(_: Context) -> None:
 
     if stray:
         raise RuntimeError("Every comment is a complete sentence sitting on what it explains:\n  " + "\n  ".join(stray))
+
+    unlisted = unlisted_icons()
+
+    if unlisted:
+        raise RuntimeError("The accessor answers the complete icon set, so the cases that render and compare every icon reach these too:\n  " + "\n  ".join(unlisted))
 
     inherited = inherited_catalogs()
 

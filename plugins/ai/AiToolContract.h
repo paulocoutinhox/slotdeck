@@ -58,8 +58,9 @@ struct ToolArgumentError final {
 
 [[nodiscard]] std::optional<ToolArgumentError> findToolArgumentError(const ToolSchema& schema, const QJsonObject& arguments);
 [[nodiscard]] qint64 estimateTokens(const QJsonArray& messages);
-[[nodiscard]] qint64 fittingTokenLimit(int contextWindow, qint64 reservedTokens);
-[[nodiscard]] qsizetype pruneToolResults(QJsonArray& messages, qint64 limit);
+// A window nobody declares bounds nothing, which is not the same as a window the reservation leaves no room in.
+[[nodiscard]] std::optional<qint64> fittingTokenLimit(int contextWindow, qint64 reservedTokens);
+[[nodiscard]] qsizetype pruneToolResults(QJsonArray& messages, std::optional<qint64> limit);
 
 // Old turns are dropped whole, because an assistant turn carrying tool calls is invalid without the results that answer it.
 struct FittedConversation final {
@@ -68,7 +69,7 @@ struct FittedConversation final {
     qsizetype preservedHead{0};
 };
 
-[[nodiscard]] FittedConversation fitConversation(const QJsonArray& messages, qint64 limit);
+[[nodiscard]] FittedConversation fitConversation(const QJsonArray& messages, std::optional<qint64> limit);
 [[nodiscard]] QJsonArray serializeTools(WireProtocol protocol, const QVector<ToolSchema>& tools, const std::function<QString(const QString&)>& translate);
 [[nodiscard]] QJsonObject serializeAssistantTurn(WireProtocol protocol, const QString& content, const QVector<ToolCall>& calls);
 // Each protocol declares what a conversation has to look like before it is accepted, so the projection ends by satisfying it.

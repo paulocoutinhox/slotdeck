@@ -1115,7 +1115,7 @@ TEST(AiPluginTest, SummarizesTheTurnsThatNoLongerFitInsteadOfLosingThem) {
     FakeChatClient* agent = clients.first();
     const QString filler(60000, QLatin1Char('x'));
     // Each turn asks for a different file, because an agent repeating the same call is stopped as making no progress.
-    const qsizetype limit = fittingTokenLimit(findModel(*findProvider(QStringLiteral("openai")), QStringLiteral("gpt-4o"))->contextWindow, 0);
+    const qsizetype limit = fittingTokenLimit(findModel(*findProvider(QStringLiteral("openai")), QStringLiteral("gpt-4o"))->contextWindow, 0).value();
     int turns = 0;
 
     while (clients.size() == 1 && turns < 40) {
@@ -1357,8 +1357,8 @@ TEST(AiPluginTest, FitsTheConversationToTheModelTheRunDeclaresAndNotToALaterSele
 
     FakeChatClient* agent = clients.first();
     const QString filler(60000, QLatin1Char('x'));
-    const qint64 runLimit = fittingTokenLimit(findModel(*provider, QStringLiteral("gpt-4o"))->contextWindow, 0);
-    const qint64 widerLimit = fittingTokenLimit(findModel(*provider, widerModel)->contextWindow, 0);
+    const qint64 runLimit = fittingTokenLimit(findModel(*provider, QStringLiteral("gpt-4o"))->contextWindow, 0).value();
+    const qint64 widerLimit = fittingTokenLimit(findModel(*provider, widerModel)->contextWindow, 0).value();
     int turns = 0;
 
     while (clients.size() == 1 && turns < 40) {

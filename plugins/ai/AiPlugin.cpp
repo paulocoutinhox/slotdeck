@@ -1611,7 +1611,7 @@ void AiPlugin::continueAgent(const QString& taskId) {
 
     // The conversation is fitted to the window of the selected model before every turn.
     const ModelDescriptor* model = findModelDescriptor(position->connection);
-    const qint64 limit = fittingTokenLimit(model == nullptr ? 0 : model->contextWindow, reservedContextTokens(position->connection));
+    const std::optional<qint64> limit = fittingTokenLimit(model == nullptr ? 0 : model->contextWindow, reservedContextTokens(position->connection));
     QVector<qint64> sequences;
     QJsonArray projected = projectConversation(position->instructions, position->connection, m_conversations.value(taskId), position->seenImages, &sequences);
 
@@ -1671,7 +1671,7 @@ void AiPlugin::summarizeDroppedTurns(const QString& taskId, const FittedConversa
     // What was dropped can be larger than the window itself, so the request that summarizes it is fitted like any other.
     QJsonArray dropped = fitted.dropped;
     const ModelDescriptor* model = findModelDescriptor(position->connection);
-    const qint64 summaryLimit = fittingTokenLimit(model == nullptr ? 0 : model->contextWindow, aiLimits().summaryMaximumTokens);
+    const std::optional<qint64> summaryLimit = fittingTokenLimit(model == nullptr ? 0 : model->contextWindow, aiLimits().summaryMaximumTokens);
     const qsizetype prunedForSummary = pruneToolResults(dropped, summaryLimit);
 
     if (prunedForSummary > 0) {

@@ -2029,6 +2029,43 @@ TEST(AiToolRegistryTest, DiscoversSkillsInThePublishedLayoutAndDisclosesThemProg
     EXPECT_TRUE(results.at(6).failed);
 }
 
+// A model whose answer budget takes its whole window leaves no room, and a conversation nobody fits overflows the model instead of compacting.
+TEST(AiToolContractTest, FitsTheConversationWhenTheReservationTakesTheWholeWindow) {
+    QJsonArray conversation;
+    conversation.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("system")}, {QStringLiteral("content"), QStringLiteral("instructions")}});
+    conversation.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QStringLiteral("the task")}});
+    const QString filler(2000, QLatin1Char('x'));
+
+    for (int index = 0; index < 8; ++index) {
+        conversation.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("assistant")}, {QStringLiteral("content"), filler}});
+        conversation.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), filler}});
+    }
+
+    // The catalog carries models whose declared maximum output is the whole context window, and a budget of zero asks for exactly that.
+    const std::optional<qint64> noRoom = fittingTokenLimit(8192, 8192);
+    ASSERT_TRUE(noRoom.has_value());
+    EXPECT_EQ(noRoom.value(), 0);
+
+    const FittedConversation fitted = fitConversation(conversation, noRoom);
+    EXPECT_GT(fitted.dropped.size(), 0);
+    EXPECT_LT(fitted.messages.size(), conversation.size());
+
+    // The instructions and the task are what a run cannot lose, so they are what survives a window with no room.
+    ASSERT_EQ(fitted.messages.size(), 2);
+    EXPECT_EQ(fitted.messages.at(0).toObject().value(QStringLiteral("content")).toString(), QStringLiteral("instructions"));
+    EXPECT_EQ(fitted.messages.at(1).toObject().value(QStringLiteral("content")).toString(), QStringLiteral("the task"));
+
+    // A tool result is shortened before any turn is dropped, which a window with no room still asks for.
+    QJsonArray results;
+    results.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("tool")}, {QStringLiteral("tool_call_id"), QStringLiteral("call-1")}, {QStringLiteral("content"), QString(40000, QLatin1Char('y'))}});
+    EXPECT_GT(pruneToolResults(results, noRoom), 0);
+
+    // A model that declares no window bounds nothing, so the same conversation passes whole.
+    const FittedConversation unbounded = fitConversation(conversation, fittingTokenLimit(0, 0));
+    EXPECT_EQ(unbounded.messages.size(), conversation.size());
+    EXPECT_TRUE(unbounded.dropped.isEmpty());
+}
+
 TEST(AiToolContractTest, FitsTheConversationToTheModelWindowWithoutBreakingToolTurns) {
     const QJsonObject instructions{{QStringLiteral("role"), QStringLiteral("system")}, {QStringLiteral("content"), QStringLiteral("be an agent")}};
     const QJsonObject task{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QStringLiteral("do the work")}};
@@ -2042,13 +2079,17 @@ TEST(AiToolContractTest, FitsTheConversationToTheModelWindowWithoutBreakingToolT
     }
 
     EXPECT_GT(estimateTokens(conversation), 0);
-    EXPECT_EQ(fittingTokenLimit(0, 0), 0);
-    EXPECT_LT(fittingTokenLimit(1000, 0), 1000);
+
+    // A window nobody declares bounds nothing, so there is no limit rather than a limit of zero.
+    EXPECT_FALSE(fittingTokenLimit(0, 0).has_value());
+    EXPECT_LT(fittingTokenLimit(1000, 0).value(), 1000);
 
     // The answer and the tool declarations take their share of the window before the conversation gets any.
-    EXPECT_LT(fittingTokenLimit(1000, 400), fittingTokenLimit(1000, 0));
-    EXPECT_EQ(fittingTokenLimit(1000, 1000), 0);
-    EXPECT_EQ(fittingTokenLimit(1000, 4000), 0);
+    EXPECT_LT(fittingTokenLimit(1000, 400).value(), fittingTokenLimit(1000, 0).value());
+
+    // A reservation that takes the whole window leaves a limit of zero, which is a window with no room and not the absence of one.
+    EXPECT_EQ(fittingTokenLimit(1000, 1000).value(), 0);
+    EXPECT_EQ(fittingTokenLimit(1000, 4000).value(), 0);
 
     // A window that fits everything leaves the conversation untouched.
     const FittedConversation complete = fitConversation(conversation, estimateTokens(conversation));

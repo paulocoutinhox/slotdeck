@@ -78,11 +78,12 @@ qint64 estimateTokens(const QJsonArray& messages) {
 }
 
 // The window has to hold the answer and the tool declarations as well as the conversation, so the budget is what is left of it.
-qint64 fittingTokenLimit(int contextWindow, qint64 reservedTokens) {
+std::optional<qint64> fittingTokenLimit(int contextWindow, qint64 reservedTokens) {
     if (contextWindow <= 0) {
-        return 0;
+        return std::nullopt;
     }
 
+    // A reservation that consumes the whole window leaves nothing to fit into, which is a limit of zero rather than the absence of one.
     const qint64 available = static_cast<qint64>(contextWindow) - std::max<qint64>(reservedTokens, 0);
     return available <= 0 ? 0 : static_cast<qint64>(static_cast<double>(available) * contextSafetyMargin);
 }
@@ -153,8 +154,8 @@ QJsonObject AiToolContractHelper::prunedToolResult(const QJsonObject& message, b
 }
 
 // What a tool returned long ago is the cheapest thing to shorten, so its middle goes before any turn is dropped and before a model is asked for a summary.
-qsizetype pruneToolResults(QJsonArray& messages, qint64 limit) {
-    if (limit <= 0 || estimateTokens(messages) <= limit) {
+qsizetype pruneToolResults(QJsonArray& messages, std::optional<qint64> limit) {
+    if (!limit.has_value() || estimateTokens(messages) <= limit.value()) {
         return 0;
     }
 
@@ -162,7 +163,7 @@ qsizetype pruneToolResults(QJsonArray& messages, qint64 limit) {
     qsizetype pruned = 0;
     qint64 current = estimateTokens(messages);
 
-    for (qsizetype index = 0; index < messages.size() && current > limit; ++index) {
+    for (qsizetype index = 0; index < messages.size() && current > limit.value(); ++index) {
         const QJsonObject message = messages.at(index).toObject();
         if (!AiToolContractHelper::answersToolCalls(message)) {
             continue;
@@ -179,8 +180,8 @@ qsizetype pruneToolResults(QJsonArray& messages, qint64 limit) {
     return pruned;
 }
 
-FittedConversation fitConversation(const QJsonArray& messages, qint64 limit) {
-    if (limit <= 0 || estimateTokens(messages) <= limit) {
+FittedConversation fitConversation(const QJsonArray& messages, std::optional<qint64> limit) {
+    if (!limit.has_value() || estimateTokens(messages) <= limit.value()) {
         return {messages, {}, 0};
     }
 
@@ -206,7 +207,7 @@ FittedConversation fitConversation(const QJsonArray& messages, qint64 limit) {
 
     QJsonArray dropped;
 
-    while (!remaining.isEmpty() && estimateTokens(preserved) + estimateTokens(remaining) > limit) {
+    while (!remaining.isEmpty() && estimateTokens(preserved) + estimateTokens(remaining) > limit.value()) {
         dropped.append(remaining.first());
         remaining.removeFirst();
         while (!remaining.isEmpty() && AiToolContractHelper::answersToolCalls(remaining.first().toObject())) {
