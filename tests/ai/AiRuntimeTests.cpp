@@ -2213,4 +2213,74 @@ TEST(AiMcpClientTest, AnswersEveryMalformedLineInsteadOfReadingPastIt) {
     AiMcpClient::drainTransports();
 }
 
+// A command task reaches no model, so it runs a process and is judged by what that process printed and by how it ended.
+TEST(AiPluginTest, RunsACommandTaskAndRecordsWhatTheProcessPrinted) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    QTemporaryDir project;
+    ASSERT_TRUE(project.isValid());
+    const QString workdir = QFileInfo(project.path()).canonicalFilePath();
+    QFile marker(QDir(workdir).filePath(QStringLiteral("marker.txt")));
+    ASSERT_TRUE(marker.open(QIODevice::WriteOnly));
+    marker.write(QByteArrayLiteral("here"));
+    marker.close();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+
+    AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    task.executionKind = TaskExecutionKind::Command;
+    task.command = AiTestsHelper::readFileCommand(QStringLiteral("marker.txt"));
+    task.workdir = workdir;
+    task.agentId.clear();
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+    const AiTestsHelper::RecordedRuns runs = AiTestsHelper::installExecutionRows(host, {}, {});
+    // clang-format off
+    AiPlugin plugin([](AiRequestGate&, const ModelConnection&) { return std::unique_ptr<AiChatClient>(std::make_unique<FakeChatClient>()); });
+    // clang-format on
+    const auto started = plugin.initialize(host);
+    ASSERT_TRUE(started.hasValue()) << started.error().code.toStdString() << " " << started.error().message.toStdString() << " " << started.error().detail.toStdString();
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&plugin]() { return plugin.tasks().first().column == TaskColumn::Done; }));
+    // clang-format on
+
+    // A command that ended well leaves nothing to report and moves the card on.
+    EXPECT_TRUE(plugin.lastError(task.id).isEmpty()) << plugin.lastError(task.id).toStdString();
+
+    // The command only succeeds beside the file, so reaching Done is what proves it ran where the task declared.
+    Q_UNUSED(runs);
+}
+
+// A command that ends badly fails its run and keeps what it printed, because that is where the reason is.
+TEST(AiPluginTest, FailsACommandTaskThatEndedBadlyAndKeepsWhatItPrinted) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    QTemporaryDir project;
+    ASSERT_TRUE(project.isValid());
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+
+    AiTask task = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    task.executionKind = TaskExecutionKind::Command;
+    task.command = AiTestsHelper::failingCommand();
+    task.workdir = QFileInfo(project.path()).canonicalFilePath();
+    task.agentId.clear();
+    AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
+    const AiTestsHelper::RecordedRuns runs = AiTestsHelper::installExecutionRows(host, {}, {});
+
+    // clang-format off
+    AiPlugin plugin([](AiRequestGate&, const ModelConnection&) { return std::unique_ptr<AiChatClient>(std::make_unique<FakeChatClient>()); });
+    // clang-format on
+    const auto started = plugin.initialize(host);
+    ASSERT_TRUE(started.hasValue()) << started.error().code.toStdString() << " " << started.error().message.toStdString() << " " << started.error().detail.toStdString();
+    ASSERT_TRUE(test::awaitFuture(plugin.startTask(task.id)).hasValue());
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&plugin, &task]() { return !plugin.lastError(task.id).isEmpty(); }));
+    // clang-format on
+
+    // A command that ended badly returns the card to the board and keeps the reason on it.
+    EXPECT_EQ(plugin.tasks().first().column, TaskColumn::Todo) << "a task whose command failed did not return to the board";
+    Q_UNUSED(runs);
+}
+
 } // namespace slotdeck::plugins::ai

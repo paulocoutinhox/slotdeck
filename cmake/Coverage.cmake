@@ -3,11 +3,11 @@ function(slotdeck_enable_coverage target)
         return()
     endif()
 
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$")
         target_compile_options(${target} PRIVATE --coverage -O0 -g)
         target_link_options(${target} PRIVATE --coverage)
         return()
     endif()
 
-    message(FATAL_ERROR "Coverage requires a GCC toolchain with gcov support")
+    message(FATAL_ERROR "Coverage requires a toolchain that emits gcov data")
 endfunction()

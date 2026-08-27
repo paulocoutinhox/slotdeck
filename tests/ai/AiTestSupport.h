@@ -205,6 +205,8 @@ class AiTestsHelper final {
     static QString sleepingCommand(int seconds);
     // The command tests speak the shell of the running platform, because the runner starts the native one.
     static QString printWorkingDirectoryCommand();
+    // A command that only succeeds beside a file proves which directory it really ran in.
+    static QString readFileCommand(const QString& name);
     static QString failingCommand();
     static ModelConnection testConnection();
     static AiWorkspace validWorkspace(int position, bool active);
@@ -232,6 +234,14 @@ inline QString AiTestsHelper::printWorkingDirectoryCommand() {
     return QStringLiteral("cd");
 #else
     return QStringLiteral("pwd");
+#endif
+}
+
+inline QString AiTestsHelper::readFileCommand(const QString& name) {
+#ifdef Q_OS_WIN
+    return QStringLiteral("type %1").arg(name);
+#else
+    return QStringLiteral("cat %1").arg(name);
 #endif
 }
 
