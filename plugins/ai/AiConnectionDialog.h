@@ -60,6 +60,7 @@ class AiConnectionDialog final : public QDialog {
     QLineEdit* m_address{nullptr};
     QFormLayout* m_form{nullptr};
     QFormLayout* m_parameterForm{nullptr};
+    QWidget* m_extraSection{nullptr};
     QPlainTextEdit* m_extraParameters{nullptr};
     QLabel* m_extraValidation{nullptr};
     QLabel* m_validation{nullptr};

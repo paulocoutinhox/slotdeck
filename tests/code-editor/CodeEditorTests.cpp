@@ -2922,4 +2922,41 @@ TEST(LanguageRegistryTest, RefusesAnAnalysisWaitThatDoesNotOutlastTheChangeWait)
     }
 }
 
+// A server answer is decoded away from this thread, so a client that goes while one is in flight must take the answer with it.
+TEST(LanguageServerClientTest, SurvivesBeingDestroyedWhileAnAnswerIsStillBeingDecoded) {
+    QTemporaryDir root;
+    ASSERT_TRUE(root.isValid());
+    const QString path = QDir(root.path()).filePath(QStringLiteral("main.cpp"));
+    ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(path, QByteArrayLiteral("int main() {}\n")));
+
+    for (int round = 0; round < 12; ++round) {
+        auto client = std::make_unique<LanguageServerClient>(ResolvedLanguageServer{QStringLiteral("cpp"), QCoreApplication::applicationFilePath(), {QStringLiteral("--slotdeck-test-lsp-many-completions")}}, root.path());
+        int answers = 0;
+        // clang-format off
+        QObject::connect(client.get(), &LanguageServerClient::completionsReady, client.get(), [&answers](const QString&, const QVector<CompletionProposal>&) { ++answers; });
+        // clang-format on
+        client->start();
+        // clang-format off
+        ASSERT_TRUE(test::waitUntil([&client]() { return client->ready(); }));
+        // clang-format on
+        client->openDocument(path, QStringLiteral("int main() {}\n"), QStringLiteral("cpp"));
+
+        // Asking again supersedes the request before it, so several decodes are in flight at once.
+        for (int request = 0; request < 4; ++request) {
+            client->requestCompletion(path, 0, 4);
+        }
+
+        // The client goes while forty thousand candidates are still being read, in a round the platform decides.
+        if (round % 3 == 0) {
+            // clang-format off
+            ASSERT_TRUE(test::waitUntil([&answers]() { return answers > 0; }));
+            // clang-format on
+        }
+
+        client->stop();
+        client.reset();
+        QCoreApplication::processEvents();
+    }
+}
+
 } // namespace slotdeck::plugins::codeeditor

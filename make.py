@@ -121,6 +121,11 @@ def task_coverage(context: Context) -> None:
         "-DSLOTDECK_ENABLE_COVERAGE=ON",
     )
     cmake_build(coverage_context)
+
+    # The counters of a previous run belong to the sources as they were then, so a report merged with them describes neither build.
+    for stale in coverage_context.build_dir.rglob("*.gcda"):
+        stale.unlink()
+
     run([
         executable("ctest"),
         "--test-dir",

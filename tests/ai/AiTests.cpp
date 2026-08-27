@@ -3270,4 +3270,49 @@ TEST(AiCliChatClientTest, RefusesToRunWhatIsNotInstalledAndWhatHasNowhereToRun) 
     EXPECT_EQ(failure.code, QStringLiteral("ai_cli_provider_invalid"));
 }
 
+// A command line agent is started and stopped again and again, so nothing it owns may outlive the run that started it.
+TEST(AiCliChatClientTest, SurvivesManyRunsStartedAndStoppedBeforeTheyAnswer) {
+    QTemporaryDir project;
+    ASSERT_TRUE(project.isValid());
+    const QString workdir = QFileInfo(project.path()).canonicalFilePath();
+    // clang-format off
+    const auto resolver = [](const QString&) { return QCoreApplication::applicationFilePath(); };
+    const auto translate = [](const QString& key) { return key; };
+    // clang-format on
+    qputenv("SLOTDECK_TEST_CLI_AGENT", QByteArrayLiteral("1"));
+
+    ModelConnection connection;
+    connection.providerId = QStringLiteral("claude-cli");
+    connection.modelId = QStringLiteral("claude-cli");
+    ChatRequest request;
+    request.connection = connection;
+    request.messages = QJsonArray{QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QStringLiteral("anything")}}};
+    request.workdir = workdir;
+
+    for (int round = 0; round < 15; ++round) {
+        auto client = std::make_unique<AiCliChatClient>(resolver, nullptr);
+        bool settled = false;
+        // clang-format off
+        QObject::connect(client.get(), &AiChatClient::finished, client.get(), [&settled](const QString&, const QVector<ToolCall>&, ChatUsage, const QString&) { settled = true; });
+        QObject::connect(client.get(), &AiChatClient::failed, client.get(), [&settled](const utils::Error&) { settled = true; });
+        // clang-format on
+        client->send(request, translate);
+
+        // Every third run is let finish, and the rest are stopped while the agent is still writing.
+        if (round % 3 == 0) {
+            // clang-format off
+            ASSERT_TRUE(test::waitUntil([&settled]() { return settled; }));
+            // clang-format on
+        } else {
+            client->cancel();
+        }
+
+        EXPECT_FALSE(client->running());
+        client.reset();
+        QCoreApplication::processEvents();
+    }
+
+    qunsetenv("SLOTDECK_TEST_CLI_AGENT");
+}
+
 } // namespace slotdeck::plugins::ai

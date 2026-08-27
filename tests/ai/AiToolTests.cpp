@@ -956,6 +956,36 @@ TEST(AiPluginTest, FailsAQueuedTaskWhoseConnectionIsGoneInsteadOfLeavingItWaitin
     plugin.shutdown();
 }
 
+// A command line agent has no catalog to list and no request body, so the dialog closes what would answer about neither.
+TEST(AiConnectionDialogTest, OffersNeitherModelDiscoveryNorExtraParametersToACommandLineAgent) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+
+    AiConnectionDialog dialog(host, AiTestsHelper::testConnection(), {}, nullptr);
+    dialog.show();
+    auto* provider = dialog.findChild<QComboBox*>(QStringLiteral("aiConnectionProvider"));
+    auto* refresh = dialog.findChild<QToolButton*>(QStringLiteral("aiConnectionRefreshModels"));
+    auto* extras = dialog.findChild<QWidget*>(QStringLiteral("aiConnectionExtraSection"));
+    ASSERT_NE(provider, nullptr);
+    ASSERT_NE(refresh, nullptr);
+    ASSERT_NE(extras, nullptr);
+
+    // A provider reached over a wire owns both, because it answers a catalog and carries a request body.
+    EXPECT_TRUE(refresh->isVisible());
+    EXPECT_TRUE(extras->isVisible());
+
+    provider->setCurrentIndex(provider->findData(QStringLiteral("claude-cli")));
+
+    EXPECT_FALSE(refresh->isVisible());
+    EXPECT_FALSE(extras->isVisible());
+
+    // Coming back restores them, because the shape follows the selection rather than the first provider shown.
+    provider->setCurrentIndex(provider->findData(QStringLiteral("openai")));
+
+    EXPECT_TRUE(refresh->isVisible());
+    EXPECT_TRUE(extras->isVisible());
+}
+
 TEST(AiConnectionDialogTest, KeepsTheReplacedParameterEditorsAliveUntilTheClickThatCausedItIsOver) {
     test::TestPluginHost host;
     host.translations = translations::english();

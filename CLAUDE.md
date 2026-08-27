@@ -675,6 +675,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The extra-parameter editor validates while it is typed, reporting the parse position, a document that is not an object and an empty key, and the confirm action stays disabled while it is invalid.
 - The settings form is generated from the applicable parameter descriptors, so selecting a reasoning model replaces the sampling fields with the reasoning fields without any interface change.
 - A connection dialog opens from a complete configuration, using the stored one when it is edited and the values its provider declares when it is new, so a first run never presents an empty field that its own validation would reject.
+- A command line agent is offered neither model discovery nor extra parameters, because it answers no catalog and carries no request body, and offering them answers a question about an address that provider does not have.
 - Every search service and speech service exists from the moment the application opens, carrying the voice, credential reference and address its own descriptor declares, and storage holds only what the user changed.
 - A model connection is created by the user rather than declared, because the catalog cannot know which provider and model this installation has a credential for.
 - The interface never asks the user to save a value that is already the declared default, because a default that must be confirmed is not a default.
@@ -1277,6 +1278,7 @@ Newer explicit product requirements take precedence when they intentionally repl
   selected toolchain supports them.
 - Coverage instrumentation applies to first-party core and plugin targets while excluding external
   dependencies and test implementation code.
+- The counters of the previous run are cleared before the suite starts, because a report merged with counters belonging to the sources as they were then describes neither build, and a case that starts a child of the test binary reads that merge as output the child produced.
 - New behavior is incomplete until its success, error and relevant boundary cases are registered in
   CTest and pass through the repository test command.
 
@@ -1488,6 +1490,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A selected row of a grid is painted in the accent and its actions switch to the ink that reads on it.
 - [x] A turn of several calls presents each result inside the card of the call it answers.
 - [x] A picture a tool read reaches the model in the request that follows the call.
+- [x] A command line agent is offered neither model discovery nor extra parameters, and coming back to a provider reached over a wire restores both.
 - [x] The view follows the reader instead of dragging them to the end of every message that arrives.
 - [x] AI tasks are grouped into renameable workspace tabs and rendered across the To Do, Doing, Blocked, Review and Done columns.
 - [x] AI task cards keep their own margin, use the filled play symbol and expose Play, Stop, Edit and Remove.

@@ -112,22 +112,28 @@ AiConnectionDialog::AiConnectionDialog(PluginHost& host, const ModelConnection& 
     m_parameterForm->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     layout->addLayout(m_parameterForm);
 
-    layout->addWidget(ui::sectionTitleLabel(m_host.translate(QStringLiteral("ai.connection.extra-parameters")), this));
-    auto* extraDescription = new QLabel(m_host.translate(QStringLiteral("ai.connection.extra-parameters-description")), this);
+    m_extraSection = new QWidget(this);
+    m_extraSection->setObjectName(QStringLiteral("aiConnectionExtraSection"));
+    auto* extraLayout = new QVBoxLayout(m_extraSection);
+    extraLayout->setContentsMargins(0, 0, 0, 0);
+    layout->addWidget(m_extraSection);
+
+    extraLayout->addWidget(ui::sectionTitleLabel(m_host.translate(QStringLiteral("ai.connection.extra-parameters")), m_extraSection));
+    auto* extraDescription = new QLabel(m_host.translate(QStringLiteral("ai.connection.extra-parameters-description")), m_extraSection);
     extraDescription->setObjectName(QStringLiteral("aiConnectionExtraDescription"));
     extraDescription->setWordWrap(true);
-    layout->addWidget(extraDescription);
+    extraLayout->addWidget(extraDescription);
 
-    m_extraParameters = new ui::TextField(m_host.translate(QStringLiteral("ai.connection.extra-parameters-placeholder")), this);
+    m_extraParameters = new ui::TextField(m_host.translate(QStringLiteral("ai.connection.extra-parameters-placeholder")), m_extraSection);
     m_extraParameters->setObjectName(QStringLiteral("aiConnectionExtraParameters"));
     m_extraParameters->setMinimumHeight(extraParametersMinimumHeight);
-    layout->addWidget(m_extraParameters);
+    extraLayout->addWidget(m_extraParameters);
 
-    m_extraValidation = new QLabel(this);
+    m_extraValidation = new QLabel(m_extraSection);
     m_extraValidation->setObjectName(QStringLiteral("aiConnectionExtraValidation"));
     m_extraValidation->setWordWrap(true);
     m_extraValidation->hide();
-    layout->addWidget(m_extraValidation);
+    extraLayout->addWidget(m_extraValidation);
 
     m_validation = new QLabel(this);
     m_validation->setObjectName(QStringLiteral("aiTaskValidation"));
@@ -189,6 +195,11 @@ void AiConnectionDialog::applyProviderShape() {
 
     m_apiKey->setEnabled(descriptor->requiresApiKey);
     m_form->setRowVisible(m_addressRow, descriptor->addressConfigurable);
+
+    // A command line agent is not reached over a wire, so it has no catalog to list and no request body to merge a field into.
+    const bool reachedOverWire = descriptor->protocol != WireProtocol::CommandLine;
+    m_refreshModels->setVisible(reachedOverWire);
+    m_extraSection->setVisible(reachedOverWire);
 }
 
 // Moving to another provider starts from what that provider declares, because the credential of the previous one does not open it.
