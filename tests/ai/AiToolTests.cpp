@@ -956,7 +956,8 @@ TEST(AiPluginTest, FailsAQueuedTaskWhoseConnectionIsGoneInsteadOfLeavingItWaitin
     ASSERT_TRUE(test::waitUntil([&]() { return plugin.hasLastExecution(orphan.id); }));
     // clang-format on
     EXPECT_EQ(plugin.lastExecutionStatus(orphan.id), ExecutionStatus::Failed);
-    EXPECT_FALSE(plugin.lastError(orphan.id).isEmpty());
+    // The card names the agent that is gone rather than showing the sentence written for the log.
+    EXPECT_EQ(plugin.lastError(orphan.id), host.translate(QStringLiteral("ai.error.agent-removed")).arg(orphan.agentId));
     EXPECT_TRUE(clients.isEmpty());
     // clang-format off
     ASSERT_TRUE(test::waitUntil([&]() { return plugin.runState(orphan.id) == TaskRunState::Idle; }));

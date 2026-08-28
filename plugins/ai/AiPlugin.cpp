@@ -1503,20 +1503,22 @@ void AiPlugin::startAgentExecution(const AiTask& task, const QString& executionI
     const auto agent = agentForTask(task);
 
     if (!agent.hasValue()) {
+        const QString reason = m_host->translate(QStringLiteral("ai.error.agent-removed")).arg(agent.error().detail);
         appendLog(executionId, ExecutionLogLevel::Error, ExecutionLogKind::Failed, agent.error().message);
-        m_lastErrors.insert(taskId, agent.error().message);
-        reportFailure(agent.error(), agent.error().message);
-        completeExecution(taskId, ExecutionStatus::Failed, agent.error().message, AgentStopReason::Failed);
+        m_lastErrors.insert(taskId, reason);
+        reportFailure(agent.error(), reason);
+        completeExecution(taskId, ExecutionStatus::Failed, reason, AgentStopReason::Failed);
         return;
     }
 
     const auto connection = connectionForAgent(agent.value());
 
     if (!connection.hasValue()) {
+        const QString reason = m_host->translate(QStringLiteral("ai.error.connection-missing")).arg(connection.error().detail);
         appendLog(executionId, ExecutionLogLevel::Error, ExecutionLogKind::Failed, connection.error().message);
-        m_lastErrors.insert(taskId, connection.error().message);
-        reportFailure(connection.error(), connection.error().message);
-        completeExecution(taskId, ExecutionStatus::Failed, connection.error().message, AgentStopReason::Failed);
+        m_lastErrors.insert(taskId, reason);
+        reportFailure(connection.error(), reason);
+        completeExecution(taskId, ExecutionStatus::Failed, reason, AgentStopReason::Failed);
         return;
     }
 

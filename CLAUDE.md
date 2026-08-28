@@ -560,6 +560,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A connection presents its display name and falls back to its key when the user named nothing, which is what a task shows when it chooses one.
 - An agent task stores only the identifier of the agent it is handed to, and a command task stores none because it never reaches a model.
 - A task resolves its agent when it starts, so an agent removed later fails that run with the reason instead of silently running on another one.
+- That reason names the agent that is gone in the language of the interface, because the card is where the reader learns why the task stopped.
 - The task loads even when its agent no longer exists, because a removed agent must not stop the application from opening.
 - Editing a connection reaches every agent that names it and through them every task, which is what makes rotating a credential or correcting a parameter a single act.
 - Changing the provider or the model of a connection changes the key that names it, so every agent that ran on it and the default that pointed at it follow to the new key in the same write.
