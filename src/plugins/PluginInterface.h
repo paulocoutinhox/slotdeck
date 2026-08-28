@@ -185,7 +185,7 @@ inline bool hasExactKeys(const QJsonObject& object, const QSet<QString>& expecte
 }
 
 // Every plugin answers a request it does not implement, so the one condition carries the one code.
-inline utils::Result<QJsonObject> unhandledTopic(const QString& topic) {
+[[nodiscard]] inline utils::Result<QJsonObject> unhandledTopic(const QString& topic) {
     return utils::Result<QJsonObject>::failure({"plugin_message_topic_unknown", "The plugin does not handle this request topic", topic});
 }
 

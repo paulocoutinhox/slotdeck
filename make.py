@@ -335,6 +335,23 @@ def inherited_catalogs() -> list[str]:
     return found
 
 
+def droppable_results() -> list[str]:
+    found: list[str] = []
+
+    for directory in ("src", "plugins"):
+        for path in sorted((ROOT / directory).rglob("*.h")):
+            for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):
+                stripped = line.strip()
+
+                if "nodiscard" in stripped or stripped.startswith("//"):
+                    continue
+
+                if re.match(r"^(?:static\s+|virtual\s+|inline\s+)*(?:utils::Result<|QFuture<utils::Result<)[^;]*\(", stripped):
+                    found.append(f"{path.relative_to(ROOT)}:{number} answers with a result a caller may drop")
+
+    return found
+
+
 def miscounted_suite() -> list[str]:
     standard = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
     recorded = re.search(r"reports (\d+) independent CTest cases", standard)
@@ -709,6 +726,11 @@ def task_audit(_: Context) -> None:
 
     if inherited:
         raise RuntimeError("Every language declares the keys it spells, because a catalog built from another one cannot be told from one that forgot a sentence:\n  " + "\n  ".join(inherited))
+
+    droppable = droppable_results()
+
+    if droppable:
+        raise RuntimeError("A failure a caller may drop is a failure nobody reports, so every result is declared nodiscard:\n  " + "\n  ".join(droppable))
 
     miscounted = miscounted_suite()
 

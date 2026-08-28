@@ -341,6 +341,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A process `QLockFile` prevents concurrent application writers.
 - Foreign keys are enabled and the database uses WAL journaling, a bounded busy timeout and normal synchronous durability.
 - Every database operation returns an explicit structured result and storage failures never become empty state or default preferences.
+- Every function answering with a result declares it nodiscard, so a failure a caller drops is one the compiler names, and the lint command refuses a declaration that does not.
 - A structured error carries a stable code, the diagnostic message and the detail that names what it happened to, and nothing else, because a field no decision consults is dead weight on every failure in the project.
 - An error code is prefixed by the subject it is about, and one condition carries one code, so two implementations of the same interface report the same failure by the same name.
 - A value the interface already shows is rolled back when its write fails, and the run that produced it stops, because a memory that disagrees with storage is a lie the next start discovers.
