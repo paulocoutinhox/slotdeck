@@ -1365,7 +1365,12 @@ void AiToolRegistry::generateImage(const ToolCall& call, const QString& sandboxR
         reply->deleteLater();
         answer->bytes.append(reply->read(maximumImageBytes - answer->bytes.size()));
         const QByteArray payload = answer->bytes;
-        if (!answer->truncated && reply->error() != QNetworkReply::NoError) {
+        // A file the service cut short is not the file the agent asked for, so it is refused rather than written broken.
+        if (answer->truncated) {
+            completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-answer-truncated"))));
+            return;
+        }
+        if (reply->error() != QNetworkReply::NoError) {
             const QJsonObject error = QJsonDocument::fromJson(payload).object().value(QStringLiteral("error")).toObject();
             completion(AiToolRegistryHelper::failure(call, error.value(QStringLiteral("message")).toString(reply->errorString())));
             return;
@@ -1439,7 +1444,12 @@ void AiToolRegistry::generateSpeech(const ToolCall& call, const QString& sandbox
         reply->deleteLater();
         answer->bytes.append(reply->read(maximumImageBytes - answer->bytes.size()));
         const QByteArray payload = answer->bytes;
-        if (!answer->truncated && reply->error() != QNetworkReply::NoError) {
+        // A file the service cut short is not the file the agent asked for, so it is refused rather than written broken.
+        if (answer->truncated) {
+            completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-answer-truncated"))));
+            return;
+        }
+        if (reply->error() != QNetworkReply::NoError) {
             completion(AiToolRegistryHelper::failure(call, AiToolRegistryHelper::serviceErrorMessage(payload, reply->errorString())));
             return;
         }

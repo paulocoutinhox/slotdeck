@@ -615,6 +615,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The agent owns a command tool that runs inside the same working directory with its own time limit and returns the exit code together with the output.
 - A new task starts in the home directory the running system reports, and a task whose working directory was cleared has no file access rather than a default root.
 - A tool that produces a file writes it exactly where the agent asked for it, inside the working directory the task declares, and answers with that path.
+- A service answering with more than the permitted size writes no file at all, because a picture or a recording cut short is not the one the agent asked for and reporting it as written is worse than failing.
 - Writing a file that is not there yet creates it together with the directories it needs, and creating a directory creates every missing level, because an agent made to create them one at a time spends a turn on each.
 - Removing a directory that is not empty is refused unless the call asked for that explicitly, because a tool described as removing one thing must not take everything inside it.
 - A call is judged against the schema the model received, so a missing argument and an argument of the wrong type are answered by name and by declared type instead of leaving the model to guess and repeat.
