@@ -102,10 +102,6 @@ AiAgentDialog::AiAgentDialog(PluginHost& host, AiAgent agent, QStringList takenI
     m_maximumIterations->setToolTip(m_host.translate(QStringLiteral("ai.task.unlimited-hint")));
 
     // The identifier follows the name until the writer types one of their own, and follows it again once they clear it.
-    m_identifierChosen = !agent.id.isEmpty();
-    // clang-format off
-    connect(m_name, &QLineEdit::textEdited, this, [this](const QString& text) { if (!m_identifierChosen) { m_identifier->setText(AiAgentSettingsViewHelper::identifierFromName(text)); } });
-    connect(m_identifier, &QLineEdit::textEdited, this, [this](const QString& text) { m_identifierChosen = !text.isEmpty(); });
     // clang-format on
 
     form->addRow(m_host.translate(QStringLiteral("ai.agent.name")), m_name);
@@ -154,7 +150,9 @@ AiAgentDialog::AiAgentDialog(PluginHost& host, AiAgent agent, QStringList takenI
 
 AiAgent AiAgentDialog::agent() const {
     AiAgent built;
-    built.id = m_identifier->text().trimmed();
+    // An identifier nobody typed is spelled from the name when it is saved, rather than written into the field while the reader is still typing it.
+    const QString typed = m_identifier->text().trimmed();
+    built.id = typed.isEmpty() ? AiAgentSettingsViewHelper::identifierFromName(m_name->text()) : typed;
     built.name = m_name->text().trimmed();
     built.description = m_description->text().trimmed();
     built.systemPrompt = m_systemPrompt->toPlainText().trimmed();

@@ -845,16 +845,15 @@ TEST(AiAgentSettingsViewTest, StartsFromTheEmptyStateAndOffersTheTemplateAndTheT
     ASSERT_NE(identifier, nullptr);
     ASSERT_NE(name, nullptr);
     EXPECT_LT(name->mapTo(&dialog, QPoint(0, 0)).y(), identifier->mapTo(&dialog, QPoint(0, 0)).y());
+    // Nothing is written into the field while the name is typed, and what it is saved as is spelled from that name.
     QTest::keyClicks(name, QStringLiteral("Claudinho Review Bot"));
-    EXPECT_EQ(identifier->text(), QStringLiteral("claudinho-review-bot"));
-    QTest::keyClicks(identifier, QStringLiteral("x"));
-    QTest::keyClicks(name, QStringLiteral(" 2"));
-    EXPECT_EQ(identifier->text(), QStringLiteral("claudinho-review-botx"));
-    identifier->selectAll();
-    QTest::keyClick(identifier, Qt::Key_Backspace);
+    EXPECT_TRUE(identifier->text().isEmpty());
+    EXPECT_EQ(dialog.agent().id, QStringLiteral("claudinho-review-bot"));
+
+    // A name that opens with something the identifier may not carry loses it rather than opening with it.
     name->clear();
     QTest::keyClicks(name, QStringLiteral("9 Reviewer!"));
-    EXPECT_EQ(identifier->text(), QStringLiteral("reviewer"));
+    EXPECT_EQ(dialog.agent().id, QStringLiteral("reviewer"));
 
     // A prompt carrying a tag nobody declares refuses to be saved and says which one.
     auto* validation = dialog.findChild<QLabel*>(QStringLiteral("aiTaskValidation"));
@@ -967,6 +966,26 @@ TEST(AiPluginTest, FailsAQueuedTaskWhoseConnectionIsGoneInsteadOfLeavingItWaitin
 
 // A command line agent has no catalog to list and no request body, so the dialog closes what would answer about neither.
 // A provider that signs in on its own has no credential to configure, and a field that fills itself says so under itself in the ink of the theme.
+// The identifier is spelled from the name when it is saved empty, and the field is left alone while the reader is still typing that name.
+TEST(AiAgentDialogTest, SpellsTheIdentifierWhenItIsSavedEmptyAndWritesNothingWhileTheNameIsTyped) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    AiAgentDialog dialog(host, {}, {}, {}, nullptr);
+    dialog.show();
+    auto* name = dialog.findChild<QLineEdit*>(QStringLiteral("aiAgentName"));
+    auto* identifier = dialog.findChild<QLineEdit*>(QStringLiteral("aiAgentIdentifier"));
+    ASSERT_NE(name, nullptr);
+    ASSERT_NE(identifier, nullptr);
+
+    QTest::keyClicks(name, QStringLiteral("Claudinho CLI"));
+    EXPECT_TRUE(identifier->text().isEmpty()) << identifier->text().toStdString();
+    EXPECT_EQ(dialog.agent().id, QStringLiteral("claudinho-cli"));
+
+    // An identifier the reader typed is the one that is kept.
+    QTest::keyClicks(identifier, QStringLiteral("chosen-name"));
+    EXPECT_EQ(dialog.agent().id, QStringLiteral("chosen-name"));
+}
+
 TEST(AiConnectionDialogTest, HidesTheCredentialAProviderDoesNotUseAndSaysWhichFieldFillsItself) {
     test::TestPluginHost host;
     host.translations = translations::english();

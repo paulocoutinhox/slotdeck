@@ -35,7 +35,6 @@ class AiAgentDialog final : public QDialog {
     PluginHost& m_host;
     QStringList m_takenIdentifiers;
     QLineEdit* m_identifier{nullptr};
-    bool m_identifierChosen{false};
     QLineEdit* m_name{nullptr};
     QLineEdit* m_description{nullptr};
     QComboBox* m_connection{nullptr};

@@ -780,7 +780,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A single-pixel divider separates every kanban column across the full column height, drawn as its own widget between columns.
 - A divider that must span a surface is its own widget rather than a border on a container, because a child laid out to the full width paints over the border and leaves only a stub.
 - An agent is a configured entity carrying a stable lowercase identifier, a name, a description, its own system prompt, the connection it speaks through and its iteration limit.
-- The dialog asks for the name first and spells the identifier from it while nobody has typed one, because a name is what the writer came to give and the identifier is a consequence of it.
+- The dialog asks for the name first and spells the identifier from it when the field is saved empty, because a name is what the writer came to give and the identifier is a consequence of it.
+- Nothing is written into that field while the reader is typing the name, because a field that fills itself under the hands of whoever is reading it is a field they have to undo.
 - There is no system prompt written in code, so what an agent is told is what the user wrote for it and nothing else.
 - The system prompt of an agent carries tags from a closed set, and a tag nobody declares is refused where the prompt is written rather than met by a run that cannot answer it.
 - A capability tag answers what the run really has, covering the selected model and its traits, whether that model reads an image, whether a search service and a speech service are configured, which servers are connected and the room the turn has, so an agent never promises what is not there.
@@ -1561,6 +1562,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] The input of a command line agent is closed at once, so a program that reads what it was piped is not left waiting.
 - [x] A provider that needs no credential shows no field for one, and the hint under a field that fills itself reads in the muted ink and the caption size of the theme.
 - [x] Every call that formats a sentence passes exactly what that sentence declares, and the lint command refuses any other, including the shape where one branch takes an argument and the other does not.
+- [x] An agent saved with no identifier is given one spelled from its name, and nothing is written into that field while the name is typed.
 - [x] Every plugin releases what it already took before returning a failure from initialization, checked against all eight.
 - [x] The cost of a run reaches the reader in the execution history, proven through the fake that answers the columns the real schema has.
 - [x] The price of every model the catalog carries reaches it, a model nobody priced reports no cost, and a price of the wrong shape or below zero rejects the plugin.
