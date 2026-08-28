@@ -1469,7 +1469,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A stored settings value the owner cannot use is the declared default and every other value still loads, and a key nobody declares changes nothing.
 - [x] Every field of the AI, terminal and editor settings survives the document and comes back, proven against the writer that forgot one.
 - [x] Every field of a task, its schedule included, survives the database and comes back, proven against the reader that stopped selecting a column.
-- [x] The tabs, the bookmarks and the web server configurations survive a real database and a second start of their plugin, which nothing exercised before.
+- [x] The tabs, the bookmarks, the web server configurations, the terminal workspace and the paging of the logs are all exercised against a real database, which none of those five suites did before.
 - [x] A second consecutive external edit reaches the open document, proven by a case that was intermittent while the watch was not rearmed.
 - [x] The shared page header, data grid, tool button, section title, empty state and timestamp primitives are owned by the core and consumed by every plugin.
 - [x] First-run language selection follows complete system locale, base language and English order.

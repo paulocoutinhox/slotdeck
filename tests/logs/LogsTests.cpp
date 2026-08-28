@@ -2,6 +2,7 @@
 #include "TestFuture.h"
 #include "TestPluginHost.h"
 #include "TestTranslations.h"
+#include "persistence/StateStore.h"
 
 #include <QLabel>
 #include <QLayout>
@@ -213,6 +214,58 @@ TEST(LogsPluginTest, InitializesMetadataAndStoresStrictEvents) {
     EXPECT_EQ(migrationFailure.initialize(migrationHost).error().code, QStringLiteral("migration_failed"));
     migrationHost.migrationError.reset();
     EXPECT_TRUE(migrationFailure.initialize(migrationHost).hasValue());
+}
+
+// Paging is answered by real SQL, so a double that returns the rows it was handed proves nothing about the order or the page.
+TEST(LogsPluginTest, PagesItsEntriesNewestFirstOutOfARealDatabase) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    persistence::StateStore store(directory.filePath(QStringLiteral("slotdeck.sqlite3")));
+    ASSERT_TRUE(store.initialize().hasValue());
+
+    test::TestPluginHost host;
+    host.useDatabase(store, QStringLiteral("logs"));
+    LogsPlugin plugin;
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+
+    const QDateTime base = QDateTime::currentDateTimeUtc();
+    constexpr int written = 7;
+
+    for (int index = 0; index < written; ++index) {
+        QJsonObject payload = LogsTestsHelper::validLogPayload();
+        payload.insert(QStringLiteral("timestampUtc"), base.addSecs(index).toString(Qt::ISODateWithMs));
+        payload.insert(QStringLiteral("message"), QStringLiteral("entry %1").arg(QString::number(index)));
+        plugin.handleEvent(QStringLiteral("terminal"), QStringLiteral("slotdeck.log.entry"), payload);
+    }
+
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&plugin]() { const auto page = test::awaitFuture(plugin.entries(0, 100)); return page.hasValue() && page.value().size() == written; }));
+    // clang-format on
+
+    // The newest entries come first, which is what the viewer opens on.
+    const auto newest = test::awaitFuture(plugin.entries(0, 3));
+    ASSERT_TRUE(newest.hasValue());
+    ASSERT_EQ(newest.value().size(), 3);
+    EXPECT_EQ(newest.value().at(0).message, QStringLiteral("entry 6"));
+    EXPECT_EQ(newest.value().at(1).message, QStringLiteral("entry 5"));
+    EXPECT_EQ(newest.value().at(2).message, QStringLiteral("entry 4"));
+    EXPECT_EQ(newest.value().at(0).sourcePluginId, QStringLiteral("terminal"));
+    EXPECT_EQ(newest.value().at(0).level, QStringLiteral("info"));
+    EXPECT_TRUE(newest.value().at(0).timestampUtc.isValid());
+
+    // The page before it starts where the reader stopped rather than at the newest entry again.
+    const auto older = test::awaitFuture(plugin.entries(newest.value().last().sequence, 3));
+    ASSERT_TRUE(older.hasValue());
+    ASSERT_EQ(older.value().size(), 3);
+    EXPECT_EQ(older.value().at(0).message, QStringLiteral("entry 3"));
+    EXPECT_EQ(older.value().at(2).message, QStringLiteral("entry 1"));
+
+    // Clearing removes what was stored and leaves the reader an empty page.
+    ASSERT_TRUE(test::awaitFuture(plugin.clearEntries()).hasValue());
+    const auto cleared = test::awaitFuture(plugin.entries(0, 100));
+    ASSERT_TRUE(cleared.hasValue());
+    EXPECT_TRUE(cleared.value().isEmpty());
+    plugin.shutdown();
 }
 
 QJsonObject LogsTestsHelper::validLogPayload() {

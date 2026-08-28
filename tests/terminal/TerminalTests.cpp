@@ -5,6 +5,7 @@
 #include "TestFuture.h"
 #include "TestPluginHost.h"
 #include "TestTranslations.h"
+#include "persistence/StateStore.h"
 #include "terminal/GhosttyTerminalAdapter.h"
 #include "terminal/ShellProfile.h"
 #include "terminal/TerminalSession.h"
@@ -1394,6 +1395,41 @@ TEST(TerminalWorkspaceRepositoryTest, RoundTripsACompleteStrictWorkspace) {
     ASSERT_EQ(loaded.value().sessions.size(), 2);
     EXPECT_TRUE(loaded.value().sessions.first().historyFile.isEmpty());
 }
+// A double enforces no column that must not be null, so what the terminal keeps is written to a real database and read from it.
+TEST(TerminalWorkspaceRepositoryTest, KeepsAWorkspaceThroughARealDatabase) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    persistence::StateStore store(directory.filePath(QStringLiteral("slotdeck.sqlite3")));
+    ASSERT_TRUE(store.initialize().hasValue());
+
+    test::TestPluginHost host;
+    host.useDatabase(store, QStringLiteral("terminal"));
+    ASSERT_TRUE(store.migratePluginDatabase(QStringLiteral("terminal"), {{1, {QStringLiteral("CREATE TABLE terminal_state(scope_id TEXT PRIMARY KEY CHECK(scope_id IN ('preferences', 'workspace')), data_json TEXT NOT NULL) STRICT")}}}).hasValue());
+    plugins::terminalplugin::TerminalWorkspaceRepository repository(host);
+
+    const auto workspace = TerminalTestsHelper::validWorkspace();
+    ASSERT_TRUE(test::awaitFuture(repository.save(workspace)).hasValue());
+
+    const auto loaded = repository.loadLastOpened();
+    ASSERT_TRUE(loaded.hasValue());
+    EXPECT_EQ(loaded.value().id, workspace.id);
+    EXPECT_EQ(loaded.value().name, workspace.name);
+    EXPECT_EQ(loaded.value().selectedMainTabId, workspace.selectedMainTabId);
+    EXPECT_EQ(loaded.value().lastOpenedAt, workspace.lastOpenedAt);
+    ASSERT_EQ(loaded.value().tabs.size(), workspace.tabs.size());
+    EXPECT_EQ(loaded.value().tabs.first().id, workspace.tabs.first().id);
+    EXPECT_EQ(loaded.value().tabs.first().layout.presetId, workspace.tabs.first().layout.presetId);
+    ASSERT_EQ(loaded.value().sessions.size(), workspace.sessions.size());
+    EXPECT_EQ(loaded.value().sessions.first().id, workspace.sessions.first().id);
+    EXPECT_EQ(loaded.value().sessions.first().cwd, workspace.sessions.first().cwd);
+
+    // Saving the same workspace again replaces what it stored rather than adding a second row for it.
+    ASSERT_TRUE(test::awaitFuture(repository.save(workspace)).hasValue());
+    const auto reloaded = repository.loadLastOpened();
+    ASSERT_TRUE(reloaded.hasValue());
+    EXPECT_EQ(reloaded.value().id, workspace.id);
+}
+
 TEST(TerminalWorkspaceRepositoryTest, RejectsStorageErrorsMissingStateAndInvalidWrites) {
     test::TestPluginHost host;
     plugins::terminalplugin::TerminalWorkspaceRepository repository(host);
