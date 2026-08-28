@@ -83,6 +83,7 @@ class TerminalWidget final : public QWidget {
     [[nodiscard]] bool mouseBelongsToProgram(Qt::KeyboardModifiers modifiers) const;
     [[nodiscard]] QPointF gridPosition(const QPointF& position) const;
     void reportMouse(terminalcore::MouseAction action, terminalcore::MouseButton button, const QPointF& position, Qt::KeyboardModifiers modifiers, Qt::MouseButtons pressedButtons);
+    void reportWheel(int cells, terminalcore::MouseButton forward, terminalcore::MouseButton backward, const QWheelEvent& event);
     void paintCursor(QPainter& painter, const terminalcore::TerminalRenderSnapshot& renderSnapshot);
     void paintMatches(QPainter& painter, const terminalcore::TerminalRenderSnapshot& renderSnapshot);
     void paintPreedit(QPainter& painter, const terminalcore::TerminalRenderSnapshot& renderSnapshot);
@@ -109,8 +110,10 @@ class TerminalWidget final : public QWidget {
     bool m_confirmMultilinePaste{true};
     int m_cellWidth{8};
     int m_cellHeight{17};
-    int m_wheelPixelRemainder{};
-    int m_wheelAngleRemainder{};
+    int m_wheelPixelRemainderX{};
+    int m_wheelPixelRemainderY{};
+    int m_wheelAngleRemainderX{};
+    int m_wheelAngleRemainderY{};
     bool m_updatingScrollBar{false};
     QScrollBar* m_scrollBar{nullptr};
     QTimer m_resizeTimer;

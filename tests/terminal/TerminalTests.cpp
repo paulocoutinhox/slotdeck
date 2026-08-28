@@ -17,9 +17,11 @@
 #include "ui/ShelfSessionChip.h"
 #include "ui/TerminalPane.h"
 #include "ui/TerminalWidget.h"
+
 #include "ui/WorkspaceView.h"
 #include "workspace/LayoutManager.h"
 #include "workspace/WorkspaceManager.h"
+#include <QWheelEvent>
 
 #include <QAction>
 #include <QApplication>
@@ -1761,8 +1763,6 @@ TEST(TerminalWidgetTests, AsksBeforePastingTextThatWouldRunAndWritesNothingWhenR
     widget.setSession(nullptr);
 }
 
-} // namespace slotdeck
-
 TEST(TerminalTranslationsTest, SpellsEveryKeyInEveryLanguageTheSelectorOffers) {
     slotdeck::plugins::terminalplugin::TerminalPlugin plugin;
     slotdeck::test::expectCompleteCatalog(QStringLiteral("terminal"), plugin.translations());
@@ -1770,13 +1770,85 @@ TEST(TerminalTranslationsTest, SpellsEveryKeyInEveryLanguageTheSelectorOffers) {
 
 // A toast never shows the diagnostic of the engine, so the two conditions a reader reaches carry a sentence of the catalog.
 TEST(TerminalInteractionTest, SaysWhatStoppedTheInputInTheLanguageOfTheReader) {
-    slotdeck::test::TestPluginHost host;
+    test::TestPluginHost host;
     host.translations.insert(QStringLiteral("terminal.error.input-queue-full"), QStringLiteral("O terminal ainda esta lendo"));
     host.translations.insert(QStringLiteral("terminal.error.not-running"), QStringLiteral("O shell terminou"));
 
-    EXPECT_EQ(slotdeck::plugins::terminalplugin::terminalInteractionMessage({"terminal_input_queue_full", QStringLiteral("The terminal input queue is full"), {}}, host), QStringLiteral("O terminal ainda esta lendo"));
-    EXPECT_EQ(slotdeck::plugins::terminalplugin::terminalInteractionMessage({"terminal_not_running", QStringLiteral("The terminal process is not running"), {}}, host), QStringLiteral("O shell terminou"));
+    EXPECT_EQ(plugins::terminalplugin::terminalInteractionMessage({"terminal_input_queue_full", QStringLiteral("The terminal input queue is full"), {}}, host), QStringLiteral("O terminal ainda esta lendo"));
+    EXPECT_EQ(plugins::terminalplugin::terminalInteractionMessage({"terminal_not_running", QStringLiteral("The terminal process is not running"), {}}, host), QStringLiteral("O shell terminou"));
 
     // A fault of the emulator is written for the log, because nothing the reader can do answers it.
-    EXPECT_EQ(slotdeck::plugins::terminalplugin::terminalInteractionMessage({"ghostty_key_encoding_failed", QStringLiteral("The key event could not be encoded"), {}}, host), QStringLiteral("The key event could not be encoded"));
+    EXPECT_EQ(plugins::terminalplugin::terminalInteractionMessage({"ghostty_key_encoding_failed", QStringLiteral("The key event could not be encoded"), {}}, host), QStringLiteral("The key event could not be encoded"));
 }
+
+// A program that asked for the mouse receives every wheel notch, and a trackpad moves sideways as readily as it moves down.
+TEST(TerminalWidgetTests, ReportsEveryWheelNotchToAProgramReadingTheMouseOnBothAxes) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    test::TestPluginHost host;
+    plugins::terminalplugin::TerminalWorkspaceRepository repository(host);
+    QList<FakePtyBackend*> backends;
+    // clang-format off
+    terminalcore::PtyBackendFactory factory = [&backends]() {
+        auto backend = std::make_unique<FakePtyBackend>();
+        backends.append(backend.get());
+        return backend;
+    };
+    // clang-format on
+    workspace::WorkspaceManager manager(repository, host, directory.path(), *terminalcore::terminalTheme(QStringLiteral("balanced")), std::move(factory));
+    ASSERT_TRUE(manager.initialize().hasValue());
+    auto* session = qobject_cast<terminalcore::TerminalSession*>(manager.sessionObject(manager.currentFocusedSessionId()));
+    ASSERT_NE(session, nullptr);
+    ASSERT_FALSE(backends.isEmpty());
+
+    ui::TerminalWidget widget(host);
+    widget.resize(600, 400);
+    widget.setSession(session);
+
+    // The program asks for the mouse and for the format that names the cell in decimal.
+    backends.first()->sendOutput(QByteArrayLiteral("\x1b[?1000h\x1b[?1006h"));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([session]() { return session->programWantsMouse(); }));
+    // clang-format on
+    backends.first()->writes.clear();
+
+    // clang-format off
+    const auto written = [&backends]() {
+        QByteArray joined;
+        for (const auto& chunk : backends.first()->writes) {
+            joined.append(chunk);
+        }
+        return joined;
+    };
+    const auto notch = [&widget](QPoint angle) {
+        QWheelEvent event(QPointF(80, 64), widget.mapToGlobal(QPointF(80, 64)), QPoint(), angle, Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+        QCoreApplication::sendEvent(&widget, &event);
+    };
+    // clang-format on
+
+    notch(QPoint(0, 120));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&written]() { return written().contains(QByteArrayLiteral("\x1b[<64;")); })) << written().toStdString();
+    // clang-format on
+
+    backends.first()->writes.clear();
+    notch(QPoint(0, -120));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&written]() { return written().contains(QByteArrayLiteral("\x1b[<65;")); })) << written().toStdString();
+    // clang-format on
+
+    // A sideways notch travels as the button the protocol reserves for it rather than being swallowed.
+    backends.first()->writes.clear();
+    notch(QPoint(120, 0));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&written]() { return written().contains(QByteArrayLiteral("\x1b[<66;")); })) << written().toStdString();
+    // clang-format on
+
+    backends.first()->writes.clear();
+    notch(QPoint(-120, 0));
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&written]() { return written().contains(QByteArrayLiteral("\x1b[<67;")); })) << written().toStdString();
+    // clang-format on
+}
+
+} // namespace slotdeck

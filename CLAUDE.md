@@ -429,6 +429,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The pixel geometry of the grid is declared when the emulator is created, so no reader finds a terminal that knows its columns and not the size of its cells.
 - A program that asked for the mouse receives every press, release, drag and wheel notch in the protocol it selected, and the shift modifier claims that gesture back for the selection.
 - The wheel scrolls the history only while no program is reading the mouse, because a pager scrolls itself once it is.
+- A sideways notch reaches that program on the button the protocol reserves for it, because a trackpad moves sideways as readily as it moves down.
+- Only the history scrolls when no program is reading the wheel, because the grid is exactly as wide as the terminal and has nowhere sideways to go.
 - A program that asked for focus reporting is told when the terminal gains and loses the focus.
 - The selection belongs to the emulator rather than to the widget, so it reaches the scrollback, follows a wrapped line and survives everything the program writes under it.
 - A single press selects by cell, the second press of a sequence takes the word and the third takes the line, all decided by the emulator gesture rather than by a timer of our own.
@@ -1716,6 +1718,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A command that timed out, overflowed its output, found no working directory, did not start or ended abnormally reads on the card in the language of the interface rather than in the English of the log.
 - [x] Every condition the filesystem service reports reads in the editor as a sentence of its catalog naming the path, proven for the complete set the service can answer with.
 - [x] A paste the terminal has not finished reading and a shell that ended read in the language of the interface, while a fault of the emulator stays in the log.
+- [x] Every wheel notch reaches a program reading the mouse on both axes, proven by a case that read nothing sideways before the horizontal notch was reported.
 - [x] The POSIX and the Windows pseudo-terminal backends name their six shared conditions identically, which they did not before.
 - [x] A command task runs a real process for both endings, moving to Done on a zero exit code and back to the board with its reason on any other, and the directory it ran in is proven by a command that only succeeds beside a file that directory holds.
 - [x] A paste the reader refused writes nothing to the shell, a confirmed one reaches it, text that only wraps is never asked about and the setting turned off writes without asking, all driven through the key a reader presses.

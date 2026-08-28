@@ -41,6 +41,30 @@ namespace slotdeck::ui {
 // A drag held outside the grid moves the viewport at a readable pace rather than as fast as the events arrive.
 constexpr int autoscrollIntervalMs = 50;
 
+// A wheel reports an eighth of a degree, and one notch of the market convention is fifteen degrees of them.
+constexpr int wheelNotchAngle = 120;
+constexpr int cellsPerWheelNotch = 3;
+
+class TerminalWidgetHelper final {
+  public:
+    static int cellsScrolled(int pixelDelta, int cellSize, int& remainder);
+    static int cellsNotched(int angleDelta, int& remainder);
+};
+
+int TerminalWidgetHelper::cellsScrolled(int pixelDelta, int cellSize, int& remainder) {
+    remainder += pixelDelta;
+    const int cells = remainder / cellSize;
+    remainder %= cellSize;
+    return cells;
+}
+
+int TerminalWidgetHelper::cellsNotched(int angleDelta, int& remainder) {
+    remainder += angleDelta;
+    const int notches = remainder / wheelNotchAngle;
+    remainder %= wheelNotchAngle;
+    return notches * cellsPerWheelNotch;
+}
+
 // A bar and an underline are drawn as the thin edge of the cell they mark.
 constexpr qreal cursorEdgeThickness = 2.0;
 
@@ -111,8 +135,10 @@ void TerminalWidget::setSession(terminalcore::TerminalSession* newSession) {
     }
 
     m_session = newSession;
-    m_wheelPixelRemainder = 0;
-    m_wheelAngleRemainder = 0;
+    m_wheelPixelRemainderX = 0;
+    m_wheelPixelRemainderY = 0;
+    m_wheelAngleRemainderX = 0;
+    m_wheelAngleRemainderY = 0;
 
     if (m_session != nullptr) {
         m_renderConnection = connect(m_session, &terminalcore::TerminalSession::renderChanged, this, &TerminalWidget::scheduleSnapshotRefresh);
@@ -878,35 +904,44 @@ void TerminalWidget::wheelEvent(QWheelEvent* event) {
         return;
     }
 
+    const bool byPixel = !event->pixelDelta().isNull();
     int rows = 0;
+    int columns = 0;
 
-    if (!event->pixelDelta().isNull()) {
-        m_wheelPixelRemainder += event->pixelDelta().y();
-        rows = m_wheelPixelRemainder / m_cellHeight;
-        m_wheelPixelRemainder %= m_cellHeight;
+    if (byPixel) {
+        rows = TerminalWidgetHelper::cellsScrolled(event->pixelDelta().y(), m_cellHeight, m_wheelPixelRemainderY);
+        columns = TerminalWidgetHelper::cellsScrolled(event->pixelDelta().x(), m_cellWidth, m_wheelPixelRemainderX);
     } else if (!event->angleDelta().isNull()) {
-        m_wheelAngleRemainder += event->angleDelta().y();
-        const int steps = m_wheelAngleRemainder / 120;
-        m_wheelAngleRemainder %= 120;
-        rows = steps * 3;
+        rows = TerminalWidgetHelper::cellsNotched(event->angleDelta().y(), m_wheelAngleRemainderY);
+        columns = TerminalWidgetHelper::cellsNotched(event->angleDelta().x(), m_wheelAngleRemainderX);
     }
 
-    if (rows == 0) {
+    if (rows == 0 && columns == 0) {
         event->accept();
         return;
     }
 
     if (mouseBelongsToProgram(event->modifiers())) {
-        const terminalcore::MouseButton button = rows > 0 ? terminalcore::MouseButton::WheelUp : terminalcore::MouseButton::WheelDown;
-        for (int step = 0; step < std::abs(rows); ++step) {
-            reportMouse(terminalcore::MouseAction::Press, button, event->position(), event->modifiers(), event->buttons());
-        }
+        reportWheel(rows, terminalcore::MouseButton::WheelUp, terminalcore::MouseButton::WheelDown, *event);
+        reportWheel(columns, terminalcore::MouseButton::WheelLeft, terminalcore::MouseButton::WheelRight, *event);
         event->accept();
         return;
     }
 
-    m_session->scrollViewport(-rows);
+    // The grid is exactly as wide as the terminal, so only the history scrolls when the program is not reading the wheel.
+    if (rows != 0) {
+        m_session->scrollViewport(-rows);
+    }
+
     event->accept();
+}
+
+void TerminalWidget::reportWheel(int cells, terminalcore::MouseButton forward, terminalcore::MouseButton backward, const QWheelEvent& event) {
+    const terminalcore::MouseButton button = cells > 0 ? forward : backward;
+
+    for (int step = 0; step < std::abs(cells); ++step) {
+        reportMouse(terminalcore::MouseAction::Press, button, event.position(), event.modifiers(), event.buttons());
+    }
 }
 
 void TerminalWidget::refreshSnapshot() {
