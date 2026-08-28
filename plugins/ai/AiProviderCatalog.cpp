@@ -155,6 +155,10 @@ utils::Result<CommandLineDescriptor> AiProviderCatalogHelper::commandLineDescrip
         return utils::Result<CommandLineDescriptor>::failure(invalid(QStringLiteral("A command line provider never passes the prompt"), providerId));
     }
 
+    if (!commandLine.arguments.contains(commandLineModelPlaceholder)) {
+        return utils::Result<CommandLineDescriptor>::failure(invalid(QStringLiteral("A command line provider never passes the model"), providerId));
+    }
+
     return utils::Result<CommandLineDescriptor>::success(commandLine);
 }
 

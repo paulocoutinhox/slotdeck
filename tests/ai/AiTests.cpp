@@ -3337,6 +3337,10 @@ TEST(AiProviderCatalogTest, RefusesEveryMalformedCommandLineProviderItDeclaresAR
     noPrompt.insert(QStringLiteral("command"), QJsonObject{{QStringLiteral("program"), QStringLiteral("claude")}, {QStringLiteral("arguments"), QJsonArray{QStringLiteral("--quiet")}}});
     malformed.append({QStringLiteral("a provider that never passes the prompt"), noPrompt});
 
+    QJsonObject noModel = sound;
+    noModel.insert(QStringLiteral("command"), QJsonObject{{QStringLiteral("program"), QStringLiteral("claude")}, {QStringLiteral("arguments"), QJsonArray{QStringLiteral("-p"), QStringLiteral("{prompt}")}}, {QStringLiteral("clearedVariables"), QJsonArray{QStringLiteral("ANTHROPIC_API_KEY")}}});
+    malformed.append({QStringLiteral("a provider that never passes the model"), noModel});
+
     QJsonObject variablesNotAList = sound;
     variablesNotAList.insert(QStringLiteral("command"), QJsonObject{{QStringLiteral("program"), QStringLiteral("claude")}, {QStringLiteral("arguments"), QJsonArray{QStringLiteral("-p"), QStringLiteral("{prompt}")}}, {QStringLiteral("clearedVariables"), QStringLiteral("ANTHROPIC_API_KEY")}});
     malformed.append({QStringLiteral("variables to clear that are not a list"), variablesNotAList});

@@ -664,6 +664,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The wire protocols are the Anthropic native API and the OpenAI-compatible API, and every other provider reached over a wire differs from those two only by address and model list.
 - A command line agent answers the same question a model answers, so it is a provider on its own protocol, invoked rather than requested.
 - Such a provider declares the program to run and the arguments to run it with, as data like every other provider, and the argument list declares where the prompt goes and where the working directory goes.
+- That list also declares where the model goes and is refused without it, because the reader chooses a model for every connection and a vector that never carries it would discard that choice in silence.
+- The working directory is the one place the list may leave out, because the process already runs there.
 - The program is started with an argument vector rather than a command line, so a prompt carrying quotes, newlines, dollars, backticks or semicolons reaches the agent exactly as it was written.
 - The program is found by its name alone, resolved against the executable path of the running system and then against the install directories that platform declares, because a window opened by the desktop does not inherit the path a shell has.
 - Which executable a name resolves to is a property of the running system, so the transport receives that resolution and a deterministic run is given one of its own.
@@ -1701,6 +1703,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A command line agent is started as a real process against a fixture, running where the task declares and reading a prompt carrying every character a shell acts on.
 - [x] A command line agent that exits without printing anything is reported with its exit code rather than with an empty message.
 - [x] Every argument the installed command line agents are given is accepted by them, which removed the three flags Kimi does not declare after its own parser refused the first of them.
+- [x] A command line provider whose argument list never carries the model is refused from text, so the model the reader chose can never be dropped in silence.
 - [x] A command task runs a real process for both endings, moving to Done on a zero exit code and back to the board with its reason on any other, and the directory it ran in is proven by a command that only succeeds beside a file that directory holds.
 - [x] A paste the reader refused writes nothing to the shell, a confirmed one reaches it, text that only wraps is never asked about and the setting turned off writes without asking, all driven through the key a reader presses.
 - [x] A selection is indented and unindented as whole lines, leaving a line nobody selected alone and answering a document resolved to tabs with a tab.
