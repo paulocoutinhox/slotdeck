@@ -127,7 +127,7 @@ void AiCliChatClient::send(const ChatRequest& request, const std::function<QStri
     m_running = true;
     emit started();
     emit requestSent(program, arguments.join(QLatin1Char('\n')));
-    m_runner.startProgram(program, arguments, request.workdir, 0);
+    m_runner.startProgram(program, arguments, request.workdir, 0, provider->commandLine.clearedVariables);
 }
 
 // A command line agent runs its own tools, so its run is one turn that ends when the program does.

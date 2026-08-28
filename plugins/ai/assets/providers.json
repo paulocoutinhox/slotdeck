@@ -1968,6 +1968,11 @@
           "{prompt}",
           "--output-format",
           "plain"
+        ],
+        "clearedVariables": [
+          "XAI_API_KEY",
+          "GROK_API_KEY",
+          "XAI_BASE_URL"
         ]
       },
       "requiresApiKey": false,
@@ -1991,6 +1996,13 @@
           "--no-session-persistence",
           "--output-format",
           "text"
+        ],
+        "clearedVariables": [
+          "ANTHROPIC_API_KEY",
+          "ANTHROPIC_AUTH_TOKEN",
+          "ANTHROPIC_BASE_URL",
+          "CLAUDE_CODE_USE_BEDROCK",
+          "CLAUDE_CODE_USE_VERTEX"
         ]
       },
       "requiresApiKey": false,
@@ -2014,6 +2026,12 @@
           "--cd",
           "{workdir}",
           "{prompt}"
+        ],
+        "clearedVariables": [
+          "OPENAI_API_KEY",
+          "OPENAI_BASE_URL",
+          "OPENAI_ORGANIZATION",
+          "OPENAI_PROJECT"
         ]
       },
       "requiresApiKey": false,
@@ -2036,6 +2054,12 @@
           "text",
           "--print-timeout",
           "1h"
+        ],
+        "clearedVariables": [
+          "GEMINI_API_KEY",
+          "GOOGLE_API_KEY",
+          "GOOGLE_GENAI_API_KEY",
+          "GOOGLE_APPLICATION_CREDENTIALS"
         ]
       },
       "requiresApiKey": false,
@@ -2058,6 +2082,11 @@
           "--quiet",
           "--max-steps-per-turn",
           "100"
+        ],
+        "clearedVariables": [
+          "MOONSHOT_API_KEY",
+          "KIMI_API_KEY",
+          "MOONSHOT_BASE_URL"
         ]
       },
       "requiresApiKey": false,

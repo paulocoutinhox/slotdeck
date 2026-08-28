@@ -3295,6 +3295,14 @@ TEST(AiProviderCatalogTest, RefusesEveryMalformedCommandLineProviderItDeclaresAR
     noPrompt.insert(QStringLiteral("command"), QJsonObject{{QStringLiteral("program"), QStringLiteral("claude")}, {QStringLiteral("arguments"), QJsonArray{QStringLiteral("--quiet")}}});
     malformed.append({QStringLiteral("a provider that never passes the prompt"), noPrompt});
 
+    QJsonObject variablesNotAList = sound;
+    variablesNotAList.insert(QStringLiteral("command"), QJsonObject{{QStringLiteral("program"), QStringLiteral("claude")}, {QStringLiteral("arguments"), QJsonArray{QStringLiteral("-p"), QStringLiteral("{prompt}")}}, {QStringLiteral("clearedVariables"), QStringLiteral("ANTHROPIC_API_KEY")}});
+    malformed.append({QStringLiteral("variables to clear that are not a list"), variablesNotAList});
+
+    QJsonObject emptyVariable = sound;
+    emptyVariable.insert(QStringLiteral("command"), QJsonObject{{QStringLiteral("program"), QStringLiteral("claude")}, {QStringLiteral("arguments"), QJsonArray{QStringLiteral("-p"), QStringLiteral("{prompt}")}}, {QStringLiteral("clearedVariables"), QJsonArray{QStringLiteral("  ")}}});
+    malformed.append({QStringLiteral("an empty variable to clear"), emptyVariable});
+
     QJsonObject withAddress = sound;
     withAddress.insert(QStringLiteral("baseUrl"), QStringLiteral("https://example.com"));
     malformed.append({QStringLiteral("a command line provider declaring an address"), withAddress});
@@ -3395,6 +3403,8 @@ TEST(AiCliChatClientTest, RunsTheProgramWhereTheTaskSaysAndAnswersWithWhatItPrin
     const auto resolver = [](const QString&) { return QCoreApplication::applicationFilePath(); };
     // clang-format on
     qputenv("SLOTDECK_TEST_CLI_AGENT", QByteArrayLiteral("1"));
+    // A credential in the environment would make the agent bill that key instead of the subscription the reader pays for.
+    qputenv("ANTHROPIC_API_KEY", QByteArrayLiteral("a-key-the-agent-must-not-see"));
     AiCliChatClient client(resolver, nullptr);
 
     QString answered;
@@ -3425,6 +3435,11 @@ TEST(AiCliChatClientTest, RunsTheProgramWhereTheTaskSaysAndAnswersWithWhatItPrin
     EXPECT_TRUE(answered.contains(QStringLiteral("directory: ") + workdir)) << answered.toStdString();
     EXPECT_TRUE(answered.contains(prompt.section(QLatin1Char('\n'), 0, 0))) << answered.toStdString();
     EXPECT_FALSE(client.running());
+
+    // The provider names that variable among the ones it clears, so the agent never reads it.
+    EXPECT_TRUE(answered.contains(QStringLiteral("credential:"))) << answered.toStdString();
+    EXPECT_FALSE(answered.contains(QStringLiteral("a-key-the-agent-must-not-see"))) << answered.toStdString();
+    qunsetenv("ANTHROPIC_API_KEY");
     qunsetenv("SLOTDECK_TEST_CLI_AGENT");
 }
 

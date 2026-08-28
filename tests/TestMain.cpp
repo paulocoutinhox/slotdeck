@@ -381,6 +381,7 @@ int main(int argc, char** argv) {
         QTextStream out(stdout);
         out << QStringLiteral("directory: %1\n").arg(QDir::currentPath());
         out << QStringLiteral("prompt: %1\n").arg(prompt);
+        out << QStringLiteral("credential: %1\n").arg(qEnvironmentVariable("ANTHROPIC_API_KEY"));
         out.flush();
         return prompt.isEmpty() ? 3 : 0;
     }

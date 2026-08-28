@@ -121,7 +121,7 @@ std::optional<WireProtocol> AiProviderCatalogHelper::protocolFromIdentifier(cons
 utils::Result<CommandLineDescriptor> AiProviderCatalogHelper::commandLineDescriptor(const QJsonObject& document, const QString& providerId) {
     const QJsonObject declared = document.value(QStringLiteral("command")).toObject();
 
-    if (!document.value(QStringLiteral("command")).isObject() || !hasExactKeys(declared, {QStringLiteral("program"), QStringLiteral("arguments")})) {
+    if (!document.value(QStringLiteral("command")).isObject() || !hasExactKeys(declared, {QStringLiteral("program"), QStringLiteral("arguments"), QStringLiteral("clearedVariables")})) {
         return utils::Result<CommandLineDescriptor>::failure(invalid(QStringLiteral("A command line provider declares no program to run"), providerId));
     }
 
@@ -137,6 +137,18 @@ utils::Result<CommandLineDescriptor> AiProviderCatalogHelper::commandLineDescrip
         }
 
         commandLine.arguments.append(value.toString());
+    }
+
+    if (!declared.value(QStringLiteral("clearedVariables")).isArray()) {
+        return utils::Result<CommandLineDescriptor>::failure(invalid(QStringLiteral("A command line provider declares no variables to clear"), providerId));
+    }
+
+    for (const auto& value : declared.value(QStringLiteral("clearedVariables")).toArray()) {
+        if (!value.isString() || value.toString().trimmed().isEmpty()) {
+            return utils::Result<CommandLineDescriptor>::failure(invalid(QStringLiteral("A command line provider declares an empty variable to clear"), providerId));
+        }
+
+        commandLine.clearedVariables.append(value.toString());
     }
 
     if (!commandLine.arguments.contains(commandLinePromptPlaceholder)) {

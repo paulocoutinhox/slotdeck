@@ -150,13 +150,13 @@ bool AiCommandRunner::running() const {
     return m_process != nullptr;
 }
 
-void AiCommandRunner::startProgram(const QString& program, const QStringList& arguments, const QString& workdir, int timeoutSeconds) {
+void AiCommandRunner::startProgram(const QString& program, const QStringList& arguments, const QString& workdir, int timeoutSeconds, const QStringList& clearedVariables) {
     if (program.trimmed().isEmpty()) {
         reportFailure({"ai_command_invalid", "The program is required", {}});
         return;
     }
 
-    launch(program, arguments, workdir, timeoutSeconds);
+    launch(program, arguments, workdir, timeoutSeconds, clearedVariables);
 }
 
 void AiCommandRunner::start(const QString& command, const QString& workdir, int timeoutSeconds) {
@@ -165,10 +165,10 @@ void AiCommandRunner::start(const QString& command, const QString& workdir, int 
         return;
     }
 
-    launch(AiCommandRunnerHelper::shellExecutable(), AiCommandRunnerHelper::shellArguments(command), workdir, timeoutSeconds);
+    launch(AiCommandRunnerHelper::shellExecutable(), AiCommandRunnerHelper::shellArguments(command), workdir, timeoutSeconds, {});
 }
 
-void AiCommandRunner::launch(const QString& program, const QStringList& arguments, const QString& workdir, int timeoutSeconds) {
+void AiCommandRunner::launch(const QString& program, const QStringList& arguments, const QString& workdir, int timeoutSeconds, const QStringList& clearedVariables) {
     if (m_process != nullptr) {
         reportFailure({"ai_command_busy", "The runner is already running a command", {}});
         return;
@@ -193,6 +193,14 @@ void AiCommandRunner::launch(const QString& program, const QStringList& argument
     m_timedOut = false;
 
     m_process = new QProcess(this);
+    // A credential the child can read is one it may spend, so the variables the provider names are removed from what it inherits.
+    QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+
+    for (const auto& name : clearedVariables) {
+        environment.remove(name);
+    }
+
+    m_process->setProcessEnvironment(environment);
     m_process->setWorkingDirectory(directory.absolutePath());
     m_process->setProcessChannelMode(QProcess::MergedChannels);
     connect(m_process, &QProcess::readyReadStandardOutput, this, &AiCommandRunner::readOutput);

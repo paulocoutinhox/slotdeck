@@ -23,6 +23,8 @@ inline constexpr auto commandLineWorkdirPlaceholder = "{workdir}";
 struct CommandLineDescriptor final {
     QString program;
     QStringList arguments;
+    // A credential in the environment makes these agents bill the key instead of the subscription the reader pays for, so the run starts without them.
+    QStringList clearedVariables;
 };
 
 enum class ModelTrait { Sampling, Reasoning, FunctionCalling, Vision, SystemPrompt };

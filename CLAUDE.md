@@ -667,6 +667,9 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A command line agent runs its own tools, so none is declared to it and its run is one turn that ends when the program does.
 - The conversation is rendered into the prompt, because these agents are invoked without a session and keep nothing between runs.
 - A command line provider declares no address, no credential and no parameter, and a provider reached over a wire declares no program.
+- A command line agent signs in on its own and bills the subscription of the reader, so the credentials each vendor reads are named by that provider and removed from what the process inherits, otherwise the agent spends an API key instead.
+- Those variable names are data in the catalog like the program and the arguments, so a vendor that starts reading another one is a change of data.
+- The name of a command line provider says it is a command line agent, because a reader choosing between one and the service behind it must be able to tell them apart.
 - Only a model reached over a wire declares tool calling, because a command line agent declares none and still runs a task.
 - A model descriptor declares its identifier, display name, context window, maximum output and the traits it supports.
 - A model source is not declared, because every provider accepts a model typed by the user and the catalog only decides which ones are offered.
@@ -1547,6 +1550,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Every owner that keeps a committed copy guards it by revision, proven for the editor and for the AI by cases that roll back to the older value without that guard.
 - [x] Every one of the hundred and twenty eight continuations names the object it reaches or reaches nothing at all, and the lint command now refuses any other.
 - [x] A run that compacted reports the tokens its summary spent, and a command line agent reports no cost at all.
+- [x] A credential in the environment never reaches a command line agent, proven by a run that reads it back as empty and reads it as the key without the clearing.
 - [x] Every plugin releases what it already took before returning a failure from initialization, checked against all eight.
 - [x] The cost of a run reaches the reader in the execution history, proven through the fake that answers the columns the real schema has.
 - [x] The price of every model the catalog carries reaches it, a model nobody priced reports no cost, and a price of the wrong shape or below zero rejects the plugin.
