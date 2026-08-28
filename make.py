@@ -335,6 +335,24 @@ def inherited_catalogs() -> list[str]:
     return found
 
 
+def miscounted_suite() -> list[str]:
+    standard = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+    recorded = re.search(r"reports (\d+) independent CTest cases", standard)
+
+    if recorded is None:
+        return ["the standard records no suite size"]
+
+    registered = 0
+
+    for path in sorted((ROOT / "tests").rglob("*.cpp")):
+        registered += len(re.findall(r"^TEST\(", path.read_text(encoding="utf-8"), re.M))
+
+    if int(recorded.group(1)) != registered:
+        return [f"the standard records {recorded.group(1)} cases and the suite registers {registered}"]
+
+    return []
+
+
 def undocumented_commands() -> list[str]:
     readme = ROOT / "README.md"
 
@@ -691,6 +709,11 @@ def task_audit(_: Context) -> None:
 
     if inherited:
         raise RuntimeError("Every language declares the keys it spells, because a catalog built from another one cannot be told from one that forgot a sentence:\n  " + "\n  ".join(inherited))
+
+    miscounted = miscounted_suite()
+
+    if miscounted:
+        raise RuntimeError("The standard records what the suite really is, because a number nobody keeps is a number nobody believes:\n  " + "\n  ".join(miscounted))
 
     undocumented = undocumented_commands()
 
