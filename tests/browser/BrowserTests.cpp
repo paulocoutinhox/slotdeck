@@ -1,6 +1,7 @@
 #include "BrowserBookmarksView.h"
 #include "BrowserPlugin.h"
 #include "BrowserTranslations.h"
+#include "TestFuture.h"
 #include "TestPluginHost.h"
 #include "TestTranslations.h"
 #include "ui/Icons.h"
@@ -370,6 +371,52 @@ TEST(BrowserPluginTest, KeepsEveryBookmarkOfAGroupInOrderWhenThatGroupIsRemoved)
     for (int index = 0; index < written.size(); ++index) {
         EXPECT_EQ(written.at(index), index);
     }
+}
+
+// Two snapshots of the tabs can be in flight at once, so the one written last is what the next start reads whatever order the answers arrive in.
+TEST(BrowserPluginTest, KeepsTheSnapshotWrittenLastWhenTwoOfThemAnswerOutOfOrder) {
+    auto host = BrowserTestsHelper::browserHost();
+    QVector<std::shared_ptr<QPromise<utils::Result<void>>>> held;
+    // clang-format off
+    host.transactionFutureHandler = [&held](const QVector<persistence::DatabaseStatement>&) {
+        auto pending = std::make_shared<QPromise<utils::Result<void>>>();
+        pending->start();
+        held.append(pending);
+        return pending->future();
+    };
+    // clang-format on
+
+    BrowserPlugin plugin;
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    ASSERT_TRUE(plugin.createTab(QUrl(QStringLiteral("https://example.com/first")), true).hasValue());
+    ASSERT_TRUE(plugin.createTab(QUrl(QStringLiteral("https://example.com/second")), true).hasValue());
+    ASSERT_GE(held.size(), 2);
+    const qsizetype tabsAfterBoth = plugin.tabs().size();
+
+    // The newer write answers first and the older one answers after it, which is what a queue of two may really do.
+    held.constLast()->addResult(utils::Result<void>::success());
+    held.constLast()->finish();
+    held.constFirst()->addResult(utils::Result<void>::success());
+    held.constFirst()->finish();
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&plugin, tabsAfterBoth]() { return plugin.tabs().size() == tabsAfterBoth; }));
+    // clang-format on
+
+    // The state the reader sees is the later one, and a failure now rolls back to it rather than to the earlier snapshot.
+    ASSERT_EQ(plugin.tabs().size(), tabsAfterBoth);
+    EXPECT_EQ(plugin.tabs().constLast().url, QUrl(QStringLiteral("https://example.com/second")));
+
+    held.clear();
+    ASSERT_TRUE(plugin.createTab(QUrl(QStringLiteral("https://example.com/third")), true).hasValue());
+    ASSERT_EQ(held.size(), 1);
+    const qsizetype told = host.notifications.size();
+    held.constFirst()->addResult(utils::Result<void>::failure({"browser_persistence", "no", {}}));
+    held.constFirst()->finish();
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&host, told]() { return host.notifications.size() > told; }));
+    // clang-format on
+    EXPECT_EQ(plugin.tabs().size(), tabsAfterBoth);
+    EXPECT_EQ(plugin.tabs().constLast().url, QUrl(QStringLiteral("https://example.com/second")));
 }
 
 TEST(BrowserPluginTest, RestoresCompleteBookmarkStateAndRejectsCorruptRows) {

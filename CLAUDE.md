@@ -920,6 +920,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Addresses without a scheme receive HTTPS deterministically and malformed or unsupported addresses are rejected.
 - The Browser owns its homepage in its settings document and its tab identifiers, order, titles, URLs, active tab and UTC timestamps in its own tables.
 - Every tab mutation queues an asynchronous full-session database transaction and the final queued snapshot is authoritative.
+- A snapshot that answers after a newer one commits nothing, and a failure rolls back to what was committed rather than to the snapshot that failure carried, because two writes of the tabs can be in flight at once.
 - Closing the last tab leaves the Browser without any tab so its renderer is released, and the view presents the empty state with the action that opens a new tab.
 - The tab surface and the empty state are mutually exclusive pages of one stacked widget, so neither can share the content area with the other.
 - A start without any stored tab opens one homepage tab, and exactly one tab is active whenever a tab exists.
@@ -1536,6 +1537,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A database the previous version of the product left keeps its workspaces, its tasks and its runs when the AI schema gains its second version, proven against the real schema rather than a sample one.
 - [x] A group of three bookmarks removed beside an existing ungrouped one keeps all four, keeps their order and writes them numbered from zero.
 - [x] A workspace that comes back without the terminal a server was created from drops that link and keeps the server, with its name, its root and its port as they were.
+- [x] Two snapshots of the tabs answering out of order leave the later one standing, and a failure after them rolls back to it rather than to the earlier one.
 - [x] The cost of a run reaches the reader in the execution history, proven through the fake that answers the columns the real schema has.
 - [x] The price of every model the catalog carries reaches it, a model nobody priced reports no cost, and a price of the wrong shape or below zero rejects the plugin.
 - [x] The view follows the reader instead of dragging them to the end of every message that arrives.
