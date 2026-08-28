@@ -1130,9 +1130,7 @@ TEST(CodeDocumentTest, OpensEveryEncodingItCanWriteBackAndNamesTheOnesItCannot) 
 
     // A file carrying a null byte and no mark is binary and stays refused.
     const QString binary = QDir(root.path()).filePath(QStringLiteral("binary.bin"));
-    ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(binary, QByteArray("\x7F"
-                                                                        "ELF\0\1",
-                                                                        6)));
+    ASSERT_TRUE(CodeEditorTestsHelper::writeTestFile(binary, QByteArray::fromHex(QByteArrayLiteral("7f454c460001"))));
     CodeDocument executable(binary, root.path(), false, CodeEditorFont{}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Latin1, host);
     QSignalSpy binaryFailures(&executable, &CodeDocument::operationFailed);
     // clang-format off
@@ -2544,7 +2542,6 @@ TEST(CodeEditorTranslationsTest, SpellsEveryKeyInEveryLanguageTheSelectorOffers)
 TEST(EditorConfigTest, AnswersEveryHostileDocumentInsteadOfReadingPastIt) {
     const QStringList hostile{
         QString{}, QStringLiteral("["), QStringLiteral("[*"), QStringLiteral("[*]"), QStringLiteral("[{"), QStringLiteral("[{a"), QStringLiteral("[{a,"), QStringLiteral("[a-"), QStringLiteral("[!"), QStringLiteral("[/]"), QStringLiteral("[**"), QStringLiteral("[{1..}]"), QStringLiteral("[{..2}]"), QStringLiteral("[{99999999999999999999..99999999999999999999}]"), QStringLiteral("[{1..999999999}]"), QStringLiteral("[") + QString(4096, QLatin1Char('*')) + QStringLiteral("]\nindent_size = 4"), QStringLiteral("[") + QString(200, QLatin1Char('{')) + QStringLiteral("]\nindent_size = 4"), QString(200, QLatin1Char('{')), QStringLiteral("root"), QStringLiteral("root ="), QStringLiteral("= value"), QStringLiteral("indent_size ="), QStringLiteral("indent_size = notanumber"), QStringLiteral("indent_size = 99999999999999999999"), QStringLiteral("indent_size = -1"), QStringLiteral("[*]\nindent_style"), QStringLiteral("[*]\n\n\n[*]\n"), QString::fromUtf8("[*]\ncharset = \xC3\x28"),
-
     };
 
     for (const auto& text : hostile) {

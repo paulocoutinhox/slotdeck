@@ -335,6 +335,42 @@ def inherited_catalogs() -> list[str]:
     return found
 
 
+def wrapped_statements() -> list[str]:
+    found: list[str] = []
+
+    for directory in ("src", "plugins", "tests"):
+        for path in sorted((ROOT / directory).rglob("*")):
+            if path.suffix not in (".cpp", ".h"):
+                continue
+
+            lines = path.read_text(encoding="utf-8").split("\n")
+            protected = False
+
+            for index, line in enumerate(lines[:-1]):
+                stripped = line.strip()
+
+                if stripped == "// clang-format off":
+                    protected = True
+                    continue
+
+                if stripped == "// clang-format on":
+                    protected = False
+                    continue
+
+                if protected or stripped.startswith("//") or stripped.startswith("#") or stripped.endswith("{"):
+                    continue
+
+                following = lines[index + 1].strip()
+
+                # A table written on one line ends with the comma of its last entry, and the brace that closes it follows.
+                if not re.search(r"(,|&&|\|\||==|!=)\s*$", stripped) or not following or following.startswith("}"):
+                    continue
+
+                found.append(f"{path.relative_to(ROOT)}:{index + 1}")
+
+    return found
+
+
 def crowded_scopes() -> list[str]:
     found: list[str] = []
 
@@ -626,6 +662,11 @@ def task_audit(_: Context) -> None:
 
     if inherited:
         raise RuntimeError("Every language declares the keys it spells, because a catalog built from another one cannot be told from one that forgot a sentence:\n  " + "\n  ".join(inherited))
+
+    wrapped = wrapped_statements()
+
+    if wrapped:
+        raise RuntimeError("Every call, declaration and return stays complete on one physical line, because the formatter never wraps one:\n  " + "\n  ".join(wrapped))
 
     crowded = crowded_scopes()
 
