@@ -343,6 +343,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Each plugin declares its migrations in its implementation without external migration files, numbered consecutively from the creating one.
 - The scoped host supplies the current schema version and applies the creating migration atomically.
 - A stored schema a plugin can no longer use is dropped and created again from the migrations that plugin declares, and only the objects carrying its identifier are touched.
+- That rebuild answers only a stored schema that does not match what the plugin declares, because it destroys what the reader recorded and every other failure of the migration path is a mistake in code or a passing condition.
+- A schema written by a later version of the product is refused by name rather than rebuilt, so going back to an older build leaves what the newer one recorded where it is.
 - The stored objects of a plugin are compared with the ones its migrations declare, so a schema that changed while its version stayed the same is rebuilt instead of failing on the first statement that reads it.
 - Every rebuilt feature is named to the reader once, because the data it held is gone.
 - Every multi-statement domain mutation uses the host transaction API and rolls back completely on failure.
@@ -1526,6 +1528,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A tool call presents its line unwrapped when the surface has room, proven by a case that reads two lines back without the precise measurement.
 - [x] Every turn a summary replaced is still stored after the run that compacted it, because the history of a task is the memory of its agent.
 - [x] A plugin schema that gains a version keeps every row the previous one stored, proven by a case that loses the row against the comparison that read the migrations as text.
+- [x] A database two versions along refuses an older build by name instead of being rebuilt, and a schema that really cannot be used is still rebuilt.
+- [x] The cost of a run reaches the reader in the execution history, proven through the fake that answers the columns the real schema has.
 - [x] The price of every model the catalog carries reaches it, a model nobody priced reports no cost, and a price of the wrong shape or below zero rejects the plugin.
 - [x] The view follows the reader instead of dragging them to the end of every message that arrives.
 - [x] AI tasks are grouped into renameable workspace tabs and rendered across the To Do, Doing, Blocked, Review and Done columns.

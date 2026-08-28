@@ -313,7 +313,13 @@ utils::Result<void> StateStore::migratePluginDatabase(const QString& pluginId, c
 
     const QMutexLocker locker(&m_mutex);
 
-    if (const auto applied = applyPluginMigrations(pluginId, migrations); applied.hasValue()) {
+    const auto applied = applyPluginMigrations(pluginId, migrations);
+
+    if (applied.hasValue()) {
+        return applied;
+    }
+    // Only a stored schema this plugin can no longer use is worth rebuilding, because everything else it can fail with costs the reader what they recorded.
+    if (applied.error().code != QStringLiteral("plugin_database_schema_invalid")) {
         return applied;
     }
 

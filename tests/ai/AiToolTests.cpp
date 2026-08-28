@@ -242,6 +242,10 @@ TEST(AiTaskInfoDialogTest, PresentsExecutionsLogsAndExplainsAnEmptyOutput) {
     failed.startedAtUtc = now;
     failed.finishedAtUtc = now.addSecs(1);
     failed.errorMessage = QStringLiteral("invalid_request_error: model is unknown");
+    failed.inputTokens = 1000;
+    failed.outputTokens = 500;
+    failed.providerId = QStringLiteral("openai");
+    failed.modelId = QStringLiteral("gpt-4o");
     AiTestsHelper::installAiRows(host, {workspace}, {task}, {});
     AiTestsHelper::installExecutionRows(host, {failed}, {{QStringLiteral("log-1"), failed.id, 1, now, ExecutionLogLevel::Error, ExecutionLogKind::Failed, failed.errorMessage}});
 
@@ -266,6 +270,11 @@ TEST(AiTaskInfoDialogTest, PresentsExecutionsLogsAndExplainsAnEmptyOutput) {
     ASSERT_EQ(executionGrid->rowCount(), 1);
     EXPECT_EQ(executionGrid->item(0, 1)->text(), QStringLiteral("Failed"));
     EXPECT_EQ(executionGrid->item(0, 5)->text(), failed.errorMessage);
+
+    // A run reports what it cost, from the price the catalog carries for the model that run really spoke to.
+    const auto spent = runCost(failed.providerId, failed.modelId, failed.inputTokens, failed.outputTokens);
+    ASSERT_TRUE(spent.has_value());
+    EXPECT_EQ(executionGrid->item(0, 3)->text(), QStringLiteral("USD %1").arg(QLocale::system().toString(spent.value(), 'f', 4)));
     EXPECT_EQ(logGrid->item(0, 2)->text(), host.translations.value(QStringLiteral("ai.log-kind.failed")));
     EXPECT_EQ(logGrid->item(0, 3)->text(), failed.errorMessage);
 

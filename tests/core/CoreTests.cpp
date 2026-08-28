@@ -168,6 +168,40 @@ TEST(StateStoreTest, KeepsWhatAPluginStoredWhenALaterVersionEvolvesItsSchema) {
     EXPECT_EQ(again.value().size(), 1);
 }
 
+// A schema written by a later version of the product is refused rather than rebuilt, because rebuilding it would answer running an older build by destroying what the reader recorded.
+TEST(StateStoreTest, RefusesASchemaNewerThanThePluginInsteadOfRebuildingIt) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    persistence::StateStore store(directory.filePath(QStringLiteral("slotdeck.sqlite3")));
+    ASSERT_TRUE(store.initialize().hasValue());
+
+    const QString creating = QStringLiteral("CREATE TABLE sample_runs(id TEXT PRIMARY KEY, tokens INTEGER NOT NULL)");
+    const QString evolving = QStringLiteral("ALTER TABLE sample_runs ADD COLUMN model_id TEXT NOT NULL DEFAULT ''");
+    const QVector<persistence::DatabaseMigration> newer{{1, {creating}}, {2, {evolving}}};
+    ASSERT_TRUE(store.migratePluginDatabase(QStringLiteral("sample"), newer).hasValue());
+    ASSERT_TRUE(store.executePluginDatabase(QStringLiteral("sample"), QStringLiteral("INSERT INTO sample_runs(id, tokens, model_id) VALUES(?, ?, ?)"), {QStringLiteral("run-1"), 42, QStringLiteral("gpt-4o")}).hasValue());
+
+    // An older build of the product declares only the creating migration and meets a database two versions along.
+    const QVector<persistence::DatabaseMigration> older{{1, {creating}}};
+    const auto refused = store.migratePluginDatabase(QStringLiteral("sample"), older);
+    ASSERT_FALSE(refused.hasValue());
+    EXPECT_EQ(refused.error().code, QStringLiteral("plugin_database_version_newer"));
+
+    // What the reader recorded is still there, and the stored version was not moved back.
+    const auto rows = store.queryPluginDatabase(QStringLiteral("sample"), QStringLiteral("SELECT id, model_id FROM sample_runs"), {});
+    ASSERT_TRUE(rows.hasValue()) << rows.error().message.toStdString();
+    ASSERT_EQ(rows.value().size(), 1);
+    EXPECT_EQ(rows.value().first().value(QStringLiteral("model_id")).toString(), QStringLiteral("gpt-4o"));
+    EXPECT_EQ(store.pluginSchemaVersion(QStringLiteral("sample")).value(), 2);
+
+    // A stored schema that really cannot be used is still rebuilt, because that is what the rebuild is for.
+    const QVector<persistence::DatabaseMigration> different{{1, {QStringLiteral("CREATE TABLE sample_runs(id TEXT PRIMARY KEY, note TEXT NOT NULL)")}}, {2, {evolving}}};
+    ASSERT_TRUE(store.migratePluginDatabase(QStringLiteral("sample"), different).hasValue());
+    const auto rebuilt = store.queryPluginDatabase(QStringLiteral("sample"), QStringLiteral("SELECT id FROM sample_runs"), {});
+    ASSERT_TRUE(rebuilt.hasValue());
+    EXPECT_TRUE(rebuilt.value().isEmpty());
+}
+
 TEST(StateStoreTest, ReportsPathMigrationAndTransactionErrors) {
     persistence::StateStore emptyPath(QString{});
     EXPECT_EQ(emptyPath.initialize().error().code, QStringLiteral("database_path_invalid"));
