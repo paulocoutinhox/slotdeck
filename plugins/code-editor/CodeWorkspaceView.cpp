@@ -26,6 +26,9 @@
 
 namespace slotdeck::plugins::codeeditor {
 
+// A folder reached through a symbolic link can name the folder that holds it, so the walk carries the depth this project declares rather than the one the tree keeps offering.
+constexpr int maximumTreeDepth = 64;
+
 class CodeWorkspaceViewHelper final {
   public:
     static QString charsetName(TextCharset charset);
@@ -872,11 +875,15 @@ void CodeWorkspaceView::updateDocumentTitle(CodeDocument* document) {
 
 // The tree follows the document the reader points at, so a double click on its tab selects the file it belongs to.
 void CodeWorkspaceView::applyFileFilter() {
-    narrowTree(m_fileModel->index(m_initialState.rootPath));
+    narrowTree(m_fileModel->index(m_initialState.rootPath), 0);
 }
 
 // A folder that leads to a name the filter matched stays, because a match nobody can reach is not a result.
-bool CodeWorkspaceView::narrowTree(const QModelIndex& parent) {
+bool CodeWorkspaceView::narrowTree(const QModelIndex& parent, int depth) {
+    if (depth >= maximumTreeDepth) {
+        return false;
+    }
+
     if (!m_fileNeedle.isEmpty() && m_fileModel->canFetchMore(parent)) {
         m_fileModel->fetchMore(parent);
     }
@@ -886,7 +893,7 @@ bool CodeWorkspaceView::narrowTree(const QModelIndex& parent) {
     for (int row = 0; row < m_fileModel->rowCount(parent); ++row) {
         const QModelIndex entry = m_fileModel->index(row, 0, parent);
         const bool named = entry.data(Qt::DisplayRole).toString().contains(m_fileNeedle, Qt::CaseInsensitive);
-        const bool leadsToOne = m_fileModel->isDir(entry) && narrowTree(entry);
+        const bool leadsToOne = m_fileModel->isDir(entry) && narrowTree(entry, depth + 1);
         const bool visible = m_fileNeedle.isEmpty() || named || leadsToOne;
         m_tree->setRowHidden(row, parent, !visible);
         anyVisible = anyVisible || visible;

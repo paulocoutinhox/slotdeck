@@ -1038,6 +1038,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Destroying a document disconnects text-document notifications before destroying its highlighter and timers.
 - The editor provides line numbers, current-line emphasis, an optional persisted word wrap, EditorConfig indentation, selection indent and unindent, native editing shortcuts, save, incremental find and language completion.
 - The tree of a workspace carries the shared filter field above it and narrows to the names that match what was typed, keeping the folders that lead to a match and reading a folder it has to look inside.
+- That walk carries the depth this project declares, because a folder reached through a symbolic link can name the folder that holds it and the tree would otherwise keep offering one more level for as long as anyone waited.
 - One single-pixel divider separates that filter from the tree, because two surfaces of one panel are told apart by the boundary between them.
 - The find bar is the shared component every surface searches with, and its owner supplies the words so it carries no catalog of its own.
 - The find bar opens with the native find shortcut, moves between matches with the native find-next and find-previous shortcuts, wraps around the document and closes with Escape.
@@ -1664,7 +1665,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 446 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 447 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] That number is held to what the suite really registers by the lint command, because a number nobody keeps is a number nobody believes.
 - [x] Every case holds in a random order, proven across five schedules of the whole suite, three of them parallel and two one case at a time, which nothing had exercised before.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
@@ -1679,6 +1680,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] The focused terminal closes with the platform combination, which no shortcut answered before.
 - [x] A file is found by part of its name, ranked by the characters found in order, from a folder walked away from the interface and bounded by the catalog.
 - [x] The Problems surface carries every file the workspace analysed and is narrowed by a filter over the file and the message.
+- [x] The tree filter stops at the depth the code declares rather than following a folder that names itself, proven against a tree deeper than that bound.
 - [x] Every read of the render snapshot goes through the lock that guards it.
 - [x] The Linux, macOS and Windows workflows build, test, package and validate the product on every push.
 - [x] The release workflow publishes the Linux archive, the macOS disk image and the Windows archive for every `v*` tag.

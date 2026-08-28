@@ -55,7 +55,9 @@
 
 #include <gtest/gtest.h>
 
+#include <filesystem>
 #include <memory>
+#include <system_error>
 #include <utility>
 
 namespace slotdeck::plugins::codeeditor {
@@ -1594,6 +1596,59 @@ TEST(CodeWorkspaceViewTest, NarrowsTheTreeToWhatWasTypedAndKeepsThePathThatLeads
     ASSERT_TRUE(test::waitUntil([&]() { return !tree->isRowHidden(rowNamed(QStringLiteral("css")), treeRoot); }));
     // clang-format on
     EXPECT_FALSE(tree->isRowHidden(rowNamed(QStringLiteral("index.html")), treeRoot));
+}
+
+// A folder reached through a symbolic link can name the folder that holds it, so the walk carries a declared depth and a tree deeper than it is what proves that depth is enforced.
+TEST(CodeWorkspaceViewTest, StopsNarrowingATreeDeeperThanTheDeclaredDepth) {
+    QTemporaryDir root;
+    ASSERT_TRUE(root.isValid());
+    QString nested;
+
+    for (int level = 0; level < 80; ++level) {
+        nested += QStringLiteral("level/");
+    }
+
+    ASSERT_TRUE(QDir(root.path()).mkpath(nested));
+
+    test::TestPluginHost host;
+    host.translations = translations::catalog().value(QStringLiteral("en"));
+    CodeWorkspaceState state;
+    state.id = QStringLiteral("workspace-1");
+    state.rootPath = root.path();
+    CodeWorkspaceView view(state, {}, false, {}, CodeColorSchemeCatalog::schemes().first(), TextCharset::Utf8, host, nullptr);
+    view.resize(900, 600);
+    view.show();
+
+    auto* tree = view.findChild<QTreeView*>(QStringLiteral("codeEditorTree"));
+    auto* filter = view.findChild<ui::FilterField*>(QStringLiteral("codeEditorFileFilter"));
+    ASSERT_NE(tree, nullptr);
+    ASSERT_NE(filter, nullptr);
+    auto* model = qobject_cast<QFileSystemModel*>(tree->model());
+    ASSERT_NE(model, nullptr);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([tree, model]() { return model->rowCount(tree->rootIndex()) == 1; }));
+    // clang-format on
+
+    // The needle matches nothing, so the walk looks inside every folder it can reach.
+    auto* editor = filter->findChild<QLineEdit*>(QStringLiteral("filterField"));
+    ASSERT_NE(editor, nullptr);
+    editor->setText(QStringLiteral("nothing-matches-this"));
+
+    // clang-format off
+    const auto descend = [model, tree]() { int levels = 0; QModelIndex entry = model->index(0, 0, tree->rootIndex()); while (entry.isValid() && model->rowCount(entry) > 0) { entry = model->index(0, 0, entry); ++levels; } return levels; };
+    // clang-format on
+    QElapsedTimer clock;
+    clock.start();
+    int reached = -1;
+    qint64 stableSince = 0;
+    // clang-format off
+    const auto settled = [&]() { const int now = descend(); if (now != reached) { reached = now; stableSince = clock.elapsed(); return false; } return now > 0 && clock.elapsed() - stableSince > 2000; };
+    ASSERT_TRUE(test::waitUntil(settled));
+    // clang-format on
+
+    // The walk stops at the depth this project declares instead of following the tree for as deep as it goes.
+    EXPECT_LE(reached, 64);
+    EXPECT_LT(reached, 80);
 }
 
 TEST(CodeWorkspaceViewTest, RenamesTheFileOnDiskAndFollowsItWithTheOpenDocument) {
