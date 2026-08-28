@@ -73,7 +73,7 @@ class WorkspaceManager final : public QAbstractListModel {
   private slots:
     void persistRuntimeSession();
     void notifySessionNameChanged();
-    void reportSessionError(const QString& message);
+    void reportSessionError(const utils::Error& error);
 
   private:
     [[nodiscard]] domain::MainTab* currentTab();

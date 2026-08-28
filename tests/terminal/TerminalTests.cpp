@@ -1625,7 +1625,10 @@ TEST(TerminalSessionTest, ControlsBackendLifecycleDataAndFailures) {
     QSignalSpy names(session.get(), &terminalcore::TerminalSession::nameChanged);
     QSignalSpy states(session.get(), &terminalcore::TerminalSession::stateChanged);
     QSignalSpy statuses(session.get(), &terminalcore::TerminalSession::statusChanged);
-    QSignalSpy errors(session.get(), &terminalcore::TerminalSession::errorOccurred);
+    QVector<utils::Error> errors;
+    // clang-format off
+    QObject::connect(session.get(), &terminalcore::TerminalSession::errorOccurred, session.get(), [&errors](const utils::Error& error) { errors.append(error); });
+    // clang-format on
     session->setName(QStringLiteral("  Renamed  "));
     session->setName(QStringLiteral("Renamed"));
     session->setName(QStringLiteral("   "));
@@ -1666,8 +1669,9 @@ TEST(TerminalSessionTest, ControlsBackendLifecycleDataAndFailures) {
     EXPECT_EQ(session->exitCode(), 7);
     backendPointer->sendError(QStringLiteral("backend failed"));
     EXPECT_EQ(session->status(), QStringLiteral("Failed"));
-    ASSERT_EQ(errors.count(), 1);
-    EXPECT_EQ(errors.first().first().toString(), QStringLiteral("backend failed"));
+    ASSERT_EQ(errors.size(), 1);
+    EXPECT_EQ(errors.first().code, QStringLiteral("terminal_backend_failed"));
+    EXPECT_EQ(errors.first().message, QStringLiteral("backend failed"));
     EXPECT_GT(states.count(), 1);
 
     backendPointer->sendOutput(QByteArray(1024 * 1024, 'x'));
@@ -1695,11 +1699,15 @@ TEST(TerminalSessionTest, PropagatesStartWriteResizeAndRestartErrors) {
     backendPointer->resizeError = utils::Error{QStringLiteral("resize_failed"), QStringLiteral("Resize failed"), {}};
     EXPECT_EQ(session->resize(120, 40, 10, 20).error().code, QStringLiteral("resize_failed"));
 
-    QSignalSpy errors(session.get(), &terminalcore::TerminalSession::errorOccurred);
+    QVector<utils::Error> errors;
+    // clang-format off
+    QObject::connect(session.get(), &terminalcore::TerminalSession::errorOccurred, session.get(), [&errors](const utils::Error& error) { errors.append(error); });
+    // clang-format on
     backendPointer->startError = utils::Error{QStringLiteral("restart_failed"), QStringLiteral("Restart failed"), {}};
     session->restart();
-    ASSERT_EQ(errors.count(), 1);
-    EXPECT_EQ(errors.first().first().toString(), QStringLiteral("Restart failed"));
+    ASSERT_EQ(errors.size(), 1);
+    EXPECT_EQ(errors.first().code, QStringLiteral("restart_failed"));
+    EXPECT_EQ(errors.first().message, QStringLiteral("Restart failed"));
     EXPECT_GT(backendPointer->terminateCalls, 0);
 }
 
@@ -1872,16 +1880,26 @@ TEST(TerminalTranslationsTest, SpellsEveryKeyInEveryLanguageTheSelectorOffers) {
 }
 
 // A toast never shows the diagnostic of the engine, so the two conditions a reader reaches carry a sentence of the catalog.
-TEST(TerminalInteractionTest, SaysWhatStoppedTheInputInTheLanguageOfTheReader) {
+TEST(TerminalFailureTest, SaysWhatStoppedTheTerminalInTheLanguageOfTheReader) {
     test::TestPluginHost host;
     host.translations.insert(QStringLiteral("terminal.error.input-queue-full"), QStringLiteral("O terminal ainda esta lendo"));
     host.translations.insert(QStringLiteral("terminal.error.not-running"), QStringLiteral("O shell terminou"));
 
-    EXPECT_EQ(plugins::terminalplugin::terminalInteractionMessage({"terminal_input_queue_full", QStringLiteral("The terminal input queue is full"), {}}, host), QStringLiteral("O terminal ainda esta lendo"));
-    EXPECT_EQ(plugins::terminalplugin::terminalInteractionMessage({"terminal_not_running", QStringLiteral("The terminal process is not running"), {}}, host), QStringLiteral("O shell terminou"));
+    EXPECT_EQ(plugins::terminalplugin::terminalFailureMessage({"terminal_input_queue_full", QStringLiteral("The terminal input queue is full"), {}}, host), QStringLiteral("O terminal ainda esta lendo"));
+    EXPECT_EQ(plugins::terminalplugin::terminalFailureMessage({"terminal_not_running", QStringLiteral("The terminal process is not running"), {}}, host), QStringLiteral("O shell terminou"));
+
+    // Starting a terminal reaches the reader too, so what stopped it reads in their language rather than in the words of the platform.
+    host.translations.insert(QStringLiteral("terminal.error.shell-not-executable"), QStringLiteral("O shell nao pode ser executado"));
+    host.translations.insert(QStringLiteral("terminal.error.workdir-missing"), QStringLiteral("O diretorio nao existe mais"));
+    host.translations.insert(QStringLiteral("terminal.error.backend-failed"), QStringLiteral("O terminal parou de responder"));
+    host.translations.insert(QStringLiteral("terminal.error.workspace-invalid"), QStringLiteral("O espaco de trabalho nao pode ser salvo"));
+    EXPECT_EQ(plugins::terminalplugin::terminalFailureMessage({"shell_not_executable", QStringLiteral("The selected shell is not executable"), {}}, host), QStringLiteral("O shell nao pode ser executado"));
+    EXPECT_EQ(plugins::terminalplugin::terminalFailureMessage({"terminal_working_directory_missing", QStringLiteral("The working directory does not exist"), {}}, host), QStringLiteral("O diretorio nao existe mais"));
+    EXPECT_EQ(plugins::terminalplugin::terminalFailureMessage({"terminal_backend_failed", QStringLiteral("Broken pipe"), {}}, host), QStringLiteral("O terminal parou de responder"));
+    EXPECT_EQ(plugins::terminalplugin::terminalFailureMessage({"terminal_workspace_invalid", QStringLiteral("The terminal workspace is invalid"), {}}, host), QStringLiteral("O espaco de trabalho nao pode ser salvo"));
 
     // A fault of the emulator is written for the log, because nothing the reader can do answers it.
-    EXPECT_EQ(plugins::terminalplugin::terminalInteractionMessage({"ghostty_key_encoding_failed", QStringLiteral("The key event could not be encoded"), {}}, host), QStringLiteral("The key event could not be encoded"));
+    EXPECT_EQ(plugins::terminalplugin::terminalFailureMessage({"ghostty_key_encoding_failed", QStringLiteral("The key event could not be encoded"), {}}, host), QStringLiteral("The key event could not be encoded"));
 }
 
 // A program that asked for the mouse receives every wheel notch, and a trackpad moves sideways as readily as it moves down.

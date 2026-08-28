@@ -475,7 +475,9 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Terminal view shortcuts are active only while focus is inside the Terminal plugin view.
 - The terminal status bar reports the workspace count and the terminal count instead of the active workspace name.
 - A gesture the terminal refuses travels to the plugin as the structured error it was, so the plugin that owns the catalog decides what the reader is told rather than receiving a sentence already rendered.
-- The two conditions a reader reaches, which are input the terminal has not read yet and a shell that has ended, carry a sentence of the catalog while every fault of the emulator stays in the log.
+- Every condition of the terminal a reader reaches carries a sentence of the catalog, covering input it has not read yet, a shell that has ended, a shell that cannot be run, a working directory that is gone, a process that did not start, a backend that stopped answering and a workspace that could not be saved.
+- A fault of the emulator stays in the log, because nothing the reader can do answers it.
+- A failure the engine reports travels to the plugin as the structured error it was, so nothing renders it into a sentence before the plugin that owns the catalog has seen it.
 - The two pseudo-terminal backends report a shared condition by one name and in one sentence, so nothing that reads a failure has to know which platform produced it.
 - The lint command refuses a shared condition the two backends spell differently, because only one of them compiles per platform and no case can compare them.
 - The terminal actions offer the directory the shell is standing in to the Code Editor and to the Web Server, and offer each one only while its plugin is available.
@@ -1743,7 +1745,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A command line provider whose argument list never carries the model is refused from text, so the model the reader chose can never be dropped in silence.
 - [x] A command that timed out, overflowed its output, found no working directory, did not start or ended abnormally reads on the card in the language of the interface rather than in the English of the log.
 - [x] Every condition the filesystem service reports reads in the editor as a sentence of its catalog naming the path, proven for the complete set the service can answer with.
-- [x] A paste the terminal has not finished reading and a shell that ended read in the language of the interface, while a fault of the emulator stays in the log.
+- [x] A paste the terminal has not finished reading, a shell that ended, a shell that cannot be run, a directory that is gone, a backend that stopped answering and a workspace that could not be saved all read in the language of the interface, while a fault of the emulator stays in the log.
 - [x] Every wheel notch reaches a program reading the mouse on both axes, proven by a case that read nothing sideways before the horizontal notch was reported.
 - [x] A drop carrying a line break, a carriage return or an address the shell has no path for delivers nothing, and one bad entry refuses the drop it arrived in.
 - [x] The POSIX and the Windows pseudo-terminal backends name their six shared conditions identically and describe them in one sentence, which the lint command now refuses to let drift.

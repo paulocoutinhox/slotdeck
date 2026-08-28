@@ -1,5 +1,6 @@
 #include "workspace/WorkspaceManager.h"
 
+#include "TerminalFailure.h"
 #include "terminal/ShellProfile.h"
 #include "terminal/TerminalThemeCatalog.h"
 #include "ui/Theme.h"
@@ -456,7 +457,7 @@ QString WorkspaceManager::createTerminal(int slotIndex) {
     const auto result = runtimeSession(sessionId)->start();
 
     if (!result.hasValue()) {
-        emit notificationRequested(m_host.translate(QStringLiteral("terminal.error.start-title")), result.error().message, true);
+        emit notificationRequested(m_host.translate(QStringLiteral("terminal.error.start-title")), plugins::terminalplugin::terminalFailureMessage(result.error(), m_host), true);
     }
 
     notifyTabChanged(m_currentTabIndex);
@@ -614,8 +615,8 @@ void WorkspaceManager::notifySessionNameChanged() {
     }
 }
 
-void WorkspaceManager::reportSessionError(const QString& message) {
-    emit notificationRequested(m_host.translate(QStringLiteral("terminal.error.runtime-title")), message, true);
+void WorkspaceManager::reportSessionError(const utils::Error& error) {
+    emit notificationRequested(m_host.translate(QStringLiteral("terminal.error.runtime-title")), plugins::terminalplugin::terminalFailureMessage(error, m_host), true);
 }
 
 domain::MainTab* WorkspaceManager::currentTab() {
@@ -710,7 +711,7 @@ utils::Result<void> WorkspaceManager::startRuntimeSessions() {
         m_runtimeSessions.emplace(id, std::move(session));
         const auto result = runtimeSession(id)->start();
         if (!result.hasValue()) {
-            emit notificationRequested(m_host.translate(QStringLiteral("terminal.error.start-title")), result.error().message, true);
+            emit notificationRequested(m_host.translate(QStringLiteral("terminal.error.start-title")), plugins::terminalplugin::terminalFailureMessage(result.error(), m_host), true);
         }
     }
 
@@ -763,7 +764,7 @@ void WorkspaceManager::persist() {
     // clang-format off
     future.then(this, [this](utils::Result<void> result) {
         if (!result.hasValue() && !m_shuttingDown) {
-            emit notificationRequested(m_host.translate(QStringLiteral("terminal.error.save-title")), result.error().message, true);
+            emit notificationRequested(m_host.translate(QStringLiteral("terminal.error.save-title")), plugins::terminalplugin::terminalFailureMessage(result.error(), m_host), true);
         }
     });
     // clang-format on

@@ -100,7 +100,7 @@ void TerminalSession::setTheme(const domain::TerminalTheme& theme) {
     const auto result = m_emulator.setTheme(theme);
 
     if (!result.hasValue()) {
-        emit errorOccurred(result.error().message);
+        emit errorOccurred(result.error());
         return;
     }
 
@@ -320,7 +320,7 @@ void TerminalSession::restart() {
     const auto result = start();
 
     if (!result.hasValue()) {
-        emit errorOccurred(result.error().message);
+        emit errorOccurred(result.error());
     }
 }
 
@@ -376,14 +376,14 @@ void TerminalSession::processExited(int processExitCode) {
 void TerminalSession::processError(const QString& message) {
     m_state.processState = domain::TerminalProcessState::Failed;
     emit statusChanged();
-    emit errorOccurred(message);
+    emit errorOccurred({"terminal_backend_failed", message, {}});
 }
 
 void TerminalSession::writeTerminalResponse(const QByteArray& bytes) {
     const auto result = m_backend->write(bytes);
 
     if (!result.hasValue()) {
-        emit errorOccurred(result.error().message);
+        emit errorOccurred(result.error());
     }
 }
 

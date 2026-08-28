@@ -1,6 +1,8 @@
 qt_add_library(
     SlotDeckTerminalObjects
     OBJECT
+    TerminalFailure.cpp
+    TerminalFailure.h
     TerminalPlugin.cpp
     TerminalPlugin.h
     TerminalSettingsStore.cpp

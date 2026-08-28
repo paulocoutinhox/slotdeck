@@ -78,7 +78,7 @@ class TerminalSession final : public QObject {
     void clipboardWriteRequested(const QString& text);
     void notificationPosted(const QString& title, const QString& body);
     void stateChanged();
-    void errorOccurred(const QString& message);
+    void errorOccurred(const utils::Error& error);
 
   private slots:
     void processOutput(const QByteArray& bytes);
