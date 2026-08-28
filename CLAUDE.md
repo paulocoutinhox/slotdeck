@@ -1651,6 +1651,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] The editor reads and writes the five character sets EditorConfig declares, names the one in use in the status bar and changes it from there.
 - [x] The glob and the parser answer the cases the EditorConfig core test suite defines.
 - [x] Terminal output is selected by dragging and by double clicking a word, copied with the combination each platform uses, and the combination that interrupts the shell still reaches it.
+- [x] A drag held above the grid moves the viewport toward the older rows on every step and stops when the drag ends, which nothing exercised before.
 - [x] The focused terminal closes with the platform combination, which no shortcut answered before.
 - [x] A file is found by part of its name, ranked by the characters found in order, from a folder walked away from the interface and bounded by the catalog.
 - [x] The Problems surface carries every file the workspace analysed and is narrowed by a filter over the file and the message.

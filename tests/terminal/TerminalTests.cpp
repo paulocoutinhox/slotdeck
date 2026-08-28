@@ -670,6 +670,46 @@ TEST(GhosttyTerminalAdapterTest, FindsAQueryThroughTheHistoryAndRevealsWhereItIs
     EXPECT_GT(adapter.snapshot().scrollOffset, 0U);
 }
 
+// A drag held outside the grid moves the viewport under it, which is what selects more than the rows on screen.
+TEST(GhosttyTerminalAdapterTest, MovesTheViewportUnderADragHeldOutsideTheGrid) {
+    terminalcore::GhosttyTerminalAdapter adapter;
+    ASSERT_TRUE(adapter.initialize(20, 4, 8, 16, *terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
+
+    for (int line = 0; line < 20; ++line) {
+        adapter.write(QStringLiteral("line %1\r\n").arg(line).toUtf8());
+    }
+
+    // clang-format off
+    const auto cellCenter = [](int column, int row) { return QPointF(column * 8 + 4, row * 16 + 8); };
+    // clang-format on
+    constexpr quint64 repeatInterval = 500'000'000;
+    constexpr double repeatDistance = 4;
+
+    // Nothing is being dragged, so there is nothing to advance and nothing fails.
+    EXPECT_EQ(adapter.selectionAutoscroll(), terminalcore::SelectionAutoscroll::None);
+    EXPECT_TRUE(adapter.advanceSelectionAutoscroll(cellCenter(0, 0), false).hasValue());
+
+    const quint64 restingOffset = adapter.snapshot().scrollOffset;
+    ASSERT_TRUE(adapter.beginSelection(cellCenter(2, 3), 0, repeatInterval, repeatDistance, false).hasValue());
+
+    // The pointer is held above the first row, which is where the viewport has to follow it.
+    const QPointF aboveTheGrid(16, -24);
+    ASSERT_TRUE(adapter.extendSelection(aboveTheGrid, false).hasValue());
+    ASSERT_EQ(adapter.selectionAutoscroll(), terminalcore::SelectionAutoscroll::Up);
+
+    ASSERT_TRUE(adapter.advanceSelectionAutoscroll(aboveTheGrid, false).hasValue());
+    EXPECT_LT(adapter.snapshot().scrollOffset, restingOffset) << "the viewport did not follow the drag toward the older rows";
+
+    // Holding it there keeps moving, so a drag reaches rows the screen never showed.
+    const quint64 afterOneStep = adapter.snapshot().scrollOffset;
+    ASSERT_TRUE(adapter.advanceSelectionAutoscroll(aboveTheGrid, false).hasValue());
+    EXPECT_LT(adapter.snapshot().scrollOffset, afterOneStep);
+    EXPECT_TRUE(adapter.hasSelection());
+
+    adapter.endSelection(aboveTheGrid);
+    EXPECT_EQ(adapter.selectionAutoscroll(), terminalcore::SelectionAutoscroll::None);
+}
+
 TEST(GhosttyTerminalAdapterTest, SelectsWordsLinesAndDragsThroughTheEmulator) {
     terminalcore::GhosttyTerminalAdapter adapter;
     ASSERT_TRUE(adapter.initialize(20, 4, 8, 16, *terminalcore::terminalTheme(QStringLiteral("vivid"))).hasValue());
