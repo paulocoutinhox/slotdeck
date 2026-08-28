@@ -1780,6 +1780,9 @@ Newer explicit product requirements take precedence when they intentionally repl
 ## Continuous verification
 
 - Static analysis runs clang-tidy with the bugprone, performance, misc and clang-analyzer checks over the compile database, and its reports are triaged rather than applied, because a sink parameter taken by value and moved is correct even when a check calls it a copy.
+- The `.clang-tidy` file declares exactly those families, so running the tool plainly gives what the workflow describes rather than a wider set nobody triages.
+- It leaves out the include cleaner, because the compiler decides which header a file needs, the internal linkage check, because it sees one translation unit and every shared function looks unused from there, and the recursion check, because a recursion this project bounds is one it allows.
+- A return of a value declared const and two adjacent parameters of one type are the reports that remain, and neither is applied, because the const is deliberate and the second is informational.
 - A widening report over a literal that already fits, a narrowing report over a flag set the drawing call takes as an integer and a multilevel pointer report over a C interop argument stay unapplied for the same reason, while a report that the value behind an optional was read without the analyzer seeing the guard is applied, because that one reads as a doubt in the code itself.
 - A result a future continuation receives by value is the shape that library hands it, so a copy report over one is not applied, and neither is a report over a value that is only ever implicitly shared.
 - A report over a source only one platform compiles is read against that platform before it is believed, because the parse that produced it resolved the preprocessor branches of another one.
