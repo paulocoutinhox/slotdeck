@@ -119,6 +119,47 @@ TEST(FileSystemServiceTest, PerformsSerializedAtomicFileAndDirectoryOperations) 
     EXPECT_EQ(test::awaitFuture(service.createDirectory(levels)).error().code, QStringLiteral("filesystem_destination_exists"));
 }
 
+// An order the platform decides shows up in repetition, so the service is driven with overlapping work whose continuation contexts die mid-flight.
+TEST(FileSystemServiceTest, SurvivesManyOverlappingOperationsAndCancelledContinuations) {
+    QTemporaryDir root;
+    ASSERT_TRUE(root.isValid());
+    const QDir directory(root.path());
+    constexpr int rounds = 60;
+    int answered = 0;
+    {
+        filesystem::FileSystemService service;
+
+        for (int round = 0; round < rounds; ++round) {
+            // The context of a continuation is destroyed while its work may still be running, which is what a plugin closing does.
+            auto context = std::make_unique<QObject>();
+            const QString name = directory.filePath(QStringLiteral("file-%1.txt").arg(QString::number(round)));
+            auto written = service.writeFile(name, QStringLiteral("round %1").arg(QString::number(round)).toUtf8());
+            auto listed = service.listDirectory(root.path(), 1000);
+            auto read = service.readFile(name, 1024);
+            // clang-format off
+            written.then(context.get(), [&answered](utils::Result<void>) { ++answered; });
+            listed.then(context.get(), [&answered](utils::Result<QVector<filesystem::DirectoryEntry>>) { ++answered; });
+            read.then(context.get(), [&answered](utils::Result<QByteArray>) { ++answered; });
+            // clang-format on
+
+            if (round % 3 == 0) {
+                context.reset();
+            }
+
+            QCoreApplication::processEvents();
+        }
+    }
+
+    // Every file the service was asked for is on the disk whatever order the work ran in.
+    for (int round = 0; round < rounds; ++round) {
+        const QString name = directory.filePath(QStringLiteral("file-%1.txt").arg(QString::number(round)));
+        QFile stored(name);
+        ASSERT_TRUE(stored.exists()) << name.toStdString();
+        ASSERT_TRUE(stored.open(QIODevice::ReadOnly));
+        EXPECT_EQ(stored.readAll(), QStringLiteral("round %1").arg(QString::number(round)).toUtf8());
+    }
+}
+
 TEST(FileSystemServiceTest, RejectsUnsafeInvalidAndUnavailablePaths) {
     filesystem::FileSystemService service;
     QTemporaryDir root;

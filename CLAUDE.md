@@ -1603,6 +1603,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Two snapshots of the tabs answering out of order leave the later one standing, and a failure after them rolls back to it rather than to the earlier one.
 - [x] Every write still waiting when the executor is destroyed reaches the disk, and a folder opened the moment before the product closes is there when it opens again.
 - [x] Rounds of overlapping writes, transactions and reads whose continuation contexts die mid-flight leave every row on the disk and answer nobody who is gone.
+- [x] The filesystem service is driven the same way, so the second serialized worker of the core carries the repetition its sibling does.
 - [x] Every owner that keeps a committed copy guards it by revision, proven for the editor and for the AI by cases that roll back to the older value without that guard.
 - [x] Every one of the hundred and twenty eight continuations names the object it reaches or reaches nothing at all, and the lint command now refuses any other.
 - [x] A run that compacted reports the tokens its summary spent, and a command line agent reports no cost at all.
