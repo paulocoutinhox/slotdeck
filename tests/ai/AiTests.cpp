@@ -3502,6 +3502,43 @@ TEST(AiCliChatClientTest, RunsTheProgramWhereTheTaskSaysAndAnswersWithWhatItPrin
     qunsetenv("SLOTDECK_TEST_CLI_AGENT");
 }
 
+// A run that failed without printing anything still tells the reader what happened.
+TEST(AiCliChatClientTest, ReportsTheExitCodeWhenTheProgramFailedWithoutPrintingAReason) {
+    QTemporaryDir project;
+    ASSERT_TRUE(project.isValid());
+    // clang-format off
+    const auto resolver = [](const QString&) { return QCoreApplication::applicationFilePath(); };
+    // clang-format on
+    qputenv("SLOTDECK_TEST_CLI_AGENT", QByteArrayLiteral("silent"));
+    AiCliChatClient client(resolver, nullptr);
+
+    utils::Error failure;
+    bool finished = false;
+    // clang-format off
+    QObject::connect(&client, &AiChatClient::finished, &client, [&finished](const QString&, const QVector<ToolCall>&, ChatUsage, const QString&) { finished = true; });
+    QObject::connect(&client, &AiChatClient::failed, &client, [&failure, &finished](const utils::Error& error) { failure = error; finished = true; });
+    const auto translate = [](const QString& key) { return key + QStringLiteral(" %1"); };
+    // clang-format on
+
+    ModelConnection connection;
+    connection.providerId = QStringLiteral("claude-cli");
+    connection.modelId = QStringLiteral("claude-cli");
+    ChatRequest request;
+    request.connection = connection;
+    request.messages = QJsonArray{QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QStringLiteral("anything")}}};
+    request.workdir = QFileInfo(project.path()).canonicalFilePath();
+
+    client.send(request, translate);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&finished]() { return finished; }));
+    // clang-format on
+
+    EXPECT_EQ(failure.code, QStringLiteral("ai_cli_failed"));
+    EXPECT_EQ(failure.message, QStringLiteral("ai.error.exit-code 9"));
+    EXPECT_EQ(failure.detail, QStringLiteral("9"));
+    qunsetenv("SLOTDECK_TEST_CLI_AGENT");
+}
+
 // A program that is not installed is named rather than answered with nothing.
 TEST(AiCliChatClientTest, RefusesToRunWhatIsNotInstalledAndWhatHasNowhereToRun) {
     // clang-format off

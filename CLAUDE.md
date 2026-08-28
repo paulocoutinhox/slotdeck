@@ -670,6 +670,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A program that is not installed is an explicit failure naming it, and a task with no working directory cannot run a command line agent.
 - The process runs in the directory the task declares, whether or not that provider also takes it as an argument.
 - A command line agent runs its own tools, so none is declared to it and its run is one turn that ends when the program does.
+- A command line agent that failed carries what it printed as its reason, and its exit code when it printed nothing, because a program refusing its own arguments is the failure the reader has to be told about.
 - A command line agent is told which model to answer with, because every one of them takes that as an argument, so the model of the connection replaces the mark the provider declares for it.
 - A command line agent answers with the same model the service does, so its window and its output bound are read from that model in the catalog rather than declared a second time.
 - A command line agent is handed a prompt and runs its own tools, so neither an answer budget nor a tool declaration travels to it and neither takes room from its window, which matters because a service may publish the same number for what a model reads and for what it may answer.
@@ -1698,6 +1699,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] An answer of tens of thousands of semantic tokens is decoded and grouped off the interface thread, measured as seventeen and twenty nine milliseconds becoming two and four.
 - [x] A server answering forty thousand completion candidates reaches the reader with the bound it declares rather than with all of them.
 - [x] A command line agent is started as a real process against a fixture, running where the task declares and reading a prompt carrying every character a shell acts on.
+- [x] A command line agent that exits without printing anything is reported with its exit code rather than with an empty message.
+- [x] Every argument the installed command line agents are given is accepted by them, which removed the three flags Kimi does not declare after its own parser refused the first of them.
 - [x] A command task runs a real process for both endings, moving to Done on a zero exit code and back to the board with its reason on any other, and the directory it ran in is proven by a command that only succeeds beside a file that directory holds.
 - [x] A paste the reader refused writes nothing to the shell, a confirmed one reaches it, text that only wraps is never asked about and the setting turned off writes without asking, all driven through the key a reader presses.
 - [x] A selection is indented and unindented as whole lines, leaving a line nobody selected alone and answering a document resolved to tabs with a tab.
@@ -1718,6 +1721,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A widening report over a literal that already fits, a narrowing report over a flag set the drawing call takes as an integer and a multilevel pointer report over a C interop argument stay unapplied for the same reason, while a report that the value behind an optional was read without the analyzer seeing the guard is applied, because that one reads as a doubt in the code itself.
 - A lambda parameter never repeats the name of a parameter of the function that contains it, because GCC rejects it as a shadow while Clang accepts it and the failure only appears on the Linux build.
 - A sweep driven by the compiler covers only what the running platform compiles, so a change that touches a shared type is also searched by hand through the sources the other platforms own.
+- The argument vector a command line provider declares is verified against the help of the installed program, because a flag that program does not accept is refused before any work and ends every run of that provider.
+- Such a vector is verified by appending a flag nobody declares to it, because these parsers report the first unknown option and reaching that report proves every flag before it was accepted without spending a request.
 - A command in a test uses the shell of the running platform through the shared `slotdeck::test` process helpers, and the Windows wait uses ping with both channels redirected, because timeout refuses a redirected console and an inherited pipe keeps the test runner waiting for a command it already killed.
 - A test that cancels a command keeps that command short enough to end on its own, because a child surviving the shell it was started from holds the pipe the process object is closed on and the case expires waiting for it.
 - A pace, a delay or an interval is asserted where it is applied rather than where its effect arrives, because an arrival also carries the setup of its own connection and the clock that timed it is not the one the waiting was measured on.

@@ -115,6 +115,7 @@ AiCliChatClient::AiCliChatClient(CommandLineResolver resolver, QObject* parent) 
 }
 
 void AiCliChatClient::send(const ChatRequest& request, const std::function<QString(const QString&)>& translate) {
+    m_translate = translate;
     const ProviderDescriptor* provider = findProvider(request.connection.providerId);
 
     if (provider == nullptr || provider->protocol != WireProtocol::CommandLine) {
@@ -148,7 +149,10 @@ void AiCliChatClient::completeRun(int exitCode, const QString& output) {
     m_running = false;
 
     if (exitCode != 0) {
-        emit failed({"ai_cli_failed", output.trimmed(), QString::number(exitCode)});
+        // A program that refuses its own arguments prints the reason and nothing else, so the exit code is the only reason left when it printed nothing.
+        const QString printed = output.trimmed();
+        const QString reason = printed.isEmpty() ? m_translate(QStringLiteral("ai.error.exit-code")).arg(QString::number(exitCode)) : printed;
+        emit failed({"ai_cli_failed", reason, QString::number(exitCode)});
         return;
     }
 

@@ -37,6 +37,7 @@ class AiCliChatClient final : public AiChatClient {
     CommandLineResolver m_resolver;
     AiCommandRunner m_runner;
     QString m_prompt;
+    std::function<QString(const QString&)> m_translate;
     bool m_running{false};
 };
 

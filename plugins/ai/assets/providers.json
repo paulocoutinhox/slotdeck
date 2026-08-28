@@ -1992,14 +1992,14 @@
         "arguments": [
           "--model",
           "{model}",
-          "-p",
-          "{prompt}",
           "--dangerously-skip-permissions",
           "--max-turns",
           "100",
           "--no-session-persistence",
           "--output-format",
-          "text"
+          "text",
+          "-p",
+          "{prompt}"
         ],
         "clearedVariables": [
           "ANTHROPIC_API_KEY",
@@ -2085,13 +2085,11 @@
         "arguments": [
           "--model",
           "{model}",
-          "--work-dir",
-          "{workdir}",
+          "--auto",
+          "--output-format",
+          "text",
           "--prompt",
-          "{prompt}",
-          "--quiet",
-          "--max-steps-per-turn",
-          "100"
+          "{prompt}"
         ],
         "clearedVariables": [
           "MOONSHOT_API_KEY",

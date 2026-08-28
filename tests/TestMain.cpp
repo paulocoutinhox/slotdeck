@@ -370,6 +370,11 @@ int main(int argc, char** argv) {
     }
     // A command line agent reads the prompt it was given and answers with it, which is what one really does.
     if (qEnvironmentVariableIsSet("SLOTDECK_TEST_CLI_AGENT")) {
+        // A program that refuses its own arguments can fail without printing anything, which leaves the exit code as the only reason there is.
+        if (qEnvironmentVariable("SLOTDECK_TEST_CLI_AGENT") == QLatin1String("silent")) {
+            return 9;
+        }
+
         QString prompt;
 
         for (int index = 1; index + 1 < argc; ++index) {
