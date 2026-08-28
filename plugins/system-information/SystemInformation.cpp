@@ -136,7 +136,7 @@ utils::Result<SystemSnapshot> HwinfoSystemInformationProvider::collect(const std
         }
         processor.cores.reserve(static_cast<qsizetype>(nativeProcessor.cores().size()));
         for (const auto& nativeCore : nativeProcessor.cores()) {
-            processor.cores.append({nativeCore.id, nativeCore.cache.l1_data, nativeCore.cache.l1_instruction, nativeCore.cache.l2, nativeCore.cache.l3, nativeCore.regular_frequency_hz, nativeCore.max_frequency_hz, nativeCore.smt});
+            processor.cores.append({nativeCore.id, nativeCore.cache.l1_data, nativeCore.cache.l1_instruction, nativeCore.cache.l2, nativeCore.cache.l3, nativeCore.max_frequency_hz, nativeCore.smt});
         }
         snapshot.processors.append(std::move(processor));
     }

@@ -20,7 +20,6 @@ struct ProcessorCore final {
     quint64 l1InstructionBytes{0};
     quint64 l2Bytes{0};
     quint64 l3Bytes{0};
-    quint64 regularFrequencyHz{0};
     quint64 maximumFrequencyHz{0};
     bool simultaneousMultithreading{false};
 };

@@ -20,8 +20,6 @@ struct LayoutPreset final {
     int slotCount{};
     int columns{};
     int rows{};
-    QVector<double> columnWeights;
-    QVector<double> rowWeights;
 };
 
 } // namespace slotdeck::domain

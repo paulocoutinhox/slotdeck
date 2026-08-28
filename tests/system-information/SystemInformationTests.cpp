@@ -300,7 +300,7 @@ SystemSnapshot SystemInformationTestsHelper::sampleSnapshot() {
     processor.physicalCoreCount = 8;
     processor.logicalCoreCount = 16;
     processor.flags = {QStringLiteral("feature-a"), QStringLiteral("feature-b")};
-    processor.cores = {{0, 32768, 32768, 1048576, 16777216, 3000000000ULL, 4000000000ULL, true}};
+    processor.cores = {{0, 32768, 32768, 1048576, 16777216, 4000000000ULL, true}};
     snapshot.processors = {processor};
     snapshot.processorUsage = {0.42, {0.25, 0.59}, {3200000000LL, 3400000000LL}};
     snapshot.memory = {34359738368ULL, 8589934592ULL, 17179869184ULL, {{0, QStringLiteral("Memory Vendor"), QStringLiteral("Physical Memory"), QStringLiteral("Module Model"), QStringLiteral("SERIAL"), 17179869184ULL, 3200000000ULL}}};
