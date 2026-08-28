@@ -1722,6 +1722,40 @@ TEST(AiCommandRunnerTest, StopsACommandThatExceedsItsTimeLimit) {
     EXPECT_EQ(failures.size(), 1);
 }
 
+// A card never shows the diagnostic of a failure, so every condition the reader reaches carries a sentence of the catalog.
+TEST(AiCommandRunnerTest, CarriesATranslatedSentenceForEveryConditionTheReaderReaches) {
+    // clang-format off
+    const auto translate = [](const QString& key) { return QStringLiteral("translated:") + key; };
+    // clang-format on
+
+    const QVector<QPair<QString, QString>> reachable{
+        {QStringLiteral("ai_command_timeout"), QStringLiteral("translated:ai.error.command-timeout")}, {QStringLiteral("ai_command_output_too_large"), QStringLiteral("translated:ai.error.command-output-too-large")}, {QStringLiteral("ai_command_workdir_invalid"), QStringLiteral("translated:ai.error.command-workdir-invalid")}, {QStringLiteral("ai_command_failed"), QStringLiteral("translated:ai.error.command-start-failed")}, {QStringLiteral("ai_command_crashed"), QStringLiteral("translated:ai.error.command-crashed")},
+    };
+
+    for (const auto& condition : reachable) {
+        EXPECT_EQ(commandFailureMessage({condition.first.toUtf8().constData(), QStringLiteral("a diagnostic nobody translates"), {}}, translate), condition.second) << condition.first.toStdString();
+    }
+
+    // A guard the interface cannot reach keeps its diagnostic, which is where it belongs.
+    EXPECT_EQ(commandFailureMessage({"ai_command_busy", QStringLiteral("The runner is already running a command"), {}}, translate), QStringLiteral("The runner is already running a command"));
+}
+
+// A command whose working directory is gone reports that condition rather than a message written for the log.
+TEST(AiCommandRunnerTest, ReportsAnUnavailableWorkingDirectoryAsTheConditionItIs) {
+    AiCommandRunner runner;
+    QVector<utils::Error> failures;
+    // clang-format off
+    QObject::connect(&runner, &AiCommandRunner::failed, &runner, [&failures](const utils::Error& error) { failures.append(error); });
+    const auto translate = [](const QString& key) { return QStringLiteral("translated:") + key; };
+    // clang-format on
+    runner.start(QStringLiteral("echo hello"), QDir::tempPath() + QStringLiteral("/a-directory-that-is-not-there-42"), 5);
+
+    ASSERT_EQ(failures.size(), 1);
+    EXPECT_EQ(failures.first().code, QStringLiteral("ai_command_workdir_invalid"));
+    EXPECT_EQ(commandFailureMessage(failures.first(), translate), QStringLiteral("translated:ai.error.command-workdir-invalid"));
+    EXPECT_FALSE(runner.running());
+}
+
 TEST(AiCommandRunnerTest, ReleasesARunningCommandWithoutBlockingTheInterface) {
     QTemporaryDir workdir;
     ASSERT_TRUE(workdir.isValid());

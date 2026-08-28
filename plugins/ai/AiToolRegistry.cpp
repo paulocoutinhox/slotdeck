@@ -1060,7 +1060,8 @@ void AiToolRegistry::runCommand(const ToolCall& call, const QString& sandboxRoot
     m_runningCommands.insert(call.id, {runner, completion});
     // clang-format off
     connect(runner, &AiCommandRunner::finished, this, [this, call, completion, runner](int exitCode, const QString& output) { m_runningCommands.remove(call.id); runner->deleteLater(); const QString reported = output.isEmpty() ? m_host.translate(QStringLiteral("ai.tool.command-no-output")) : output; completion(exitCode == 0 ? ToolResult{call.id, AiToolRegistryHelper::boundedText(reported), false} : ToolResult{call.id, AiToolRegistryHelper::boundedText(m_host.translate(QStringLiteral("ai.error.exit-code")).arg(QString::number(exitCode)) + QLatin1Char('\n') + reported), true}); });
-    connect(runner, &AiCommandRunner::failed, this, [this, call, completion, runner](const utils::Error& error) { m_runningCommands.remove(call.id); runner->deleteLater(); completion(AiToolRegistryHelper::failure(call, error.message)); });
+    const auto translate = [this](const QString& key) { return m_host.translate(key); };
+    connect(runner, &AiCommandRunner::failed, this, [this, call, completion, runner, translate](const utils::Error& error) { m_runningCommands.remove(call.id); runner->deleteLater(); completion(AiToolRegistryHelper::failure(call, commandFailureMessage(error, translate))); });
     // clang-format on
     runner->start(command, sandboxRoot, timeoutSeconds);
 }

@@ -1,6 +1,7 @@
 #include "AiCommandRunner.h"
 
 #include <QDir>
+#include <QHash>
 
 namespace slotdeck::plugins::ai {
 
@@ -15,6 +16,16 @@ class AiCommandRunnerHelper final {
     static QString shellExecutable();
     static bool isFinalCsiByte(QChar character);
 };
+
+QString commandFailureMessage(const utils::Error& error, const std::function<QString(const QString&)>& translate) {
+    static const QHash<QString, QString> keys{
+        {QStringLiteral("ai_command_timeout"), QStringLiteral("ai.error.command-timeout")}, {QStringLiteral("ai_command_output_too_large"), QStringLiteral("ai.error.command-output-too-large")}, {QStringLiteral("ai_command_workdir_invalid"), QStringLiteral("ai.error.command-workdir-invalid")}, {QStringLiteral("ai_command_failed"), QStringLiteral("ai.error.command-start-failed")}, {QStringLiteral("ai_command_crashed"), QStringLiteral("ai.error.command-crashed")},
+    };
+    const QString key = keys.value(error.code);
+
+    // A condition the reader cannot reach from the interface keeps its diagnostic, which is where it belongs.
+    return key.isEmpty() ? error.message : translate(key);
+}
 
 QStringList AiCommandRunnerHelper::shellArguments(const QString& command) {
 #ifdef Q_OS_WIN
@@ -276,7 +287,7 @@ void AiCommandRunner::completeProcess(int exitCode, QProcess::ExitStatus status)
     m_completed = true;
 
     if (status == QProcess::CrashExit) {
-        emit failed({"ai_command_failed", "The command terminated abnormally", QString::number(exitCode)});
+        emit failed({"ai_command_crashed", "The command terminated abnormally", QString::number(exitCode)});
         return;
     }
 

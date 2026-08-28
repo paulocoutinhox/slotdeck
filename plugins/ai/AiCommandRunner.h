@@ -7,10 +7,15 @@
 #include <QStringDecoder>
 #include <QTimer>
 
+#include <functional>
+
 namespace slotdeck::plugins::ai {
 
 // A shell writes colors, cursor moves and progress rewrites, so the readable text is what reaches the execution record.
 [[nodiscard]] QString plainCommandOutput(QString& pending, const QString& chunk);
+
+// A card shows the sentence of the catalog while the diagnostic of the failure stays in the log.
+[[nodiscard]] QString commandFailureMessage(const utils::Error& error, const std::function<QString(const QString&)>& translate);
 
 class AiCommandRunner final : public QObject {
     Q_OBJECT

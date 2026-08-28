@@ -673,6 +673,9 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The process runs in the directory the task declares, whether or not that provider also takes it as an argument.
 - A command line agent runs its own tools, so none is declared to it and its run is one turn that ends when the program does.
 - A command line agent that failed carries what it printed as its reason, and its exit code when it printed nothing, because a program refusing its own arguments is the failure the reader has to be told about.
+- Every condition the command runner reports that the reader can reach carries a sentence of the catalog, covering the time limit, the output bound, an unavailable working directory, a program that did not start and one that ended abnormally.
+- A guard of that runner the interface cannot reach keeps its diagnostic, because that text is written for the log rather than for the card.
+- A program that did not start and a program that ended abnormally are two conditions, so they carry two codes.
 - A command line agent is told which model to answer with, because every one of them takes that as an argument, so the model of the connection replaces the mark the provider declares for it.
 - A command line agent answers with the same model the service does, so its window and its output bound are read from that model in the catalog rather than declared a second time.
 - A command line agent is handed a prompt and runs its own tools, so neither an answer budget nor a tool declaration travels to it and neither takes room from its window, which matters because a service may publish the same number for what a model reads and for what it may answer.
@@ -1704,6 +1707,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A command line agent that exits without printing anything is reported with its exit code rather than with an empty message.
 - [x] Every argument the installed command line agents are given is accepted by them, which removed the three flags Kimi does not declare after its own parser refused the first of them.
 - [x] A command line provider whose argument list never carries the model is refused from text, so the model the reader chose can never be dropped in silence.
+- [x] A command that timed out, overflowed its output, found no working directory, did not start or ended abnormally reads on the card in the language of the interface rather than in the English of the log.
 - [x] A command task runs a real process for both endings, moving to Done on a zero exit code and back to the board with its reason on any other, and the directory it ran in is proven by a command that only succeeds beside a file that directory holds.
 - [x] A paste the reader refused writes nothing to the shell, a confirmed one reaches it, text that only wraps is never asked about and the setting turned off writes without asking, all driven through the key a reader presses.
 - [x] A selection is indented and unindented as whole lines, leaving a line nobody selected alone and answering a document resolved to tabs with a tab.

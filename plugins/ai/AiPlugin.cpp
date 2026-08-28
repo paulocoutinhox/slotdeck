@@ -1485,10 +1485,12 @@ void AiPlugin::startCommandExecution(const AiTask& task, const QString& executio
         completeExecution(taskId, ExecutionStatus::Failed, message, AgentStopReason::Failed);
     });
     connect(runner, &AiCommandRunner::failed, this, [this, taskId, executionId](const utils::Error& error) {
+        const auto translate = [this](const QString& key) { return m_host->translate(key); };
+        const QString message = commandFailureMessage(error, translate);
         appendLog(executionId, ExecutionLogLevel::Error, ExecutionLogKind::Failed, error.detail.isEmpty() ? error.message : QStringLiteral("%1 (%2)").arg(error.message, error.detail));
-        m_lastErrors.insert(taskId, error.message);
-        reportFailure(error, error.message);
-        completeExecution(taskId, ExecutionStatus::Failed, error.message, AgentStopReason::Failed);
+        m_lastErrors.insert(taskId, message);
+        reportFailure(error, message);
+        completeExecution(taskId, ExecutionStatus::Failed, message, AgentStopReason::Failed);
     });
     // clang-format on
 

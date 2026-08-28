@@ -110,7 +110,7 @@ AiCliChatClient::AiCliChatClient(CommandLineResolver resolver, QObject* parent) 
     // clang-format off
     connect(&m_runner, &AiCommandRunner::outputReceived, this, [this](const QString& text) { emit contentReceived(text); });
     connect(&m_runner, &AiCommandRunner::finished, this, [this](int exitCode, const QString& output) { completeRun(exitCode, output); });
-    connect(&m_runner, &AiCommandRunner::failed, this, [this](const utils::Error& error) { m_running = false; emit failed(error); });
+    connect(&m_runner, &AiCommandRunner::failed, this, [this](const utils::Error& error) { m_running = false; emit failed({error.code, commandFailureMessage(error, m_translate), error.detail.isEmpty() ? error.message : error.detail}); });
     // clang-format on
 }
 
