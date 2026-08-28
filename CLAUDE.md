@@ -486,6 +486,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Directory requests resolve `index.html` before `index.htm`.
 - Request headers, files, connection counts and deadlines remain bounded.
 - A connection never buffers more than one request may occupy, because the size of what a client sends is decided by that client and the bound has to hold before the bytes are read rather than after.
+- A file is written to the socket in bounded chunks and continued on every write that completes, so a response larger than that bound is the ordinary case rather than an exception.
+- A file that shrinks while it is being written ends the connection instead of waiting for bytes that are no longer there, because the same folder is opened in the editor and served at once.
 - Stopping aborts active sockets before worker destruction.
 - Request logging is bounded, thread-safe and runtime-only.
 - Timestamps are captured in UTC and rendered with system locale and timezone.
@@ -1511,6 +1513,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Every byte a text file may carry survives being opened and saved, and a non-breaking space of a UTF-8 source file is still there afterwards.
 - [x] An agent asked to edit a file that is not UTF-8 is refused by name and every byte of that file is still where it was.
 - [x] A command whose output splits a character between two reads reports that character, proven by a fixture that writes the two halves apart.
+- [x] A file larger than one transfer chunk reaches the reader whole, which is the path every real asset of a page takes and which no case entered before.
 - [x] The view follows the reader instead of dragging them to the end of every message that arrives.
 - [x] AI tasks are grouped into renameable workspace tabs and rendered across the To Do, Doing, Blocked, Review and Done columns.
 - [x] AI task cards keep their own margin, use the filled play symbol and expose Play, Stop, Edit and Remove.

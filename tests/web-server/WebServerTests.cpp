@@ -184,6 +184,37 @@ TEST(WebServerInstanceTest, ServesFilesAndReturnsProtocolErrorsWithRequestLogs) 
     EXPECT_EQ(server.port(), 0);
     server.stop();
 }
+// A file larger than one transfer chunk is written across several of them, which is what any real asset of a page is.
+TEST(WebServerInstanceTest, ServesAFileThatSpansSeveralTransferChunks) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+
+    QByteArray content;
+    content.reserve(200000);
+
+    for (int index = 0; content.size() < 200000; ++index) {
+        content.append(QByteArray::number(index)).append('\n');
+    }
+
+    WebServerTestsHelper::writeFile(directory.filePath(QStringLiteral("asset.bin")), content);
+    plugins::webserver::WebServerInstance server;
+    ASSERT_TRUE(server.start(directory.path(), QStringLiteral("127.0.0.1"), 0));
+
+    const QByteArray answer = WebServerTestsHelper::request(server, QByteArrayLiteral("GET /asset.bin HTTP/1.1\r\nHost: localhost\r\n\r\n"));
+    ASSERT_TRUE(answer.startsWith(QByteArrayLiteral("HTTP/1.1 200 OK")));
+    EXPECT_TRUE(answer.contains(QByteArrayLiteral("Content-Length: ") + QByteArray::number(content.size()) + QByteArrayLiteral("\r\n")));
+
+    const qsizetype separator = answer.indexOf(QByteArrayLiteral("\r\n\r\n"));
+    ASSERT_GT(separator, 0);
+
+    // What the reader receives is the file itself, neither cut short by the last chunk nor carrying one twice.
+    const QByteArray body = answer.mid(separator + 4);
+    EXPECT_EQ(body.size(), content.size());
+    EXPECT_EQ(body, content);
+
+    server.stop();
+}
+
 TEST(WebServerInstanceTest, RefusesABurstLargerThanAnyRequestAndKeepsServing) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());
