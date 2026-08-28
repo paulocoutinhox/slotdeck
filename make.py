@@ -645,7 +645,36 @@ def anonymous_namespaces() -> list[str]:
     return found
 
 
-def contextless_connections() -> list[str]:
+def call_arguments(text: str, opened: int) -> list[str]:
+    depth = 0
+    index = opened - 1
+
+    while index < len(text):
+        depth += 1 if text[index] == "(" else -1 if text[index] == ")" else 0
+        if depth == 0:
+            break
+        index += 1
+
+    arguments: list[str] = []
+    level = 0
+    current = ""
+
+    for character in text[opened:index]:
+        level += 1 if character in "([{" else -1 if character in ")]}" else 0
+
+        if character == "," and level == 0:
+            arguments.append(current)
+            current = ""
+        else:
+            current += character
+
+    arguments.append(current)
+    return arguments
+
+
+def contextless_deferred_work() -> list[str]:
+    # A connection names its context third and a single shot timer names it second.
+    forms = ((re.compile(r"\bconnect\s*\("), 2), (re.compile(r"\bsingleShot\s*\("), 1))
     found = []
 
     for name in source_files():
@@ -654,41 +683,20 @@ def contextless_connections() -> list[str]:
 
         text = Path(name).read_text(encoding="utf-8")
 
-        for call in re.finditer(r"\bconnect\s*\(", text):
-            depth = 0
-            index = call.end() - 1
+        for pattern, position in forms:
+            for call in pattern.finditer(text):
+                arguments = call_arguments(text, call.end())
 
-            while index < len(text):
-                depth += 1 if text[index] == "(" else -1 if text[index] == ")" else 0
-                if depth == 0:
-                    break
-                index += 1
+                if len(arguments) <= position:
+                    continue
 
-            arguments: list[str] = []
-            level = 0
-            current = ""
+                receiver = arguments[position].strip()
 
-            for character in text[call.end():index]:
-                level += 1 if character in "([{" else -1 if character in ")]}" else 0
+                # A lambda capturing nothing reaches nothing, so it needs no context exactly as a continuation does.
+                if receiver.startswith("[") and not receiver.startswith("[]"):
+                    found.append(f"{name}:{text[:call.start()].count(chr(10)) + 1}")
 
-                if character == "," and level == 0:
-                    arguments.append(current)
-                    current = ""
-                else:
-                    current += character
-
-            arguments.append(current)
-
-            if len(arguments) < 3:
-                continue
-
-            receiver = arguments[2].strip()
-
-            # A lambda capturing nothing reaches nothing, so it needs no context exactly as a continuation does.
-            if receiver.startswith("[") and not receiver.startswith("[]"):
-                found.append(f"{name}:{text[:call.start()].count(chr(10)) + 1}")
-
-    return found
+    return sorted(found)
 
 
 def divergent_backend_conditions() -> list[str]:
@@ -844,10 +852,10 @@ def task_audit(_: Context) -> None:
     if anonymous:
         raise RuntimeError("Every constant, type and function belongs to a named namespace, because nothing is hidden from the other files:\n  " + "\n  ".join(anonymous))
 
-    contextless = contextless_connections()
+    contextless = contextless_deferred_work()
 
     if contextless:
-        raise RuntimeError("A connection to a lambda that captures anything is given the object it reaches as its context, so destroying that object disconnects it:\n  " + "\n  ".join(contextless))
+        raise RuntimeError("A connection or a timer whose lambda captures anything is given the object it reaches as its context, so destroying that object cancels it:\n  " + "\n  ".join(contextless))
 
     divergent = divergent_backend_conditions()
 

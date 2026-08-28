@@ -276,7 +276,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Plugin requests, events and replies remain queued and never invoke another plugin synchronously.
 - Future continuations that access a QObject use that QObject as their context so destruction cancels delivery safely.
 - A continuation that captures nothing reaches nothing, so it needs no context, and the lint command refuses every other one that names none.
-- A connection to a lambda is given the object that lambda reaches as its context for the same reason, because a connection lives as long as its sender and would otherwise call into a receiver that is already gone.
+- A connection and a single shot timer are given the object their lambda reaches as their context for the same reason, because each outlives the receiver and would otherwise call into one that is already gone.
 - A continuation attached to a future that already finished runs immediately, so an object never starts its own asynchronous work inside its constructor and announces the result to a caller that could not connect yet.
 - Plugins with direct asynchronous continuations bind them to a runtime context they own, created during initialization and destroyed before shutdown state is released, either a dedicated context object or the runtime object the continuation mutates.
 - Runtime state a signal can reach is held behind a shared pointer rather than inside the container that indexes it, because a container that grows while a signal is being delivered invalidates every reference into it.
@@ -1281,7 +1281,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The lint command refuses a theme token no style sheet consumes and a token a style sheet writes that nothing substitutes, because the second one reaches the screen spelled as itself.
 - The lint command refuses a signal nothing emits or connects and a value of a closed set nothing names, because a declaration the reader never meets is one nobody removed.
 - The lint command refuses a future continuation that captures something without naming the object it reaches, because that object is what cancels it.
-- The lint command refuses a connection whose lambda captures something without naming that context, holding the five hundred and six connections of the project to what it already holds every continuation to.
+- The lint command refuses a connection or a single shot timer whose lambda captures something without naming that context, holding both to what it already holds every continuation to.
 - The lint command refuses a call whose arguments do not match the sentence it formats, counting what each call really passes and holding both branches of a call that chooses between two sentences to the same count.
 - Complex methods use short intent comments only at important responsibility boundaries.
 - Validation, mutation, side effects and returns are visually separated.
@@ -1657,7 +1657,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Test targets reuse production implementations and contain deterministic boundary doubles only.
 - [x] A document announces its first load only after its caller could connect, proven with a read that is already finished when the continuation is attached.
 - [x] The project has no connection, continuation or timer without an owning context, no blocking wait outside teardown, no unused function, member, signal, enum value, translation key, theme token or icon, and the lint command now holds the signals, the closed value sets, the keys, the tokens and the icons to that rather than leaving it to a reading.
-- [x] Every one of the five hundred and six connections names the object its lambda reaches, and the lint command now refuses any other rather than leaving that to a reading.
+- [x] Every one of the five hundred and six connections and nine single shot timers names the object its lambda reaches, and the lint command now refuses any other rather than leaving that to a reading.
 
 ## Current architecture verification
 
