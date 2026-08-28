@@ -11,14 +11,14 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLocale>
-#include <QResizeEvent>
-#include <QTextDocument>
-
 #include <QPushButton>
+#include <QResizeEvent>
 #include <QScrollArea>
 #include <QScrollBar>
+#include <QTextDocument>
 #include <QTimer>
 #include <QVBoxLayout>
+
 #include <algorithm>
 #include <cmath>
 

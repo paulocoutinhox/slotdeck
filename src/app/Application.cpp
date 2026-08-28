@@ -7,6 +7,8 @@
 #include "ui/Theme.h"
 
 #include <QApplication>
+#include <QCommandLineOption>
+#include <QCommandLineParser>
 #include <QCoreApplication>
 #include <QDir>
 #include <QEvent>
@@ -14,8 +16,6 @@
 #include <QStandardPaths>
 #include <QTimer>
 
-#include <QCommandLineOption>
-#include <QCommandLineParser>
 #include <memory>
 #include <utility>
 

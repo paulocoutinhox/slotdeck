@@ -334,6 +334,68 @@ def inherited_catalogs() -> list[str]:
     return found
 
 
+def misgrouped_includes() -> list[str]:
+    order = {"project": 1, "qt": 2, "platform": 3, "standard": 4}
+
+    def kind(name: str) -> str:
+        if name.startswith('"'):
+            return "project"
+        inner = name[1:-1]
+        if inner.startswith("Q"):
+            return "qt"
+        if "/" in inner or inner.endswith(".h") or inner.endswith(".hpp"):
+            return "platform"
+        return "standard"
+
+    found: list[str] = []
+
+    for directory in ("src", "plugins", "tests"):
+        for path in sorted((ROOT / directory).rglob("*")):
+            if path.suffix not in (".cpp", ".h"):
+                continue
+
+            paragraphs: list[list[str]] = []
+            current: list[str] = []
+
+            for line in path.read_text(encoding="utf-8").split("\n"):
+                match = re.match(r'\s*#include\s+([<"][^>"]+[>"])', line)
+                if match:
+                    current.append(match.group(1))
+                    continue
+                if current and (not line.strip() or not line.strip().startswith("#")):
+                    paragraphs.append(current)
+                    current = []
+
+            if current:
+                paragraphs.append(current)
+
+            # The moc translation unit a class declared in a source file needs is generated and closes that file.
+            paragraphs = [p for p in paragraphs if not (len(p) == 1 and p[0].endswith('.moc"'))]
+
+            if not paragraphs:
+                continue
+
+            where = str(path.relative_to(ROOT))
+            ranks: list[int] = []
+            mixed = False
+
+            for index, paragraph in enumerate(paragraphs):
+                kinds = {kind(name) for name in paragraph}
+                if index == 0 and path.suffix == ".cpp" and len(paragraph) == 1 and kinds == {"project"}:
+                    ranks.append(0)
+                    continue
+                if len(kinds) > 1:
+                    found.append(f"{where} puts {' and '.join(sorted(kinds))} headers in one group")
+                    mixed = True
+                    break
+                ranks.append(order[kinds.pop()])
+
+            if not mixed and ranks != sorted(ranks):
+                found.append(f"{where} orders its include groups {ranks}")
+
+    return found
+
+
 def unused_declarations() -> list[str]:
     signals: dict[str, str] = {}
     values: dict[str, str] = {}
@@ -509,6 +571,11 @@ def task_audit(_: Context) -> None:
 
     if inherited:
         raise RuntimeError("Every language declares the keys it spells, because a catalog built from another one cannot be told from one that forgot a sentence:\n  " + "\n  ".join(inherited))
+
+    misgrouped = misgrouped_includes()
+
+    if misgrouped:
+        raise RuntimeError("Includes are one group for the header of the file, one for project headers, one for Qt, one for the platform and one for the standard library, in that order:\n  " + "\n  ".join(misgrouped))
 
     unused = unused_declarations()
 

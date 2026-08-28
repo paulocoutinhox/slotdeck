@@ -1,8 +1,7 @@
 #include "LanguageServerClient.h"
-#include "LanguageRegistry.h"
-#include <QtConcurrent>
 
 #include "CodeEditorState.h"
+#include "LanguageRegistry.h"
 
 #include <QCoreApplication>
 #include <QFileInfo>
@@ -11,6 +10,7 @@
 #include <QSet>
 #include <QThread>
 #include <QUrl>
+#include <QtConcurrent>
 
 #include <algorithm>
 #include <utility>

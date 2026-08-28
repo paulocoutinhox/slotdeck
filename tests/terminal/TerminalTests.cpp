@@ -18,18 +18,15 @@
 #include "ui/ShelfSessionChip.h"
 #include "ui/TerminalPane.h"
 #include "ui/TerminalWidget.h"
-
 #include "ui/WorkspaceView.h"
 #include "workspace/LayoutManager.h"
 #include "workspace/WorkspaceManager.h"
-#include <QDropEvent>
-#include <QMimeData>
-#include <QWheelEvent>
 
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
 #include <QDir>
+#include <QDropEvent>
 #include <QFontDatabase>
 #include <QFontMetricsF>
 #include <QImage>
@@ -40,11 +37,13 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
+#include <QMimeData>
 #include <QPointF>
 #include <QSignalSpy>
 #include <QStackedWidget>
 #include <QTemporaryDir>
 #include <QToolButton>
+#include <QWheelEvent>
 #include <QtTest/QTest>
 
 #include <gtest/gtest.h>

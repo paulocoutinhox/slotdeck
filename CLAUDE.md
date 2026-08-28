@@ -1244,6 +1244,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A method that accumulates responsibilities is split into small named methods, and a linear sequence or a mapping table stays whole because splitting it would hide the flow.
 - Includes are one group for the header of the file, one group for project headers, one group for Qt headers, one group for platform and third-party headers and one group for standard headers, in that order.
 - The formatter owns the order inside a group, so the sorting is the case-sensitive one it applies and never a hand-made ordering.
+- The lint command refuses a group that mixes two of those kinds and a file whose groups fall out of that order, because the formatter sorts inside a group and never moves an include between them.
 - A header is included once per file, and the only repeated include is one the preprocessor selects between alternative branches.
 - Two blank lines never follow each other.
 
