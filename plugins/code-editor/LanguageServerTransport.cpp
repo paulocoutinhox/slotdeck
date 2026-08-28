@@ -32,7 +32,7 @@ void LanguageServerTransport::start() {
     // clang-format off
     connect(m_process, &QProcess::started, this, [this]() { emit started(); });
     connect(m_process, &QProcess::readyReadStandardOutput, this, [this]() { readOutput(); });
-    connect(m_process, &QProcess::readyReadStandardError, this, [this]() { const QString text = QString::fromUtf8(m_process->readAllStandardError()).trimmed(); if (!text.isEmpty() && !m_aborted) { emit diagnosticText(text); } });
+    connect(m_process, &QProcess::readyReadStandardError, this, [this]() { const QString text = QString(m_diagnosticDecoder(m_process->readAllStandardError())).trimmed(); if (!text.isEmpty() && !m_aborted) { emit diagnosticText(text); } });
     connect(m_process, &QProcess::errorOccurred, this, [this](QProcess::ProcessError error) { if (m_aborted) { return; } if (error != QProcess::FailedToStart) { emit diagnosticText(m_process->errorString()); return; } if (!m_startFailureReported) { m_startFailureReported = true; emit startFailed(m_process->errorString()); } });
     connect(m_process, &QProcess::finished, this, [this](int exitCode, QProcess::ExitStatus) { emit exited(exitCode); });
     // clang-format on

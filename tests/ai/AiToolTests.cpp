@@ -1562,6 +1562,28 @@ TEST(AiToolContractTest, AnswersAMalformedToolCallAndRefusesOneWithoutItsIdentit
     EXPECT_TRUE(calls.value().first().arguments.isEmpty());
 }
 
+// A pipe decides where a chunk ends, so a character split across two reads is finished by the next one rather than lost.
+TEST(AiCommandRunnerTest, KeepsACharacterSplitAcrossTwoReadsOfTheOutput) {
+    qputenv("SLOTDECK_TEST_SPLIT_OUTPUT", QByteArrayLiteral("1"));
+    AiCommandRunner runner;
+    QString output;
+    int code = -1;
+    bool finished = false;
+    // clang-format off
+    QObject::connect(&runner, &AiCommandRunner::finished, &runner, [&output, &code, &finished](int exitCode, const QString& text) { code = exitCode; output = text; finished = true; });
+    QObject::connect(&runner, &AiCommandRunner::failed, &runner, [&finished](const utils::Error&) { finished = true; });
+    // clang-format on
+
+    runner.startProgram(QCoreApplication::applicationFilePath(), {}, QDir::currentPath(), 0);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&finished]() { return finished; }));
+    // clang-format on
+    qunsetenv("SLOTDECK_TEST_SPLIT_OUTPUT");
+
+    EXPECT_EQ(code, 0);
+    EXPECT_EQ(output, QStringLiteral("março de 2026 \U0001F600 fim\n"));
+}
+
 TEST(AiCommandRunnerTest, RunsACommandAndReportsItsOutputAndExitCode) {
     QTemporaryDir workdir;
     ASSERT_TRUE(workdir.isValid());

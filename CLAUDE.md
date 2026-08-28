@@ -631,6 +631,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Bounded message size, a start timeout and escalated termination apply to the MCP transport as they do to every other child process.
 - A command task runs in its own absolute working directory, streams its merged output, succeeds on a zero exit code and fails on any other.
 - A shell draws colors, cursor moves and progress rewrites, so only the readable text of the merged output reaches the execution record and a sequence split across two reads is completed by the next one.
+- A character split across two reads is completed the same way, because whoever writes to a pipe decides where a chunk ends and decoding each one alone turns that character into the marks that stand for what was lost.
+- Content that arrives in pieces is either buffered as bytes until a whole line or frame is there, which is what a stream of events and a framed protocol do, or decoded by something that keeps what it could not finish, which is what a stream of plain output does.
 - A stopped process is detached from the object that started it, so releasing that object never waits for a child to exit.
 - A command task requires no connection, because it never reaches a model.
 - Command termination escalates from a graceful request to a forced kill on a timer, because the interactive thread never waits for a process to exit.
@@ -1508,6 +1510,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] An import applied over a database whose log a crash left behind reads what the import brought, proven by a case that reads back the previous value without the replacement that discards it.
 - [x] Every byte a text file may carry survives being opened and saved, and a non-breaking space of a UTF-8 source file is still there afterwards.
 - [x] An agent asked to edit a file that is not UTF-8 is refused by name and every byte of that file is still where it was.
+- [x] A command whose output splits a character between two reads reports that character, proven by a fixture that writes the two halves apart.
 - [x] The view follows the reader instead of dragging them to the end of every message that arrives.
 - [x] AI tasks are grouped into renameable workspace tabs and rendered across the To Do, Doing, Blocked, Review and Done columns.
 - [x] AI task cards keep their own margin, use the filled play symbol and expose Play, Stop, Edit and Remove.

@@ -17,6 +17,7 @@
 #endif
 
 #include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -355,6 +356,17 @@ int main(int argc, char** argv) {
     }
     if (TestMainHelper::hasArgument(argc, argv, "--slotdeck-test-lsp-silent")) {
         return TestMainHelper::runLanguageServerFixture(LanguageServerFixture::Silent);
+    }
+    // A character of the output is split across two writes, which is what a pipe delivering a chunk in the middle of one really does.
+    if (qEnvironmentVariableIsSet("SLOTDECK_TEST_SPLIT_OUTPUT")) {
+        const QByteArray text = QStringLiteral("mar\u00E7o de 2026 \U0001F600 fim\n").toUtf8();
+        const qsizetype cut = text.indexOf(static_cast<char>(0xC3)) + 1;
+        std::fwrite(text.constData(), 1, static_cast<size_t>(cut), stdout);
+        std::fflush(stdout);
+        std::this_thread::sleep_for(std::chrono::milliseconds(120));
+        std::fwrite(text.constData() + cut, 1, static_cast<size_t>(text.size() - cut), stdout);
+        std::fflush(stdout);
+        return 0;
     }
     // A command line agent reads the prompt it was given and answers with it, which is what one really does.
     if (qEnvironmentVariableIsSet("SLOTDECK_TEST_CLI_AGENT")) {

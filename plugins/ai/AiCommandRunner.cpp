@@ -187,6 +187,7 @@ void AiCommandRunner::launch(const QString& program, const QStringList& argument
     }
 
     m_output.clear();
+    m_decoder.resetState();
     m_pendingControl.clear();
     m_completed = false;
     m_timedOut = false;
@@ -233,7 +234,7 @@ void AiCommandRunner::readOutput() {
         return;
     }
 
-    const QString chunk = plainCommandOutput(m_pendingControl, QString::fromUtf8(m_process->readAllStandardOutput()));
+    const QString chunk = plainCommandOutput(m_pendingControl, m_decoder(m_process->readAllStandardOutput()));
 
     if (chunk.isEmpty()) {
         return;

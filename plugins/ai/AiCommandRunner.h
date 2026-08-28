@@ -4,6 +4,7 @@
 
 #include <QObject>
 #include <QProcess>
+#include <QStringDecoder>
 #include <QTimer>
 
 namespace slotdeck::plugins::ai {
@@ -40,6 +41,8 @@ class AiCommandRunner final : public QObject {
     QProcess* m_process{nullptr};
     QTimer m_timeout;
     QString m_output;
+    // A character of the output may be split across two reads, so the decoding keeps what it could not finish yet.
+    QStringDecoder m_decoder{QStringDecoder::Utf8};
     QString m_pendingControl;
     bool m_completed{false};
     bool m_timedOut{false};

@@ -7,6 +7,7 @@
 #include <QObject>
 #include <QProcess>
 #include <QString>
+#include <QStringDecoder>
 
 namespace slotdeck::plugins::codeeditor {
 
@@ -44,6 +45,8 @@ class LanguageServerTransport final : public QObject {
     QString m_rootPath;
     QProcess* m_process{nullptr};
     QByteArray m_inputBuffer;
+    // A character of the diagnostic stream may be split across two reads, so the decoding keeps what it could not finish yet.
+    QStringDecoder m_diagnosticDecoder{QStringDecoder::Utf8};
     bool m_aborted{false};
     bool m_startFailureReported{false};
 };
