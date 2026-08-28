@@ -215,6 +215,8 @@ void AiCommandRunner::launch(const QString& program, const QStringList& argument
     }
 
     m_process->start(program, arguments);
+    // Nothing is ever written to the child, so its input is closed at once rather than left open for a program that waits to be piped to.
+    m_process->closeWriteChannel();
 }
 
 void AiCommandRunner::cancel() {

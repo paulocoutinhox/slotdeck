@@ -966,6 +966,33 @@ TEST(AiPluginTest, FailsAQueuedTaskWhoseConnectionIsGoneInsteadOfLeavingItWaitin
 }
 
 // A command line agent has no catalog to list and no request body, so the dialog closes what would answer about neither.
+// A provider that signs in on its own has no credential to configure, and a field that fills itself says so under itself in the ink of the theme.
+TEST(AiConnectionDialogTest, HidesTheCredentialAProviderDoesNotUseAndSaysWhichFieldFillsItself) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+
+    AiConnectionDialog dialog(host, AiTestsHelper::testConnection(), {}, nullptr);
+    dialog.show();
+    auto* provider = dialog.findChild<QComboBox*>(QStringLiteral("aiConnectionProvider"));
+    auto* apiKey = dialog.findChild<QWidget*>(QStringLiteral("aiConnectionApiKey"));
+    ASSERT_NE(provider, nullptr);
+    ASSERT_NE(apiKey, nullptr);
+    EXPECT_TRUE(apiKey->isVisible());
+
+    provider->setCurrentIndex(provider->findData(QStringLiteral("claude-cli")));
+    EXPECT_FALSE(apiKey->isVisible());
+    provider->setCurrentIndex(provider->findData(QStringLiteral("openai")));
+    EXPECT_TRUE(apiKey->isVisible());
+
+    // The hint reads in the muted ink and the caption size of the active theme rather than in a colour of its own.
+    auto* hint = dialog.findChild<QLabel*>(QStringLiteral("settingsHint"));
+    ASSERT_NE(hint, nullptr);
+    EXPECT_FALSE(hint->text().isEmpty());
+    const slotdeck::ui::Theme& theme = slotdeck::ui::themeManager().theme();
+    EXPECT_EQ(hint->palette().color(QPalette::WindowText), theme.color(slotdeck::ui::ThemeColor::TextMuted));
+    EXPECT_EQ(hint->font().pointSize(), theme.font(slotdeck::ui::ThemeFont::Caption).pointSize());
+}
+
 TEST(AiConnectionDialogTest, OffersNeitherModelDiscoveryNorExtraParametersToACommandLineAgent) {
     test::TestPluginHost host;
     host.translations = translations::english();

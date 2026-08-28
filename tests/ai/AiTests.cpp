@@ -2155,7 +2155,8 @@ TEST(AiConnectionSettingsViewTest, StartsFromTheEmptyStateAndOpensADialogWithThe
     provider->setCurrentIndex(provider->findData(QStringLiteral("ollama")));
     EXPECT_TRUE(address->isVisible());
     EXPECT_EQ(address->text(), findProvider(QStringLiteral("ollama"))->baseUrl);
-    EXPECT_FALSE(apiKey->isEnabled());
+    // A provider that needs no credential shows no field for one rather than a field nobody may type in.
+    EXPECT_FALSE(apiKey->isVisible());
 
     section.reset();
     plugin.shutdown();
@@ -3438,6 +3439,9 @@ TEST(AiCliChatClientTest, RunsTheProgramWhereTheTaskSaysAndAnswersWithWhatItPrin
 
     // The provider names that variable among the ones it clears, so the agent never reads it.
     EXPECT_TRUE(answered.contains(QStringLiteral("credential:"))) << answered.toStdString();
+
+    // The input of the agent is closed at once, so a program that reads what it was piped is not left waiting for something nobody sends.
+    EXPECT_TRUE(answered.contains(QStringLiteral("stdin: closed"))) << answered.toStdString();
     EXPECT_FALSE(answered.contains(QStringLiteral("a-key-the-agent-must-not-see"))) << answered.toStdString();
     qunsetenv("ANTHROPIC_API_KEY");
     qunsetenv("SLOTDECK_TEST_CLI_AGENT");

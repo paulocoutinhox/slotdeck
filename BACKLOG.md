@@ -36,12 +36,6 @@ Every item below is read-only analysis. None of them changes a file.
 - Inlay hints, because a plain text editor cannot place a glyph that is not in the document without
   changing the file it would then save.
 
-## Persistence
-
-- Schema migrations beyond the creating one. Configuration left the schema, so the tables that
-  remain change rarely, but the first structural change after the release needs version two and the
-  plugin host has no path for it yet.
-
 ## Code Editor editing
 
 - Rename, formatting, code actions and quick fixes. All four apply a `WorkspaceEdit`, which is one

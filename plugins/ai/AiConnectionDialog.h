@@ -66,6 +66,7 @@ class AiConnectionDialog final : public QDialog {
     QLabel* m_validation{nullptr};
     QPushButton* m_save{nullptr};
     QHash<QString, QWidget*> m_parameterEditors;
+    int m_apiKeyRow{-1};
     int m_addressRow{-1};
     bool m_loading{false};
 };

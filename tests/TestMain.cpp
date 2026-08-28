@@ -382,6 +382,9 @@ int main(int argc, char** argv) {
         out << QStringLiteral("directory: %1\n").arg(QDir::currentPath());
         out << QStringLiteral("prompt: %1\n").arg(prompt);
         out << QStringLiteral("credential: %1\n").arg(qEnvironmentVariable("ANTHROPIC_API_KEY"));
+        // A real agent reads what it was piped, so this one reads too and says what it found rather than waiting for input nobody sends.
+        QTextStream in(stdin);
+        out << QStringLiteral("stdin: %1\n").arg(in.readAll().isEmpty() ? QStringLiteral("closed") : QStringLiteral("open"));
         out.flush();
         return prompt.isEmpty() ? 3 : 0;
     }

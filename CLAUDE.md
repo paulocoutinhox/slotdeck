@@ -73,6 +73,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The tab widget divider is the reserved top border of its pane rather than a painted row, because a page that paints its own background covers anything drawn on the row it occupies.
 - That border is declared by the component for its own class rather than for an object name, because every surface renames the widget it owns.
 - A dialog form keeps one label column for every row it shows, so a field that appears with the selected kind still aligns with the fields above it.
+- A field that fills itself when it is left empty says so under itself, and that hint is the shared component, so its ink is the muted colour of the active theme and its size is the caption role rather than a colour and a size of its own.
+- A field the selected kind has nothing to do with is absent rather than present and closed, because a control nobody may type in still asks the reader what it is for.
 - Every tabbed surface uses the shared tab bar and its close button, so AI workspaces, browser tabs, editor workspaces, editor documents, terminal workspaces and dialog pages look identical and no surface installs its own tab button.
 - A view that owns the content area starts with a shared page header, keeps its content flush with the surrounding edges and separates surfaces with one single-pixel border.
 - A grid whose cells carry long messages wraps them and sizes its rows to the wrapped content, so a failure is readable without truncation.
@@ -667,6 +669,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A command line agent runs its own tools, so none is declared to it and its run is one turn that ends when the program does.
 - The conversation is rendered into the prompt, because these agents are invoked without a session and keep nothing between runs.
 - A command line provider declares no address, no credential and no parameter, and a provider reached over a wire declares no program.
+- Nothing is ever written to the input of a command line agent, so that input is closed the moment the process starts rather than left open for a program that waits to be piped to.
 - A command line agent signs in on its own and bills the subscription of the reader, so the credentials each vendor reads are named by that provider and removed from what the process inherits, otherwise the agent spends an API key instead.
 - Those variable names are data in the catalog like the program and the arguments, so a vendor that starts reading another one is a change of data.
 - The name of a command line provider says it is a command line agent, because a reader choosing between one and the service behind it must be able to tell them apart.
@@ -1077,7 +1080,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The language-server client validates header bounds, content lengths, JSON, JSON-RPC versions and bounded payload sizes before dispatch.
 - An outline nests only as deep as this project declares, because the server decides that depth and reading it costs one frame per level.
 - A client asks its transport for nothing once that transport is gone, because the thread that owns it ends before the client does.
-- Language-server initialization, document synchronization, diagnostics, completion, definition, hover, configuration requests, dynamic capability registration, workspace-folder requests, shutdown and exit follow the current Language Server Protocol contract.
+- Language-server initialization, document synchronization, diagnostics, completion, definition, hover, configuration requests, workspace-folder requests, shutdown and exit follow the current Language Server Protocol contract.
+- A dynamic capability registration is answered rather than honoured, so what the server may be asked for is what its initialize result declared, which `BACKLOG.md` records as the decision it is.
 - A message carrying a method is a server request or notification and only a message without one answers a request the client sent, because a server numbers its own requests and would otherwise be read as our response.
 - The capabilities the initialize result declares decide what the client is allowed to send, so synchronization, save notifications, completion, definition and hover leave only for a server that offers them.
 - A request made before the server finished initializing was never sent, so the document asks for its analysis again when the client announces that the server is ready, otherwise a slow start leaves a file with its diagnostics and without its outline.
@@ -1551,6 +1555,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Every one of the hundred and twenty eight continuations names the object it reaches or reaches nothing at all, and the lint command now refuses any other.
 - [x] A run that compacted reports the tokens its summary spent, and a command line agent reports no cost at all.
 - [x] A credential in the environment never reaches a command line agent, proven by a run that reads it back as empty and reads it as the key without the clearing.
+- [x] The input of a command line agent is closed at once, so a program that reads what it was piped is not left waiting.
+- [x] A provider that needs no credential shows no field for one, and the hint under a field that fills itself reads in the muted ink and the caption size of the theme.
 - [x] Every plugin releases what it already took before returning a failure from initialization, checked against all eight.
 - [x] The cost of a run reaches the reader in the execution history, proven through the fake that answers the columns the real schema has.
 - [x] The price of every model the catalog carries reaches it, a model nobody priced reports no cost, and a price of the wrong shape or below zero rejects the plugin.
@@ -1586,7 +1592,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 389 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 412 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.

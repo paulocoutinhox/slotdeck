@@ -814,6 +814,41 @@ void addSettingsRow(QFormLayout* form, const QString& label, QWidget* field) {
     form->addRow(caption, row);
 }
 
+QLabel* hintLabel(const QString& text, QWidget* parent) {
+    const Theme& theme = themeManager().theme();
+    auto* note = new QLabel(text, parent);
+    note->setObjectName(QStringLiteral("settingsHint"));
+    note->setWordWrap(true);
+    note->setFont(theme.font(ThemeFont::Caption));
+    QPalette palette = note->palette();
+    palette.setColor(QPalette::WindowText, theme.color(ThemeColor::TextMuted));
+    note->setPalette(palette);
+    return note;
+}
+
+void addFormHint(QFormLayout* form, const QString& text, QWidget* parent) {
+    if (text.isEmpty()) {
+        return;
+    }
+
+    form->addRow(QString{}, hintLabel(text, parent));
+}
+
+void addSettingsRow(QFormLayout* form, const QString& label, QWidget* field, const QString& hint) {
+    addSettingsRow(form, label, field);
+
+    if (hint.isEmpty()) {
+        return;
+    }
+
+    auto* row = new QWidget(field->parentWidget());
+    auto* rowLayout = new QHBoxLayout(row);
+    rowLayout->setContentsMargins(0, 0, 0, 0);
+    rowLayout->addStretch(1);
+    rowLayout->addWidget(hintLabel(hint, field->parentWidget()));
+    form->addRow(QString{}, row);
+}
+
 // A stepper reads as a minus and a plus beside the value, because a pair of stacked arrows is unreadable at this size.
 // Every numeric field steps through the same minus and plus pair, because stacked native arrows are unreadable and not flat.
 QWidget* stepperRow(QAbstractSpinBox* box, const Theme& theme, QWidget* parent) {

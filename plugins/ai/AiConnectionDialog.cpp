@@ -103,7 +103,9 @@ AiConnectionDialog::AiConnectionDialog(PluginHost& host, const ModelConnection& 
     m_form->addRow(m_host.translate(QStringLiteral("ai.settings.provider")), m_provider);
     m_form->addRow(m_host.translate(QStringLiteral("ai.settings.model")), modelRow);
     m_form->addRow(m_host.translate(QStringLiteral("ai.connection.display-name")), m_displayName);
+    ui::addFormHint(m_form, m_host.translate(QStringLiteral("ai.connection.display-name-hint")), this);
     m_form->addRow(m_host.translate(QStringLiteral("ai.settings.api-key")), m_apiKey);
+    m_apiKeyRow = m_form->rowCount() - 1;
     m_form->addRow(m_host.translate(QStringLiteral("ai.connection.address")), m_address);
     m_addressRow = m_form->rowCount() - 1;
     layout->addLayout(m_form);
@@ -193,7 +195,8 @@ void AiConnectionDialog::applyProviderShape() {
         return;
     }
 
-    m_apiKey->setEnabled(descriptor->requiresApiKey);
+    // A provider that signs in on its own has nothing to do with a credential, so the field is absent rather than present and closed.
+    m_form->setRowVisible(m_apiKeyRow, descriptor->requiresApiKey);
     m_form->setRowVisible(m_addressRow, descriptor->addressConfigurable);
 
     // A command line agent is not reached over a wire, so it has no catalog to list and no request body to merge a field into.
