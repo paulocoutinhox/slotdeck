@@ -1404,7 +1404,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The sanitizer command is `python3 make.py sanitize`.
 - The registered test command is `python3 make.py test`.
 - The coverage report command is `python3 make.py coverage`.
-- The aggregate command is `python3 make.py all`.
+- The aggregate command is `python3 make.py all` and it checks the formatting, runs the audits, builds and runs the registered suites, because a rule the aggregate skips is one nobody runs.
 - The clean commands are `python3 make.py clean` for the selected configuration and `python3 make.py distclean` for every generated build directory.
 - The application data reset command is `python3 make.py reset-data` and it removes the database and every plugin state after a typed confirmation, which `python3 make.py reset-data force` skips.
 - The version command is `python3 make.py version` and it prints the current version or writes a new `MAJOR.MINOR.PATCH` value.

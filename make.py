@@ -919,6 +919,7 @@ def task_distclean(_: Context) -> None:
 
 def task_all(context: Context) -> None:
     task_format_check(context)
+    task_audit(context)
     task_build(context)
     task_test(context)
 

@@ -94,7 +94,7 @@ python3 make.py run --configuration Debug
 
 | Task | Purpose |
 | --- | --- |
-| **all** | Check formatting, build and run the registered test suites |
+| **all** | Check formatting, run the audits, build and run the registered test suites |
 | **audit** | Run the audits this project declares for itself |
 | **build** | Compile the selected configuration |
 | **clean** | Clean the selected build directory |
