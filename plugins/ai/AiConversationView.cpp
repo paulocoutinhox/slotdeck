@@ -62,7 +62,9 @@ int AiConversationViewHelper::naturalWidth(const ui::RoundedSurface* bubble, int
     for (const auto* entry : bubble->findChildren<QWidget*>(QStringLiteral("aiConversationTool"))) {
         for (const auto* label : entry->findChildren<QLabel*>()) {
             const int indent = label->contentsMargins().left() + label->contentsMargins().right();
-            wanted = std::max(wanted, indent + label->fontMetrics().horizontalAdvance(label->text()));
+            // The advance is measured without rounding it down, because a line given exactly the width it reports still wraps.
+            const int text = static_cast<int>(std::ceil(QFontMetricsF(label->font()).horizontalAdvance(label->text())));
+            wanted = std::max(wanted, indent + text);
         }
     }
 

@@ -28,6 +28,7 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDialog>
 #include <QEvent>
@@ -2385,4 +2386,25 @@ TEST(ThemeFontTests, ResolvesTheMonospaceRoleToAFamilyThatReallyIsMonospaced) {
 
 TEST(CoreTranslationsTest, SpellsEveryKeyInEveryLanguageTheSelectorOffers) {
     slotdeck::test::expectCompleteCatalog(QStringLiteral("slotdeck"), slotdeck::plugins::coretranslations::catalog());
+}
+
+// A row that shrinks around a toggle reads as a different kind of row, so every settings row is the same height.
+TEST(ComponentsTest, GivesEverySettingsRowTheSameHeightWhateverControlItCarries) {
+    const slotdeck::ui::Theme& theme = slotdeck::ui::themeManager().theme();
+    QWidget host;
+    host.setStyleSheet(slotdeck::ui::applicationStyleSheet(theme));
+    auto* form = new QFormLayout(&host);
+    auto* combo = new slotdeck::ui::ComboBox(theme, &host);
+    combo->addItem(QStringLiteral("Vivid"));
+    slotdeck::ui::addSettingsRow(form, QStringLiteral("Color intensity"), combo);
+    auto* toggle = new QCheckBox(&host);
+    slotdeck::ui::addSettingsRow(form, QStringLiteral("Confirm multiline paste"), toggle);
+    host.show();
+    host.resize(900, 300);
+    QCoreApplication::processEvents();
+
+    auto* selectable = form->itemAt(0, QFormLayout::FieldRole)->widget();
+    auto* switched = form->itemAt(1, QFormLayout::FieldRole)->widget();
+    EXPECT_EQ(switched->height(), selectable->height());
+    EXPECT_EQ(switched->height(), theme.metric(slotdeck::ui::ThemeMetric::SettingsRowHeight));
 }

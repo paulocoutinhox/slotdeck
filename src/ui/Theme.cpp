@@ -130,6 +130,8 @@ int ThemeHelper::themeMetric(ThemeMetric role) {
         return 220;
     case ThemeMetric::SettingsControlMaximumWidth:
         return 420;
+    case ThemeMetric::SettingsRowHeight:
+        return 31;
     case ThemeMetric::RoundButtonSize:
         return 36;
     }

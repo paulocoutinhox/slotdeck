@@ -118,6 +118,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The empty state of a settings surface states what is missing and never explains what the missing thing is for.
 - Exactly one single-pixel divider separates every pair of sections on a settings page, so a group of one section carries none.
 - A settings row spans the whole width with its caption on the left and its control against the right edge, and a toggle never carries its own caption.
+- Every settings row is the same height whatever control it carries, because a row that shrinks around a toggle reads as a different kind of row, and that height is a theme metric rather than whatever each control asks for.
 - A caption asks for the width its own words need and wraps only past the readable bound, because a column narrower than the words breaks them while the row still has room.
 - A settings control that carries text grows to the shared readable width and shrinks with a narrow window, while a control of fixed size keeps its own width against the right edge.
 - A field the user types several lines into is the shared text field, which declares its own border and its own raised background, because a surface painted like the window behind it does not read as somewhere to type.
@@ -790,6 +791,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Play and a due schedule send the prompt of the task again as a new user turn, because that prompt is the standing instruction a schedule repeats.
 - A message typed while a turn is running joins the conversation at once and is claimed by the next iteration of that turn, and a message that arrives after the final answer opens the next turn instead.
 - Resetting a task clears its conversation and the runs that conversation recorded, returning it to the state it was created in.
+- Nothing else removes what a task recorded, because that history is the memory of the agent, so a conversation is emptied only by that reset and by removing the task or the workspace it belongs to.
+- A summary replaces the turns it covers only in the request that is sent, and every one of those turns stays stored, so compacting a long conversation costs the model its detail and never costs the reader their history.
 - The conversation is fitted to the context window of the selected model before every turn, estimated from the serialized message size.
 - The fitting aims at a share of what remains rather than at the whole of it, because an estimate made from the size of the text underestimates what the model really counts, so a turn compacts under pressure instead of at the moment it overflows.
 - The window has to hold the answer and the tool declarations as well as the conversation, so the output budget and the serialized tools are reserved before anything is fitted into what is left.
@@ -825,6 +828,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A chat message is written with the return key, so a single newline is a line break and only the prose between fenced blocks is broken that way.
 - A box is as wide as the words it carries up to seventy percent of the surface, because a wall of text edge to edge is not a conversation.
 - One rule measures every box, so a turn of tool calls is as wide as the longest line it carries exactly like a message is, and a line that wraps is measured from its text rather than from the width one word needs.
+- That measurement never rounds the advance of a line down, because a box given exactly the width its text reports still breaks that text onto a second line.
 - The time a message was sent reads at the end of its line when that line has room and takes a line of its own when it does not, and it is written in the ink of the box at a lower weight.
 - A turn that called tools presents one entry per call with the mark of a tool and its public name on the first line and the one thing it is doing under them, separated from it, because the reader wants to know what it did rather than what it was passed.
 - A tool declares the public name a reader sees and the sentence that says what it is doing, both translated, together with the single argument that sentence carries.
@@ -1514,6 +1518,9 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] An agent asked to edit a file that is not UTF-8 is refused by name and every byte of that file is still where it was.
 - [x] A command whose output splits a character between two reads reports that character, proven by a fixture that writes the two halves apart.
 - [x] A file larger than one transfer chunk reaches the reader whole, which is the path every real asset of a page takes and which no case entered before.
+- [x] A settings row carrying a toggle is the same height as one carrying a selectable field, proven against the metric both resolve from.
+- [x] A tool call presents its line unwrapped when the surface has room, proven by a case that reads two lines back without the precise measurement.
+- [x] Every turn a summary replaced is still stored after the run that compacted it, because the history of a task is the memory of its agent.
 - [x] The view follows the reader instead of dragging them to the end of every message that arrives.
 - [x] AI tasks are grouped into renameable workspace tabs and rendered across the To Do, Doing, Blocked, Review and Done columns.
 - [x] AI task cards keep their own margin, use the filled play symbol and expose Play, Stop, Edit and Remove.

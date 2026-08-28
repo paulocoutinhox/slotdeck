@@ -1162,6 +1162,14 @@ TEST(AiPluginTest, SummarizesTheTurnsThatNoLongerFitInsteadOfLosingThem) {
     EXPECT_EQ(summary->role, ConversationRole::User);
     EXPECT_TRUE(summary->content.contains(QStringLiteral("The agent wrote the report and validated it")));
     EXPECT_LT(summary->summarizedUntil, summary->sequence);
+
+    // The stored conversation keeps every turn the summary replaced, because the history of a task is its memory and only the reader removes it.
+    ASSERT_FALSE(conversation.isEmpty());
+    EXPECT_LE(conversation.first().sequence, summary->summarizedUntil);
+    // clang-format off
+    const auto replaced = std::count_if(conversation.constBegin(), conversation.constEnd(), [summary](const ConversationMessage& message) { return message.sequence <= summary->summarizedUntil; });
+    // clang-format on
+    EXPECT_GT(replaced, 0);
     plugin.shutdown();
 }
 
@@ -2890,6 +2898,9 @@ TEST(AiConversationViewTest, MeasuresATurnOfToolsByTheSameRuleAsAMessage) {
     // A turn of tools is as wide as the words it carries, exactly like a message, instead of collapsing to one word.
     auto* carrying = bubbles.constLast();
     EXPECT_GE(carrying->width(), activity->fontMetrics().horizontalAdvance(activity->text())) << carrying->width();
+
+    // The line the reader sees is not wrapped, because a box measured to the exact advance of its text still breaks it.
+    EXPECT_LT(activity->heightForWidth(activity->width()), 2 * activity->fontMetrics().height()) << activity->width();
     EXPECT_LE(carrying->width(), static_cast<int>(view.width() * 0.70) + 1);
 
     for (auto* bubble : bubbles) {

@@ -795,6 +795,9 @@ void addSettingsRow(QFormLayout* form, const QString& label, QWidget* field) {
         field->setMaximumWidth(theme.metric(ThemeMetric::SettingsControlMaximumWidth));
     }
 
+    // Every row is the same height whatever it carries, because one that shrinks around a toggle reads as a different kind of row.
+    field->setMinimumHeight(theme.metric(ThemeMetric::SettingsRowHeight));
+
     auto* row = new QWidget(field->parentWidget());
     auto* rowLayout = new QHBoxLayout(row);
     rowLayout->setContentsMargins(0, 0, 0, 0);
