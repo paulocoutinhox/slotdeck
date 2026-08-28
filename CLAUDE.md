@@ -1257,6 +1257,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Descriptive names make routine comments unnecessary.
 - Every comment is a complete sentence starting with a capital letter and ending with a period.
 - A sentence that must start with an identifier written in lowercase keeps its exact spelling, and the sentence is preferably rewritten so that identifier is not at the start.
+- The lint command refuses a comment that opens in lower case, so a sentence naming such an identifier is rewritten rather than left opening with it.
 - The comment above a function, method, class or module says what it does for whoever calls it and never how it is implemented inside.
 - Comments are objective and read naturally, never verbose, fragmented or narrative.
 - A sentence never spans more than one line and never continues on the next one.

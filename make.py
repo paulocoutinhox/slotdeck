@@ -629,6 +629,9 @@ def stray_comments() -> list[str]:
                 if not body.endswith("."):
                     found.append(f"{where} does not end its sentence")
 
+                if body[0].isalpha() and not body[0].isupper():
+                    found.append(f"{where} opens its sentence in lower case")
+
     return found
 
 

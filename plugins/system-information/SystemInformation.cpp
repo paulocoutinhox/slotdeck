@@ -69,7 +69,7 @@ QString SystemInformationHelper::batteryStateName(const hwinfo::Battery& battery
     return QStringLiteral("unknown");
 }
 
-// macOS does not enumerate memory modules so the installed size comes from the kernel instead of the module sum.
+// The memory modules are not enumerated on macOS, so the installed size comes from the kernel rather than from their sum.
 quint64 SystemInformationHelper::totalMemoryBytes(const hwinfo::Memory& memory) {
 #if defined(Q_OS_MACOS)
     Q_UNUSED(memory);
