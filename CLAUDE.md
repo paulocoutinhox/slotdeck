@@ -1638,7 +1638,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
 - [x] The registered suite reports 431 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
-- [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the suite proves that in both directions for every composed family.
+- [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the lint command refuses any other rather than leaving it to a reading.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
 - [x] Package staging contains all eight plugins, all eight shared `hwinfo` components, shared Qt frameworks, Qt WebEngine resources and a valid assembled application signature.
 - [x] The repository package validation command verifies the signature, the plugin count, the WebEngine helper and the dynamic Qt linkage.
