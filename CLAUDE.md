@@ -1261,6 +1261,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The lint command refuses a comment separated from what it explains, a comment dividing a sentence with a semicolon and a comment that does not end its sentence, across the sources and the suite alike.
 - The lint command refuses a translation catalog whose language is built from another one, because no case reading the finished map can tell that apart.
 - The lint command refuses a translation key nothing reaches, accepting one the code names itself and one composed from a family the code names, because a sentence no caller asks for is one the reader never sees.
+- The lint command refuses a theme token no style sheet consumes and a token a style sheet writes that nothing substitutes, because the second one reaches the screen spelled as itself.
 - The lint command refuses a future continuation that captures something without naming the object it reaches, because that object is what cancels it.
 - The lint command refuses a call whose arguments do not match the sentence it formats, counting what each call really passes and holding both branches of a call that chooses between two sentences to the same count.
 - Complex methods use short intent comments only at important responsibility boundaries.
@@ -1455,7 +1456,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] AI task creation reports every invalid field as a validation message and a failed run stays visible on its card with its status badge.
 - [x] The terminal and the editor own independent font sizes with their own defaults, changed from their own settings and stepped together by the native zoom shortcuts.
 - [x] Success indicators follow the active theme accent while warning and danger stay semantic.
-- [x] Every style sheet resolves its theme values through the single token substitution and no token is defined without a style sheet that consumes it.
+- [x] Every style sheet resolves its theme values through the single token substitution, no token is defined without a style sheet that consumes it and no style sheet writes one nothing substitutes, which the lint command now refuses.
 - [x] Every shared component, stored-value and payload contract has direct coverage for its success, rejection and boundary cases.
 - [x] A stored settings value the owner cannot use is the declared default and every other value still loads, and a key nobody declares changes nothing.
 - [x] A second consecutive external edit reaches the open document, proven by a case that was intermittent while the watch was not rearmed.

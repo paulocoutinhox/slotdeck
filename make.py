@@ -334,6 +334,29 @@ def inherited_catalogs() -> list[str]:
     return found
 
 
+def mismatched_theme_tokens() -> list[str]:
+    theme = (ROOT / "src" / "ui" / "Theme.cpp").read_text(encoding="utf-8")
+    block = re.search(r"const QVector<QPair<QString, QString>> tokens\{(.*?)\n    \};", theme, re.S)
+
+    if block is None:
+        raise RuntimeError("The theme token substitution could not be read")
+
+    declared = set(re.findall(r'QStringLiteral\("(@\w+)"\)', block.group(1)))
+    written: set[str] = set()
+
+    for directory in ("src", "plugins"):
+        for path in sorted((ROOT / directory).rglob("*.cpp")):
+            if path.name == "Theme.cpp":
+                continue
+            written.update(re.findall(r"(@[a-zA-Z][a-zA-Z0-9]*)", path.read_text(encoding="utf-8", errors="ignore")))
+
+    # A style sheet writes the unit against the token, so a token is consumed when it opens one of the names that were written.
+    consumed = {name for name in declared if any(token.startswith(name) for token in written)}
+    substituted = {token for token in written if any(token.startswith(name) for name in declared)}
+    found = [f"{name} is substituted and no style sheet consumes it" for name in sorted(declared - consumed)]
+    return found + [f"{token} is written and nothing substitutes it" for token in sorted(written - substituted)]
+
+
 def unreachable_translations() -> list[str]:
     catalogs = sorted(ROOT.glob("plugins/*/*Translations.h")) + [ROOT / "src" / "plugins" / "CoreTranslations.h"]
     declared: dict[str, str] = {}
@@ -449,6 +472,11 @@ def task_lint(_: Context) -> None:
 
     if inherited:
         raise RuntimeError("Every language declares the keys it spells, because a catalog built from another one cannot be told from one that forgot a sentence:\n  " + "\n  ".join(inherited))
+
+    mismatched = mismatched_theme_tokens()
+
+    if mismatched:
+        raise RuntimeError("Every theme value a style sheet writes is substituted and every token substituted is written, because either half alone reaches the screen as itself:\n  " + "\n  ".join(mismatched))
 
     unreachable = unreachable_translations()
 
