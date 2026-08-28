@@ -280,6 +280,54 @@ TEST(DatabaseExecutorTest, RunsEveryWriteStillWaitingWhenItIsDestroyed) {
     EXPECT_EQ(rows.value().size(), queued);
 }
 
+// An order the platform decides shows up in repetition, so the executor is driven with reads, writes and transactions whose contexts die mid-flight.
+TEST(DatabaseExecutorTest, SurvivesManyOverlappingWritesReadsAndCancelledContinuations) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("slotdeck.sqlite3"));
+    {
+        persistence::StateStore store(path);
+        ASSERT_TRUE(store.initialize().hasValue());
+        ASSERT_TRUE(store.migratePluginDatabase(QStringLiteral("sample"), {{1, {QStringLiteral("CREATE TABLE sample_values(id INTEGER PRIMARY KEY, note TEXT NOT NULL) STRICT")}}}).hasValue());
+    }
+
+    constexpr int rounds = 60;
+    int answered = 0;
+    {
+        persistence::DatabaseExecutor executor(path);
+
+        for (int round = 0; round < rounds; ++round) {
+            // The context of a continuation is destroyed while its work may still be running, which is what a plugin closing does.
+            auto context = std::make_unique<QObject>();
+            auto write = executor.executePluginDatabase(QStringLiteral("sample"), QStringLiteral("INSERT INTO sample_values(id, note) VALUES(?, ?)"), {round, QStringLiteral("note %1").arg(QString::number(round))});
+            auto transaction = executor.executePluginDatabaseTransaction(QStringLiteral("sample"), {{QStringLiteral("UPDATE sample_values SET note = ? WHERE id = ?"), {QStringLiteral("changed"), round}}});
+            auto read = executor.queryPluginDatabase(QStringLiteral("sample"), QStringLiteral("SELECT id FROM sample_values"), {});
+            // clang-format off
+            write.then(context.get(), [&answered](utils::Result<void>) { ++answered; });
+            transaction.then(context.get(), [&answered](utils::Result<void>) { ++answered; });
+            read.then(context.get(), [&answered](utils::Result<persistence::DatabaseRows>) { ++answered; });
+            // clang-format on
+
+            if (round % 3 == 0) {
+                context.reset();
+            }
+
+            QCoreApplication::processEvents();
+        }
+    }
+
+    // Every row reached the disk whatever order the work ran in, and the answers nobody was left to hear were dropped rather than delivered.
+    persistence::StateStore reopened(path);
+    ASSERT_TRUE(reopened.initialize().hasValue());
+    const auto rows = reopened.queryPluginDatabase(QStringLiteral("sample"), QStringLiteral("SELECT id, note FROM sample_values"), {});
+    ASSERT_TRUE(rows.hasValue()) << rows.error().message.toStdString();
+    EXPECT_EQ(rows.value().size(), rounds);
+
+    for (const auto& row : rows.value()) {
+        EXPECT_EQ(row.value(QStringLiteral("note")).toString(), QStringLiteral("changed"));
+    }
+}
+
 TEST(DatabaseExecutorTest, SerializesRuntimeQueriesAndReportsStorageErrorsAsynchronously) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());
