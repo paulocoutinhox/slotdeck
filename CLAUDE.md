@@ -203,6 +203,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Every plugin catalog contains an English `en` locale.
 - Every plugin catalog contains every language exposed by the application language selector, which is English and Portuguese.
 - Every language spells every key the English catalog declares, including a product name that reads the same in both, because a catalog that leans on the fallback cannot be told apart from one that forgot the sentence.
+- A sentence is given exactly the arguments it declares, and a call that chooses between two sentences gives the same arguments to both, so the two declare the same, otherwise Qt reports the mismatch to the reader as a warning.
 - A language declares its own entries rather than starting from another language, because a catalog built by copying and overriding contains every key by construction and a case that reads it back can never fail.
 - The lint command refuses a catalog built from another one, because that is the only place the difference between a declared sentence and an inherited one is still visible.
 - A key belongs to the catalog of its language rather than to the function that assembles them, so the assembly names the two languages and nothing else.
@@ -1231,6 +1232,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The lint command refuses a comment separated from what it explains, a comment dividing a sentence with a semicolon and a comment that does not end its sentence, across the sources and the suite alike.
 - The lint command refuses a translation catalog whose language is built from another one, because no case reading the finished map can tell that apart.
 - The lint command refuses a future continuation that captures something without naming the object it reaches, because that object is what cancels it.
+- The lint command refuses a call whose arguments do not match the sentence it formats, counting what each call really passes and holding both branches of a call that chooses between two sentences to the same count.
 - Complex methods use short intent comments only at important responsibility boundaries.
 - Validation, mutation, side effects and returns are visually separated.
 - Methods have a visually clear beginning, middle and end.
@@ -1557,6 +1559,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A credential in the environment never reaches a command line agent, proven by a run that reads it back as empty and reads it as the key without the clearing.
 - [x] The input of a command line agent is closed at once, so a program that reads what it was piped is not left waiting.
 - [x] A provider that needs no credential shows no field for one, and the hint under a field that fills itself reads in the muted ink and the caption size of the theme.
+- [x] Every call that formats a sentence passes exactly what that sentence declares, and the lint command refuses any other, including the shape where one branch takes an argument and the other does not.
 - [x] Every plugin releases what it already took before returning a failure from initialization, checked against all eight.
 - [x] The cost of a run reaches the reader in the execution history, proven through the fake that answers the columns the real schema has.
 - [x] The price of every model the catalog carries reaches it, a model nobody priced reports no cost, and a price of the wrong shape or below zero rejects the plugin.

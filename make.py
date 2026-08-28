@@ -223,6 +223,72 @@ def unprotected_lambdas() -> list[str]:
     return found
 
 
+def translation_placeholders() -> dict[str, int]:
+    declared: dict[str, int] = {}
+    catalogs = sorted(ROOT.glob("plugins/*/*Translations.h")) + [ROOT / "src" / "plugins" / "CoreTranslations.h"]
+
+    for path in catalogs:
+        for key, value in re.findall(r"\{QStringLiteral\(\"([a-z0-9.\-]+)\"\), QStringLiteral\(\"((?:[^\"\\\\]|\\\\.)*)\"\)\}", path.read_text(encoding="utf-8")):
+            marks = [int(mark) for mark in re.findall(r"%(\d)", value)]
+            declared[key] = max(declared.get(key, 0), max(marks) if marks else 0)
+
+    return declared
+
+
+def given_arguments(text: str, start: int) -> int:
+    total = 0
+    index = start
+
+    while True:
+        opening = re.match(r"\s*\.arg\(", text[index:])
+        if opening is None:
+            return total
+        index += opening.end()
+        depth = 1
+        pieces = 1
+
+        while index < len(text) and depth:
+            character = text[index]
+            if character in "([{":
+                depth += 1
+            elif character in ")]}":
+                depth -= 1
+                if depth == 0:
+                    break
+            elif character == "," and depth == 1:
+                pieces += 1
+            index += 1
+
+        index += 1
+        total += pieces
+
+
+def mismatched_translations() -> list[str]:
+    declared = translation_placeholders()
+    found: list[str] = []
+
+    for directory in ("src", "plugins"):
+        for path in sorted((ROOT / directory).rglob("*")):
+            if path.suffix not in (".cpp", ".h") or path.name.endswith("Translations.h"):
+                continue
+
+            text = path.read_text(encoding="utf-8")
+
+            for match in re.finditer(r"translate\(QStringLiteral\(\"([a-z0-9.\-]+)\"\)\)", text):
+                key = match.group(1)
+                if key in declared and given_arguments(text, match.end()) != declared[key]:
+                    found.append(f"{path.relative_to(ROOT)}:{text[:match.start()].count(chr(10)) + 1} {key}")
+
+            # A call that chooses between two sentences gives the same arguments to both, so both must take the same.
+            for match in re.finditer(r"translate\([^()]*\?[^()]*QStringLiteral\(\"([a-z0-9.\-]+)\"\)[^()]*:[^()]*QStringLiteral\(\"([a-z0-9.\-]+)\"\)\)", text):
+                first = declared.get(match.group(1))
+                second = declared.get(match.group(2))
+                if first is not None and second is not None and first != second:
+                    found.append(f"{path.relative_to(ROOT)}:{text[:match.start()].count(chr(10)) + 1} {match.group(1)} and {match.group(2)}")
+
+    return found
+
+
 def unguarded_continuations() -> list[str]:
     found: list[str] = []
 
@@ -313,6 +379,11 @@ def task_lint(_: Context) -> None:
 
     if stray:
         raise RuntimeError("Every comment is a complete sentence sitting on what it explains:\n  " + "\n  ".join(stray))
+
+    mismatched = mismatched_translations()
+
+    if mismatched:
+        raise RuntimeError("A sentence is given exactly the arguments it declares, because one it never asked for reaches the reader as a warning:\n  " + "\n  ".join(mismatched))
 
     unguarded = unguarded_continuations()
 

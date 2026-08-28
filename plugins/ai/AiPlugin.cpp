@@ -2163,8 +2163,11 @@ QString AiPlugin::renderedSystemPrompt(const AiTask& task, const AiAgent& agent,
     values.insert(QStringLiteral("MODEL"), connectionKey(connection));
     values.insert(QStringLiteral("MODEL_TRAITS"), traitNames.join(QStringLiteral(", ")));
     values.insert(QStringLiteral("VISION"), m_host->translate(traits.contains(ModelTrait::Vision) ? QStringLiteral("ai.capability.vision-yes") : QStringLiteral("ai.capability.vision-no")));
-    values.insert(QStringLiteral("SEARCH"), m_host->translate(m_settings.search.apiKey.isEmpty() && m_settings.search.instanceUrl.isEmpty() ? QStringLiteral("ai.capability.search-no") : QStringLiteral("ai.capability.search-yes")).arg(searchProviderIdentifier(m_settings.search.provider)));
-    values.insert(QStringLiteral("SPEECH"), m_host->translate(m_settings.speech.apiKey.isEmpty() ? QStringLiteral("ai.capability.speech-no") : QStringLiteral("ai.capability.speech-yes")).arg(speechProviderIdentifier(m_settings.speech.provider)));
+    // Only the sentence that names a service takes one, because a sentence saying there is none has nothing to name.
+    const bool searchConfigured = !m_settings.search.apiKey.isEmpty() || !m_settings.search.instanceUrl.isEmpty();
+    const bool speechConfigured = !m_settings.speech.apiKey.isEmpty();
+    values.insert(QStringLiteral("SEARCH"), searchConfigured ? m_host->translate(QStringLiteral("ai.capability.search-yes")).arg(searchProviderIdentifier(m_settings.search.provider)) : m_host->translate(QStringLiteral("ai.capability.search-no")));
+    values.insert(QStringLiteral("SPEECH"), speechConfigured ? m_host->translate(QStringLiteral("ai.capability.speech-yes")).arg(speechProviderIdentifier(m_settings.speech.provider)) : m_host->translate(QStringLiteral("ai.capability.speech-no")));
     values.insert(QStringLiteral("SERVERS"), serverCatalog());
     values.insert(QStringLiteral("CONTEXT_WINDOW"), QString::number(model == nullptr ? 0 : model->contextWindow));
     values.insert(QStringLiteral("OUTPUT_BUDGET"), QString::number(outputBudget(connection)));
