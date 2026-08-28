@@ -17,9 +17,15 @@
 #include <QUrl>
 #include <QtConcurrent>
 
+#include <memory>
 #include <utility>
 
 namespace slotdeck::plugins::ai {
+
+struct HttpAnswer final {
+    QByteArray bytes;
+    bool refused{false};
+};
 
 constexpr int methodNotFound = -32601;
 constexpr int internalError = -32603;
@@ -418,9 +424,24 @@ void AiMcpClient::post(const QJsonObject& message) {
     }
 
     QNetworkReply* reply = m_network.post(request, QJsonDocument(message).toJson(QJsonDocument::Compact));
+    auto answer = std::make_shared<HttpAnswer>();
     // clang-format off
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+    // The size of the answer is decided by the server, so the bound holds while the bytes arrive rather than once they all have.
+    connect(reply, &QNetworkReply::readyRead, this, [this, reply, answer]() {
+        answer->bytes.append(reply->readAll());
+        if (answer->bytes.size() > mcpMaximumMessageBytes) {
+            const utils::Error error{"ai_mcp_answer_too_large", "The MCP server answered with more than the permitted size", m_descriptor.id};
+            answer->refused = true;
+            reply->abort();
+            reportFailure(error);
+            completeAll(error);
+        }
+    });
+    connect(reply, &QNetworkReply::finished, this, [this, reply, answer]() {
         reply->deleteLater();
+        if (answer->refused) {
+            return;
+        }
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         const QByteArray session = reply->rawHeader(QByteArrayLiteral("mcp-session-id"));
         if (!session.isEmpty()) {
@@ -440,7 +461,8 @@ void AiMcpClient::post(const QJsonObject& message) {
             completeAll(error);
             return;
         }
-        consumeHttpPayload(reply->rawHeader(QByteArrayLiteral("content-type")), reply->readAll());
+        answer->bytes.append(reply->readAll());
+        consumeHttpPayload(reply->rawHeader(QByteArrayLiteral("content-type")), answer->bytes);
     });
     // clang-format on
 }

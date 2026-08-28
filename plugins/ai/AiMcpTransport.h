@@ -11,6 +11,9 @@
 
 namespace slotdeck::plugins::ai {
 
+// A server answers with content of a size it decides, so both transports of one client hold it to the same bound.
+inline constexpr qsizetype mcpMaximumMessageBytes = 8 * 1024 * 1024;
+
 // The process of a server, the lines it writes and their JSON live on their own thread, because a server answers with content of any size.
 class AiMcpTransport final : public QObject {
     Q_OBJECT

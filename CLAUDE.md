@@ -654,6 +654,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A tools list changed notification refreshes the discovered tools, so a server that adds a tool at runtime is seen without restarting it.
 - Every pending request completes when the server stops or exits, so a callback is never leaked.
 - Bounded message size, a start timeout and escalated termination apply to the MCP transport as they do to every other child process.
+- Both transports of one client hold an answer to the same bound, and the HTTP one holds it while the bytes arrive rather than once they all have, because the size of that answer is decided by the server.
 - A command task runs in its own absolute working directory, streams its merged output, succeeds on a zero exit code and fails on any other.
 - A shell draws colors, cursor moves and progress rewrites, so only the readable text of the merged output reaches the execution record and a sequence split across two reads is completed by the next one.
 - A character split across two reads is completed the same way, because whoever writes to a pipe decides where a chunk ends and decoding each one alone turns that character into the marks that stand for what was lost.
@@ -1669,6 +1670,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] An EditorConfig section that never closes its brace is read once instead of costing the whole tail per brace.
 - [x] The web server, the provider stream and the settings reader answer every hostile input a seeded generator produces.
 - [x] Both framing transports answer every malformed frame a fixture writes on purpose instead of reading past it.
+- [x] An MCP server answering with more than the permitted size is stopped while the bytes arrive, proven against the read that held whatever the server sent.
 - [x] An outline nested deeper than the declared bound is read to that bound rather than to the depth the server chose.
 - [x] A client that outlives its transport asks it for nothing.
 - [x] A completed plugin request leaves no guard on its context, proven through a request a loaded plugin really makes.

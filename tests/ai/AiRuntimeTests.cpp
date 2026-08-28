@@ -1736,6 +1736,62 @@ TEST(AiMcpClientTest, SpeaksTheStreamableHttpTransportWithSessionAndEventStream)
     // clang-format on
 }
 
+// The size of the answer is decided by the server, so the client stops reading rather than holding whatever arrives.
+class OversizedMcpHttpServer final {
+  public:
+    OversizedMcpHttpServer() {
+        // clang-format off
+        QObject::connect(&m_server, &QTcpServer::newConnection, &m_server, [this]() {
+            QTcpSocket* socket = m_server.nextPendingConnection();
+            QObject::connect(socket, &QTcpSocket::readyRead, socket, [socket]() {
+                socket->readAll();
+                socket->write(QByteArrayLiteral("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\n"));
+                const QByteArray padding(1024 * 1024, 'a');
+                for (int chunk = 0; chunk < 12; ++chunk) {
+                    socket->write(QByteArrayLiteral(": ") + padding + QByteArrayLiteral("\n"));
+                    socket->flush();
+                }
+            });
+        });
+        // clang-format on
+    }
+
+    [[nodiscard]] bool listen() {
+        return m_server.listen(QHostAddress::LocalHost, 0);
+    }
+
+    [[nodiscard]] QString address() const {
+        return QStringLiteral("http://127.0.0.1:%1/mcp").arg(m_server.serverPort());
+    }
+
+  private:
+    QTcpServer m_server;
+};
+
+TEST(AiMcpClientTest, StopsReadingAnAnswerLargerThanThePermittedSize) {
+    OversizedMcpHttpServer server;
+    ASSERT_TRUE(server.listen());
+
+    McpServerDescriptor remote;
+    remote.id = QStringLiteral("remote");
+    remote.transport = McpTransport::Http;
+    remote.url = server.address();
+    AiMcpClient client(remote);
+    QVector<utils::Error> failures;
+    // clang-format off
+    QObject::connect(&client, &AiMcpClient::failed, &client, [&failures](const utils::Error& error) { failures.append(error); });
+    // clang-format on
+
+    client.start();
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&failures]() { return !failures.isEmpty(); }, 20000));
+    // clang-format on
+
+    EXPECT_EQ(failures.first().code, QStringLiteral("ai_mcp_answer_too_large"));
+    EXPECT_FALSE(client.ready());
+    client.stop();
+}
+
 TEST(AiMcpClientTest, RejectsAnInvalidHttpAddress) {
     McpServerDescriptor invalid;
     invalid.id = QStringLiteral("remote");

@@ -9,7 +9,6 @@
 
 namespace slotdeck::plugins::ai {
 
-constexpr qsizetype transportMaximumMessageBytes = 8 * 1024 * 1024;
 constexpr int transportTerminationGraceMs = 2000;
 
 AiMcpTransport::AiMcpTransport(QString command, QStringList arguments, QString workdir) : m_command(std::move(command)), m_arguments(std::move(arguments)), m_workdir(std::move(workdir)) {}
@@ -70,7 +69,7 @@ void AiMcpTransport::shutdown() {
 void AiMcpTransport::readMessages() {
     m_buffer.append(m_process->readAllStandardOutput());
 
-    if (m_buffer.size() > transportMaximumMessageBytes) {
+    if (m_buffer.size() > mcpMaximumMessageBytes) {
         emit failed(QStringLiteral("ai_mcp_message_too_large"), QStringLiteral("The MCP server message exceeded the permitted size"));
         return;
     }
