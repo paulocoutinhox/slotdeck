@@ -311,7 +311,15 @@ class ComponentsHelper final {
     static QString hardBreaks(const QString& text);
     static QString emojiFontFamily();
     static void resolveCodeFamily(QTextDocument* document, const QString& family);
+    static int standardControlHeight(QWidget* parent);
 };
+
+// The height of a text control is what the platform and the active style make it, so it is measured rather than declared.
+int ComponentsHelper::standardControlHeight(QWidget* parent) {
+    QComboBox reference(parent);
+    reference.setVisible(false);
+    return reference.sizeHint().height();
+}
 
 // The Markdown reader names a family only on the runs it read as code, and which name that is differs by platform, so the run is found by the property rather than by its value.
 void ComponentsHelper::resolveCodeFamily(QTextDocument* document, const QString& family) {
@@ -796,7 +804,7 @@ void addSettingsRow(QFormLayout* form, const QString& label, QWidget* field) {
     }
 
     // Every row is the same height whatever it carries, because one that shrinks around a toggle reads as a different kind of row.
-    field->setMinimumHeight(theme.metric(ThemeMetric::SettingsRowHeight));
+    field->setMinimumHeight(ComponentsHelper::standardControlHeight(field->parentWidget()));
 
     auto* row = new QWidget(field->parentWidget());
     auto* rowLayout = new QHBoxLayout(row);

@@ -2406,5 +2406,4 @@ TEST(ComponentsTest, GivesEverySettingsRowTheSameHeightWhateverControlItCarries)
     auto* selectable = form->itemAt(0, QFormLayout::FieldRole)->widget();
     auto* switched = form->itemAt(1, QFormLayout::FieldRole)->widget();
     EXPECT_EQ(switched->height(), selectable->height());
-    EXPECT_EQ(switched->height(), theme.metric(slotdeck::ui::ThemeMetric::SettingsRowHeight));
 }

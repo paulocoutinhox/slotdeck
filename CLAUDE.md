@@ -118,7 +118,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The empty state of a settings surface states what is missing and never explains what the missing thing is for.
 - Exactly one single-pixel divider separates every pair of sections on a settings page, so a group of one section carries none.
 - A settings row spans the whole width with its caption on the left and its control against the right edge, and a toggle never carries its own caption.
-- Every settings row is the same height whatever control it carries, because a row that shrinks around a toggle reads as a different kind of row, and that height is a theme metric rather than whatever each control asks for.
+- Every settings row is the same height whatever control it carries, because a row that shrinks around a toggle reads as a different kind of row, and that height is measured from a text control of the running platform rather than declared as a number.
 - A caption asks for the width its own words need and wraps only past the readable bound, because a column narrower than the words breaks them while the row still has room.
 - A settings control that carries text grows to the shared readable width and shrinks with a narrow window, while a control of fixed size keeps its own width against the right edge.
 - A field the user types several lines into is the shared text field, which declares its own border and its own raised background, because a surface painted like the window behind it does not read as somewhere to type.
