@@ -81,12 +81,20 @@ TEST(CronExpressionTest, AppliesPOSIXDayMatchingAndRejectsExtensionsOrMalformedF
     EXPECT_EQ(CronExpression::parse(QStringLiteral("60 * * * *")).error().code, QStringLiteral("ai_tasks_cron_value_invalid"));
 }
 
-TEST(AiTaskRepositoryTest, DeclaresOneCreatingMigrationAndRoundTripsWorkspacesTasksAndQueue) {
+TEST(AiTaskRepositoryTest, DeclaresConsecutiveMigrationsAndRoundTripsWorkspacesTasksAndQueue) {
     test::TestPluginHost host;
     AiTaskRepository repository(host);
     ASSERT_TRUE(repository.initialize().hasValue());
-    ASSERT_EQ(host.appliedMigrations.size(), 1);
-    EXPECT_EQ(host.appliedMigrations.first().version, 1);
+    ASSERT_EQ(host.appliedMigrations.size(), 2);
+
+    // A version that follows the creating one evolves the schema instead of rewriting it, because what a task recorded must survive the change.
+    for (int index = 0; index < host.appliedMigrations.size(); ++index) {
+        EXPECT_EQ(host.appliedMigrations.at(index).version, index + 1);
+    }
+
+    for (const auto& statement : host.appliedMigrations.last().statements) {
+        EXPECT_TRUE(statement.startsWith(QStringLiteral("ALTER TABLE ai_tasks_"))) << statement.toStdString();
+    }
 
     for (const auto& statement : host.appliedMigrations.first().statements) {
         EXPECT_TRUE(statement.startsWith(QStringLiteral("CREATE "))) << statement.toStdString();
@@ -184,7 +192,7 @@ TEST(AiPluginTest, PublishesCompleteMetadataAndRejectsUnknownRequests) {
     AiPlugin plugin;
     EXPECT_EQ(plugin.id(), QStringLiteral("ai"));
     EXPECT_EQ(plugin.dependencies(), QStringList{QStringLiteral("logs")});
-    EXPECT_EQ(plugin.databaseSchemaVersion(), 1);
+    EXPECT_EQ(plugin.databaseSchemaVersion(), 2);
     EXPECT_EQ(plugin.navigationItems(host.theme()).size(), 1);
     EXPECT_EQ(plugin.navigationItems(host.theme()).at(0).id, QStringLiteral("tasks"));
     EXPECT_FALSE(plugin.styleSheet(host.theme()).isEmpty());
@@ -565,8 +573,26 @@ TEST(AiProviderCatalogTest, LoadsEveryModelDeclaredByTheCatalogFile) {
             EXPECT_EQ(found->maximumOutputTokens, model.value(QStringLiteral("output")).toInt());
             EXPECT_EQ(found->traits.contains(ModelTrait::FunctionCalling), model.value(QStringLiteral("traits")).toArray().contains(QStringLiteral("function-calling")));
             EXPECT_FALSE(found->displayName.isEmpty());
+            // A price the file publishes reaches the catalog, and one it does not publish stays absent rather than reading as free.
+            EXPECT_EQ(found->inputCostPerToken.has_value(), model.contains(QStringLiteral("inputCost")));
+            EXPECT_EQ(found->outputCostPerToken.has_value(), model.contains(QStringLiteral("outputCost")));
+            if (found->inputCostPerToken.has_value()) {
+                EXPECT_DOUBLE_EQ(found->inputCostPerToken.value(), model.value(QStringLiteral("inputCost")).toDouble());
+            }
         }
     }
+
+    // What a run of that many tokens cost is answered from the price the catalog carries, and a model nobody priced answers nothing.
+    const ProviderDescriptor* openai = findProvider(QStringLiteral("openai"));
+    ASSERT_NE(openai, nullptr);
+    const ModelDescriptor* priced = findModel(*openai, QStringLiteral("gpt-4o"));
+    ASSERT_NE(priced, nullptr);
+    ASSERT_TRUE(priced->inputCostPerToken.has_value());
+    const auto spent = runCost(QStringLiteral("openai"), QStringLiteral("gpt-4o"), 1000, 500);
+    ASSERT_TRUE(spent.has_value());
+    EXPECT_DOUBLE_EQ(spent.value(), 1000.0 * priced->inputCostPerToken.value() + 500.0 * priced->outputCostPerToken.value());
+    EXPECT_FALSE(runCost(QStringLiteral("openai"), QStringLiteral("a-model-nobody-declares"), 10, 10).has_value());
+    EXPECT_FALSE(runCost(QStringLiteral("a-provider-nobody-declares"), QStringLiteral("gpt-4o"), 10, 10).has_value());
 
     // The tunable limits come from the catalog as well, each inside the range that keeps it sane.
     EXPECT_GT(aiLimits().repeatedToolCallLimit, 0);
@@ -3167,6 +3193,45 @@ TEST(AiProviderCatalogTest, RefusesEveryMalformedCommandLineProviderItDeclaresAR
     ASSERT_FALSE(wireWithProgram.isEmpty());
     wireWithProgram.insert(QStringLiteral("command"), QJsonObject{{QStringLiteral("program"), QStringLiteral("openai")}, {QStringLiteral("arguments"), QJsonArray{QStringLiteral("{prompt}")}}});
     EXPECT_FALSE(loadAiCatalog(onlyThis(wireWithProgram), models).hasValue()) << "a provider reached over a wire declared a program";
+}
+
+// A price is data like every other field of the catalog, so one written in a shape nobody declares rejects the plugin rather than reaching a run.
+TEST(AiProviderCatalogTest, RefusesAModelPriceThatIsNotANumberOrIsBelowZero) {
+    QFile providersFile(QStringLiteral(":/slotdeck/ai/assets/providers.json"));
+    ASSERT_TRUE(providersFile.open(QIODevice::ReadOnly));
+    const QJsonObject shipped = QJsonDocument::fromJson(providersFile.readAll()).object();
+    QJsonObject openai;
+
+    for (const auto& value : shipped.value(QStringLiteral("providers")).toArray()) {
+        if (value.toObject().value(QStringLiteral("id")).toString() == QStringLiteral("openai")) {
+            openai = value.toObject();
+        }
+    }
+
+    ASSERT_FALSE(openai.isEmpty());
+    openai.insert(QStringLiteral("preferredModels"), QJsonArray{QStringLiteral("gpt-4o")});
+    QJsonObject onlyOpenAi = shipped;
+    onlyOpenAi.insert(QStringLiteral("providers"), QJsonArray{openai});
+    const QByteArray providers = QJsonDocument(onlyOpenAi).toJson(QJsonDocument::Compact);
+    // clang-format off
+    const auto withCost = [](const QJsonValue& input, const QJsonValue& output) {
+        QJsonObject model{{QStringLiteral("id"), QStringLiteral("gpt-4o")}, {QStringLiteral("name"), QStringLiteral("GPT-4o")}, {QStringLiteral("context"), 128000}, {QStringLiteral("output"), 16384}, {QStringLiteral("traits"), QJsonArray{QStringLiteral("function-calling"), QStringLiteral("sampling")}}};
+        if (!input.isNull()) { model.insert(QStringLiteral("inputCost"), input); }
+        if (!output.isNull()) { model.insert(QStringLiteral("outputCost"), output); }
+        return QJsonDocument(QJsonObject{{QStringLiteral("providers"), QJsonObject{{QStringLiteral("openai"), QJsonArray{model}}}}}).toJson(QJsonDocument::Compact);
+    };
+    // clang-format on
+
+    ASSERT_TRUE(loadAiCatalog(providers, withCost(2.5e-06, 1e-05)).hasValue());
+    ASSERT_TRUE(loadAiCatalog(providers, withCost(QJsonValue::Null, QJsonValue::Null)).hasValue());
+
+    const QVector<QPair<QString, QByteArray>> refused{{QStringLiteral("a price written as text"), withCost(QStringLiteral("2.5e-06"), 1e-05)}, {QStringLiteral("a price below zero"), withCost(-1.0, 1e-05)}, {QStringLiteral("an answer price written as text"), withCost(2.5e-06, QStringLiteral("cheap"))}};
+
+    for (const auto& shape : refused) {
+        const auto rejected = loadAiCatalog(providers, shape.second);
+        ASSERT_FALSE(rejected.hasValue()) << shape.first.toStdString() << " was accepted";
+        EXPECT_EQ(rejected.error().code, QStringLiteral("ai_catalog_invalid")) << shape.first.toStdString();
+    }
 }
 
 // The prompt reaches the agent as written, because no shell reads the arguments it is given.

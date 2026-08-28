@@ -13,6 +13,7 @@
 #include <QHeaderView>
 #include <QJsonDocument>
 #include <QLabel>
+#include <QLocale>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QScrollBar>
@@ -39,6 +40,7 @@ class AiTaskInfoDialogHelper final {
     static int rowOfEntry(const QVector<ExecutionLogEntry>& entries, const QString& entryId);
     static QString entryAt(const QVector<ExecutionLogEntry>& entries, int row);
     static QString statusKey(ExecutionStatus status);
+    static QString costText(const TaskExecution& execution);
     static QString kindKey(ExecutionLogKind kind);
     static QString levelKey(ExecutionLogLevel level);
 };
@@ -60,6 +62,12 @@ QString AiTaskInfoDialogHelper::statusKey(ExecutionStatus status) {
 
 QString AiTaskInfoDialogHelper::kindKey(ExecutionLogKind kind) {
     return QStringLiteral("ai.log-kind.") + AiTaskRepository::executionLogKindName(kind);
+}
+
+// A run whose model or price the catalog does not declare reports no cost rather than one that reads as free.
+QString AiTaskInfoDialogHelper::costText(const TaskExecution& execution) {
+    const auto spent = runCost(execution.providerId, execution.modelId, execution.inputTokens, execution.outputTokens);
+    return spent.has_value() ? QStringLiteral("USD %1").arg(QLocale::system().toString(spent.value(), 'f', 4)) : QString{};
 }
 
 int AiTaskInfoDialogHelper::rowOf(const QVector<TaskExecution>& executions, const QString& executionId) {
@@ -142,7 +150,7 @@ AiTaskInfoDialog::AiTaskInfoDialog(AiPlugin& plugin, PluginHost& host, const AiT
     auto* executionsLayout = new QVBoxLayout(executionsPage);
     executionsLayout->setContentsMargins(0, 0, 0, 0);
     executionsLayout->setSpacing(0);
-    m_executionGrid = ui::dataGrid({m_host.translate(QStringLiteral("ai.execution.started")), m_host.translate(QStringLiteral("ai.execution.status")), m_host.translate(QStringLiteral("ai.execution.tokens")), m_host.translate(QStringLiteral("ai.execution.finish-reason")), m_host.translate(QStringLiteral("ai.execution.error"))}, executionsPage);
+    m_executionGrid = ui::dataGrid({m_host.translate(QStringLiteral("ai.execution.started")), m_host.translate(QStringLiteral("ai.execution.status")), m_host.translate(QStringLiteral("ai.execution.tokens")), m_host.translate(QStringLiteral("ai.execution.cost")), m_host.translate(QStringLiteral("ai.execution.finish-reason")), m_host.translate(QStringLiteral("ai.execution.error"))}, executionsPage);
     m_executionGrid->setObjectName(QStringLiteral("aiExecutionGrid"));
     m_executionGrid->setWordWrap(true);
     m_executionGrid->verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
@@ -264,8 +272,9 @@ void AiTaskInfoDialog::showExecutions(const utils::Result<QVector<TaskExecution>
         m_executionGrid->setItem(row, 0, new QTableWidgetItem(ui::localTimestamp(execution.startedAtUtc)));
         m_executionGrid->setItem(row, 1, new QTableWidgetItem(m_host.translate(AiTaskInfoDialogHelper::statusKey(execution.status))));
         m_executionGrid->setItem(row, 2, new QTableWidgetItem(m_host.translate(QStringLiteral("ai.execution.token-usage")).arg(QString::number(execution.inputTokens), QString::number(execution.outputTokens))));
-        m_executionGrid->setItem(row, 3, new QTableWidgetItem(execution.finishReason));
-        m_executionGrid->setItem(row, 4, new QTableWidgetItem(execution.errorMessage));
+        m_executionGrid->setItem(row, 3, new QTableWidgetItem(AiTaskInfoDialogHelper::costText(execution)));
+        m_executionGrid->setItem(row, 4, new QTableWidgetItem(execution.finishReason));
+        m_executionGrid->setItem(row, 5, new QTableWidgetItem(execution.errorMessage));
     }
 
     const int wanted = AiTaskInfoDialogHelper::rowOf(m_executions, reading);

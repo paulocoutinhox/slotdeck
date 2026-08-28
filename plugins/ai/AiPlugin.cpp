@@ -180,7 +180,7 @@ QStringList AiPlugin::dependencies() const {
 }
 
 int AiPlugin::databaseSchemaVersion() const {
-    return 1;
+    return 2;
 }
 
 TranslationCatalog AiPlugin::translations() const {
@@ -2285,6 +2285,9 @@ void AiPlugin::completeExecution(const QString& taskId, ExecutionStatus status, 
 
     const bool cancelled = m_cancelledTaskIds.remove(taskId);
     TaskExecution record = position->record;
+    // A run is priced by what it really spoke to, so the connection it ran on is recorded rather than resolved later from one that may have moved.
+    record.providerId = position->connection.providerId;
+    record.modelId = position->connection.modelId;
     m_phases.remove(taskId);
     m_phasesBeforeThrottle.remove(taskId);
 

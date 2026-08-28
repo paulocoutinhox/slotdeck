@@ -57,6 +57,9 @@ struct ModelDescriptor final {
     QSet<ModelTrait> traits;
     int contextWindow{0};
     int maximumOutputTokens{0};
+    // The price a service publishes per token, absent for a model nobody published one for.
+    std::optional<double> inputCostPerToken;
+    std::optional<double> outputCostPerToken;
 };
 
 struct ProviderDescriptor final {
@@ -112,6 +115,9 @@ struct AiCatalog final {
 [[nodiscard]] const utils::Result<void>& aiCatalogError();
 [[nodiscard]] const ProviderDescriptor* findProvider(const QString& providerId);
 [[nodiscard]] const ModelDescriptor* findModel(const ProviderDescriptor& provider, const QString& modelId);
+
+// What a run of that many tokens cost, absent when the model or its price is not declared.
+[[nodiscard]] std::optional<double> runCost(const QString& providerId, const QString& modelId, qint64 inputTokens, qint64 outputTokens);
 [[nodiscard]] QSet<ModelTrait> modelTraits(const ProviderDescriptor& provider, const QString& modelId);
 // The trait is named as the catalog file spells it, because that is the name the reader of a prompt already knows.
 [[nodiscard]] QString modelTraitIdentifier(ModelTrait trait);

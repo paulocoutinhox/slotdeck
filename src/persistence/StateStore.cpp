@@ -28,7 +28,7 @@ class StateStoreHelper final {
     static utils::Error databaseError(const QString& code, const QString& message, const QSqlError& error);
     static utils::Result<void> validatePluginStatementOwnership(const QString& pluginId, const QString& statement);
     static QString normalizedDefinition(const QString& statement);
-    static QSet<QString> declaredObjects(const QVector<DatabaseMigration>& migrations);
+    static utils::Result<QSet<QString>> declaredObjects(const QString& pluginId, const QVector<DatabaseMigration>& migrations);
 };
 
 const QRegularExpression& StateStoreHelper::pluginIdPattern() {
@@ -45,16 +45,43 @@ QString StateStoreHelper::normalizedDefinition(const QString& statement) {
     return QString(statement).remove(QLatin1Char('"')).simplified();
 }
 
-QSet<QString> StateStoreHelper::declaredObjects(const QVector<DatabaseMigration>& migrations) {
+// The schema a plugin declares is what its migrations produce rather than the text they are written as, so a table a later version altered is compared against what that alteration really made.
+utils::Result<QSet<QString>> StateStoreHelper::declaredObjects(const QString& pluginId, const QVector<DatabaseMigration>& migrations) {
+    const QString connectionName = QStringLiteral("slotdeck-schema-%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
     QSet<QString> declared;
+    utils::Result<QSet<QString>> outcome = utils::Result<QSet<QString>>::failure({"plugin_database_schema_unreadable", "The declared plugin database schema could not be built", pluginId});
+    {
+        QSqlDatabase scratch = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
+        scratch.setDatabaseName(QStringLiteral(":memory:"));
 
-    for (const auto& migration : migrations) {
-        for (const auto& statement : migration.statements) {
-            declared.insert(normalizedDefinition(statement));
+        if (scratch.open()) {
+            bool applied = true;
+
+            for (const auto& migration : migrations) {
+                for (const auto& statement : migration.statements) {
+                    QSqlQuery command(scratch);
+                    applied = applied && command.exec(statement);
+                }
+            }
+
+            QSqlQuery reading(scratch);
+            const QString prefix = QString(pluginId).replace(QLatin1Char('-'), QLatin1Char('_')) + QLatin1Char('_');
+            reading.prepare(QStringLiteral("SELECT sql FROM sqlite_schema WHERE type IN ('table', 'index') AND sql IS NOT NULL AND substr(name, 1, ?) = ?"));
+            reading.addBindValue(prefix.size());
+            reading.addBindValue(prefix);
+
+            if (applied && reading.exec()) {
+                while (reading.next()) {
+                    declared.insert(normalizedDefinition(reading.value(0).toString()));
+                }
+                outcome = utils::Result<QSet<QString>>::success(declared);
+            }
+
+            scratch.close();
         }
     }
-
-    return declared;
+    QSqlDatabase::removeDatabase(connectionName);
+    return outcome;
 }
 
 utils::Result<void> StateStoreHelper::validatePluginStatementOwnership(const QString& pluginId, const QString& statement) {
@@ -416,7 +443,12 @@ utils::Result<void> StateStore::validatePluginSchema(const QString& pluginId, co
         stored.insert(StateStoreHelper::normalizedDefinition(row.value(QStringLiteral("sql")).toString()));
     }
 
-    if (stored != StateStoreHelper::declaredObjects(migrations)) {
+    const auto declared = StateStoreHelper::declaredObjects(pluginId, migrations);
+
+    if (!declared.hasValue()) {
+        return utils::Result<void>::failure(declared.error());
+    }
+    if (stored != declared.value()) {
         return utils::Result<void>::failure({"plugin_database_schema_invalid", "The stored plugin database schema does not match the one the plugin declares", pluginId});
     }
 

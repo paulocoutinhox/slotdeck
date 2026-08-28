@@ -125,6 +125,9 @@ struct TaskExecution final {
     QString errorMessage;
     QString content;
     AgentStopReason stopReason{AgentStopReason::Answered};
+    // The run is priced by what it really spoke to, and a run recorded before the product knew that carries neither.
+    QString providerId{};
+    QString modelId{};
 };
 
 struct TaskSchedule final {

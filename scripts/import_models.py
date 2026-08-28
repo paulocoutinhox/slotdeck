@@ -81,7 +81,13 @@ def main() -> int:
         # the source omits the flag for the models that accept a system role, which is the majority.
         if entry.get("supports_system_messages", True):
             traits.append("system-prompt")
-        catalog[provider].append({"id": identifier, "context": context, "output": output, "traits": traits})
+        model = {"id": identifier, "context": context, "output": output, "traits": traits}
+        # the price the service publishes, carried only when the source declares it.
+        for field, key in (("input_cost_per_token", "inputCost"), ("output_cost_per_token", "outputCost")):
+            price = entry.get(field)
+            if isinstance(price, (int, float)) and price >= 0:
+                model[key] = float(price)
+        catalog[provider].append(model)
 
     # a model added by hand survives a regeneration, so the file stays the one place models are edited.
     target = Path(__file__).resolve().parent.parent / "plugins" / "ai" / "assets" / "models.json"

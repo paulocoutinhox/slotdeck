@@ -137,6 +137,37 @@ TEST(StateStoreTest, CreatesAndPersistsCoreStateAndPluginOwnedSchema) {
     EXPECT_EQ(rows.value().first().value(QStringLiteral("value")).toString(), QStringLiteral("persisted"));
 }
 
+// What a plugin recorded survives the version that evolves its schema, because that history is the memory of the feature and only the reader removes it.
+TEST(StateStoreTest, KeepsWhatAPluginStoredWhenALaterVersionEvolvesItsSchema) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    persistence::StateStore store(directory.filePath(QStringLiteral("slotdeck.sqlite3")));
+    ASSERT_TRUE(store.initialize().hasValue());
+
+    const QString creating = QStringLiteral("CREATE TABLE sample_runs(id TEXT PRIMARY KEY, tokens INTEGER NOT NULL)");
+    const QVector<persistence::DatabaseMigration> first{{1, {creating}}};
+    ASSERT_TRUE(store.migratePluginDatabase(QStringLiteral("sample"), first).hasValue());
+    ASSERT_TRUE(store.executePluginDatabase(QStringLiteral("sample"), QStringLiteral("INSERT INTO sample_runs(id, tokens) VALUES(?, ?)"), {QStringLiteral("run-1"), 42}).hasValue());
+
+    const QVector<persistence::DatabaseMigration> evolved{{1, {creating}}, {2, {QStringLiteral("ALTER TABLE sample_runs ADD COLUMN model_id TEXT NOT NULL DEFAULT ''")}}};
+    ASSERT_TRUE(store.migratePluginDatabase(QStringLiteral("sample"), evolved).hasValue());
+    EXPECT_EQ(store.pluginSchemaVersion(QStringLiteral("sample")).value(), 2);
+
+    // The row written before the change is still there, and the column the change added is empty for it.
+    const auto rows = store.queryPluginDatabase(QStringLiteral("sample"), QStringLiteral("SELECT id, tokens, model_id FROM sample_runs"), {});
+    ASSERT_TRUE(rows.hasValue()) << rows.error().message.toStdString();
+    ASSERT_EQ(rows.value().size(), 1);
+    EXPECT_EQ(rows.value().first().value(QStringLiteral("id")).toString(), QStringLiteral("run-1"));
+    EXPECT_EQ(rows.value().first().value(QStringLiteral("tokens")).toInt(), 42);
+    EXPECT_TRUE(rows.value().first().value(QStringLiteral("model_id")).toString().isEmpty());
+
+    // Opening again with the same migrations changes nothing, because the schema is compared against what those migrations produce.
+    ASSERT_TRUE(store.migratePluginDatabase(QStringLiteral("sample"), evolved).hasValue());
+    const auto again = store.queryPluginDatabase(QStringLiteral("sample"), QStringLiteral("SELECT id FROM sample_runs"), {});
+    ASSERT_TRUE(again.hasValue());
+    EXPECT_EQ(again.value().size(), 1);
+}
+
 TEST(StateStoreTest, ReportsPathMigrationAndTransactionErrors) {
     persistence::StateStore emptyPath(QString{});
     EXPECT_EQ(emptyPath.initialize().error().code, QStringLiteral("database_path_invalid"));
@@ -1929,7 +1960,7 @@ TEST(PluginManagerIntegrationTest, DiscoversInitializesAndBuildsThePluginDrivenI
     ASSERT_TRUE(manager.initialize(directory.path(), store, databaseExecutor).hasValue());
     EXPECT_EQ(manager.initialize(directory.path(), store, databaseExecutor).error().code, QStringLiteral("plugin_already_initialized"));
     EXPECT_EQ(store.pluginSchemaVersion(QStringLiteral("logs")).value(), 1);
-    EXPECT_EQ(store.pluginSchemaVersion(QStringLiteral("ai")).value(), 1);
+    EXPECT_EQ(store.pluginSchemaVersion(QStringLiteral("ai")).value(), 2);
     EXPECT_EQ(store.pluginSchemaVersion(QStringLiteral("terminal")).value(), 1);
     EXPECT_EQ(store.pluginSchemaVersion(QStringLiteral("web-server")).value(), 1);
     EXPECT_EQ(store.pluginSchemaVersion(QStringLiteral("browser")).value(), 1);
@@ -1975,7 +2006,7 @@ TEST(PluginManagerIntegrationTest, DiscoversInitializesAndBuildsThePluginDrivenI
     }
 
     EXPECT_EQ(manager.pluginTitle(QStringLiteral("missing")), QStringLiteral("missing"));
-    const QHash<QString, int> expectedSchemaVersions{{QStringLiteral("logs"), 1}, {QStringLiteral("ai"), 1}, {QStringLiteral("terminal"), 1}, {QStringLiteral("web-server"), 1}, {QStringLiteral("browser"), 1}, {QStringLiteral("code-editor"), 1}};
+    const QHash<QString, int> expectedSchemaVersions{{QStringLiteral("logs"), 1}, {QStringLiteral("ai"), 2}, {QStringLiteral("terminal"), 1}, {QStringLiteral("web-server"), 1}, {QStringLiteral("browser"), 1}, {QStringLiteral("code-editor"), 1}};
     EXPECT_EQ(manager.databaseSchemaVersions(), expectedSchemaVersions);
     EXPECT_EQ(manager.translate(QStringLiteral("missing.general.key")), QStringLiteral("missing.general.key"));
     EXPECT_FALSE(manager.styleSheet().isEmpty());
@@ -2303,10 +2334,10 @@ TEST(PluginManagerIntegrationTest, HoldsEveryPluginToTheContractTheStandardState
 
     EXPECT_EQ(asked, owners.size()) << "a plugin was never asked how it answers a topic it does not implement";
 
-    // Every plugin that declares a schema declares version one and owns the tables carrying its own prefix.
+    // Every plugin that declares a schema owns the tables carrying its own prefix, and its version counts from the creating migration.
     const auto versions = manager.databaseSchemaVersions();
     for (auto version = versions.constBegin(); version != versions.constEnd(); ++version) {
-        EXPECT_EQ(version.value(), 1) << version.key().toStdString();
+        EXPECT_GE(version.value(), 1) << version.key().toStdString();
         EXPECT_TRUE(owners.contains(version.key())) << version.key().toStdString();
     }
 

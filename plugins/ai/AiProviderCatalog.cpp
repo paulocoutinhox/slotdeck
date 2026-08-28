@@ -27,6 +27,7 @@ class AiProviderCatalogHelper final {
     static utils::Result<CommandLineDescriptor> commandLineDescriptor(const QJsonObject& document, const QString& providerId);
     static std::optional<ParameterType> parameterTypeFromIdentifier(const QString& identifier);
     static utils::Result<QSet<ModelTrait>> traitSet(const QJsonValue& value, const QString& detail);
+    static utils::Result<std::optional<double>> readModelCost(const QJsonObject& entry, const QString& key, const QString& modelId);
     static utils::Result<QStringList> stringList(const QJsonValue& value, const QString& detail);
     static utils::Result<QMap<QString, QString>> stringMap(const QJsonValue& value, const QString& detail);
     static utils::Result<QVector<ParameterOption>> parameterOptions(const QJsonValue& value, const QString& detail);
@@ -157,6 +158,21 @@ std::optional<ParameterType> AiProviderCatalogHelper::parameterTypeFromIdentifie
     }
 
     return std::nullopt;
+}
+
+// A price nobody published is absent rather than free, so a model without one reports no cost at all.
+utils::Result<std::optional<double>> AiProviderCatalogHelper::readModelCost(const QJsonObject& entry, const QString& key, const QString& modelId) {
+    if (!entry.contains(key)) {
+        return utils::Result<std::optional<double>>::success(std::nullopt);
+    }
+
+    const QJsonValue value = entry.value(key);
+
+    if (!value.isDouble() || value.toDouble() < 0.0) {
+        return utils::Result<std::optional<double>>::failure(invalid(QStringLiteral("A catalog model carries an invalid price"), modelId));
+    }
+
+    return utils::Result<std::optional<double>>::success(value.toDouble());
 }
 
 utils::Result<QSet<ModelTrait>> AiProviderCatalogHelper::traitSet(const QJsonValue& value, const QString& detail) {
@@ -476,7 +492,7 @@ utils::Result<QVector<ModelDescriptor>> AiProviderCatalogHelper::importedModels(
 
     for (const auto& value : entries) {
         const QJsonObject entry = value.toObject();
-        if (!hasKnownKeys(entry, {QStringLiteral("id"), QStringLiteral("name"), QStringLiteral("context"), QStringLiteral("output"), QStringLiteral("traits")})) {
+        if (!hasKnownKeys(entry, {QStringLiteral("id"), QStringLiteral("name"), QStringLiteral("context"), QStringLiteral("output"), QStringLiteral("traits"), QStringLiteral("inputCost"), QStringLiteral("outputCost")})) {
             return utils::Result<QVector<ModelDescriptor>>::failure(invalid(QStringLiteral("A catalog model carries an unknown value"), providerId));
         }
 
@@ -486,6 +502,18 @@ utils::Result<QVector<ModelDescriptor>> AiProviderCatalogHelper::importedModels(
         if (!typed || model.id.isEmpty() || model.contextWindow <= 0 || model.maximumOutputTokens <= 0) {
             return utils::Result<QVector<ModelDescriptor>>::failure(invalid(QStringLiteral("A catalog model is invalid"), model.id.isEmpty() ? providerId : model.id));
         }
+
+        const auto inputCost = readModelCost(entry, QStringLiteral("inputCost"), model.id);
+        const auto outputCost = readModelCost(entry, QStringLiteral("outputCost"), model.id);
+        if (!inputCost.hasValue()) {
+            return utils::Result<QVector<ModelDescriptor>>::failure(inputCost.error());
+        }
+        if (!outputCost.hasValue()) {
+            return utils::Result<QVector<ModelDescriptor>>::failure(outputCost.error());
+        }
+
+        model.inputCostPerToken = inputCost.value();
+        model.outputCostPerToken = outputCost.value();
 
         const auto traits = traitSet(entry.value(QStringLiteral("traits")), model.id);
         if (!traits.hasValue()) {
@@ -641,6 +669,22 @@ const ModelDescriptor* findModel(const ProviderDescriptor& provider, const QStri
     }
 
     return nullptr;
+}
+
+std::optional<double> runCost(const QString& providerId, const QString& modelId, qint64 inputTokens, qint64 outputTokens) {
+    const ProviderDescriptor* provider = findProvider(providerId);
+
+    if (provider == nullptr || inputTokens < 0 || outputTokens < 0) {
+        return std::nullopt;
+    }
+
+    const ModelDescriptor* model = findModel(*provider, modelId);
+
+    if (model == nullptr || !model->inputCostPerToken.has_value() || !model->outputCostPerToken.has_value()) {
+        return std::nullopt;
+    }
+
+    return static_cast<double>(inputTokens) * model->inputCostPerToken.value() + static_cast<double>(outputTokens) * model->outputCostPerToken.value();
 }
 
 // A model outside the catalog keeps the trait set the provider declares for its own models instead of an inferred capability.

@@ -265,7 +265,7 @@ TEST(AiTaskInfoDialogTest, PresentsExecutionsLogsAndExplainsAnEmptyOutput) {
     // clang-format on
     ASSERT_EQ(executionGrid->rowCount(), 1);
     EXPECT_EQ(executionGrid->item(0, 1)->text(), QStringLiteral("Failed"));
-    EXPECT_EQ(executionGrid->item(0, 4)->text(), failed.errorMessage);
+    EXPECT_EQ(executionGrid->item(0, 5)->text(), failed.errorMessage);
     EXPECT_EQ(logGrid->item(0, 2)->text(), host.translations.value(QStringLiteral("ai.log-kind.failed")));
     EXPECT_EQ(logGrid->item(0, 3)->text(), failed.errorMessage);
 

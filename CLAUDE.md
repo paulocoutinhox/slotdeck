@@ -308,9 +308,10 @@ Newer explicit product requirements take precedence when they intentionally repl
 ## Persistence architecture
 
 - The source of truth is one `slotdeck.sqlite3` database in the application local data directory.
-- Every schema is declared as one creating migration until the first release, and from the first release a structural change adds the next version instead of rewriting that one.
+- A structural change adds the next version and never rewrites the creating one, because what a plugin recorded is data the reader owns and rewriting that migration drops the schema and takes it with them.
+- The schema a plugin declares is what its migrations produce rather than the text they are written as, so it is built once in memory and read back, and a table a later version altered is compared against what that alteration really made.
 - Application data uses the native writable local data location selected by the operating system and never assumes a writable home-directory layout.
-- Every schema is declared as one single migration that creates the complete set of tables and indexes, and no migration alters, drops or rewrites an existing object before the first release.
+- The creating migration declares the complete set of tables and indexes, and every later version alters what it declared instead of being folded back into it.
 - Core schema evolution uses SQLite `PRAGMA user_version` and creates the complete schema when the version is zero.
 - A stored database this version cannot read is set aside under a name of its own and a new one takes its place, because nothing stored may keep the application from opening.
 - The write-ahead log of that database goes with it, because what was committed last is only there, and it never stays beside the database that replaced it.
@@ -339,7 +340,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The scoped database host accepts only the explicit SQL grammar required by current plugin migrations and runtime operations.
 - Scoped statements reject multiple commands, comments, quoted identifiers, comma-separated sources, parenthesized sources and unsupported schema objects before SQLite prepares them.
 - Every accepted scoped statement must identify at least one table or index owned by the caller's normalized identifier prefix and rejects every foreign table or index reference.
-- Each plugin declares its complete schema as the single version one migration in its implementation without external migration files.
+- Each plugin declares its migrations in its implementation without external migration files, numbered consecutively from the creating one.
 - The scoped host supplies the current schema version and applies the creating migration atomically.
 - A stored schema a plugin can no longer use is dropped and created again from the migrations that plugin declares, and only the objects carrying its identifier are touched.
 - The stored objects of a plugin are compared with the ones its migrations declare, so a schema that changed while its version stayed the same is rebuilt instead of failing on the first statement that reads it.
@@ -730,6 +731,9 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A provider nobody limited stores nothing, because a limit of zeros is what the absence already means.
 - A run that is waiting says so on its card and records the wait in its execution log, because a card that only says sending explains nothing.
 - Every run is recorded as an execution with its UTC start, UTC finish, status, token usage, finish reason, error message and returned content.
+- A run is recorded with the provider and the model it really spoke to, so what it cost is answered from the price of that model rather than from a connection that may have moved since.
+- The catalog carries the price a service publishes per token, and a model nobody published one for reports no cost at all rather than one that reads as free.
+- A price written in a shape nobody declares rejects the complete plugin, exactly like every other value of the catalog.
 - Execution statuses are exactly running, succeeded, failed and cancelled.
 - Execution log entries carry a UTC timestamp, a monotonic sequence, a level of debug, info, warning or error, a closed event kind and the exchanged payload.
 - The kind names the event in the interface language while the detail keeps the exchanged payload verbatim, because a request body is data and is never translated.
@@ -1521,6 +1525,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A settings row carrying a toggle is the same height as one carrying a selectable field, proven against the metric both resolve from.
 - [x] A tool call presents its line unwrapped when the surface has room, proven by a case that reads two lines back without the precise measurement.
 - [x] Every turn a summary replaced is still stored after the run that compacted it, because the history of a task is the memory of its agent.
+- [x] A plugin schema that gains a version keeps every row the previous one stored, proven by a case that loses the row against the comparison that read the migrations as text.
+- [x] The price of every model the catalog carries reaches it, a model nobody priced reports no cost, and a price of the wrong shape or below zero rejects the plugin.
 - [x] The view follows the reader instead of dragging them to the end of every message that arrives.
 - [x] AI tasks are grouped into renameable workspace tabs and rendered across the To Do, Doing, Blocked, Review and Done columns.
 - [x] AI task cards keep their own margin, use the filled play symbol and expose Play, Stop, Edit and Remove.
