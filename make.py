@@ -479,7 +479,7 @@ def stray_comments() -> list[str]:
     return found
 
 
-def task_lint(_: Context) -> None:
+def task_audit(_: Context) -> None:
     unguarded = unprotected_lambdas()
 
     if unguarded:
@@ -530,6 +530,10 @@ def task_lint(_: Context) -> None:
     if divergent:
         raise RuntimeError("Two implementations of one backend report a shared condition by one name, because only one of them compiles per platform:\n  " + "\n  ".join(divergent))
 
+
+# Cppcheck reads what the audits already read, so the audits run first and their findings are the ones a reader acts on.
+def task_lint(context: Context) -> None:
+    task_audit(context)
     run([
         executable("cppcheck"),
         "--enable=warning,performance,portability",
@@ -694,6 +698,7 @@ TASKS = {
     "doctor": task_doctor,
     "format": task_format,
     "format-check": task_format_check,
+    "audit": task_audit,
     "lint": task_lint,
     "package": task_package,
     "reset-data": task_reset_data,
@@ -715,7 +720,8 @@ TASK_DESCRIPTIONS = {
     "doctor": "Check required and optional development tools",
     "format": "Format all C and C++ source files",
     "format-check": "Validate C and C++ source formatting",
-    "lint": "Run Cppcheck against production sources",
+    "audit": "Run the audits this project declares for itself",
+    "lint": "Run those audits and then Cppcheck against production sources",
     "package": "Create the release package",
     "reset-data": "Remove the application database and every plugin state",
     "run": "Build and run the application",

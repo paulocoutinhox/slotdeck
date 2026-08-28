@@ -20,7 +20,10 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build cppcheck clang-format libgl1-mesa-dev libglu1-mesa-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libnss3 libnspr4 libasound2t64 libxdamage1 libxtst6 libxcomposite1 libxrandr2 libdrm2 libgbm1 libpulse0
+          sudo apt-get install -y ninja-build libgl1-mesa-dev libglu1-mesa-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libnss3 libnspr4 libasound2t64 libxdamage1 libxtst6 libxcomposite1 libxrandr2 libdrm2 libgbm1 libpulse0
+
+      - name: Audit
+        run: python3 make.py audit
 
       - name: Install Zig
         uses: mlugg/setup-zig@v2

@@ -1386,7 +1386,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The native run command is `python3 make.py run`.
 - The formatting command is `python3 make.py format`.
 - The verification command is `python3 make.py format-check`.
-- The lint command is `python3 make.py lint` and it audits the lambda guards and the comments before running Cppcheck.
+- The audit command is `python3 make.py audit` and it runs every audit this project declares for itself, which needs no tool the platform has to supply.
+- The lint command is `python3 make.py lint` and it runs those audits before running Cppcheck.
 - The sanitizer command is `python3 make.py sanitize`.
 - The registered test command is `python3 make.py test`.
 - The coverage report command is `python3 make.py coverage`.
@@ -1402,6 +1403,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 
 - Every push to the default branch and every pull request builds Linux, macOS and Windows through reusable GitHub Actions workflows.
 - Each platform workflow installs the pinned Qt 6.11 shared build with Qt WebEngine, installs Zig for the pinned Ghostty dependency, configures with Ninja, builds, runs the registered CTest suite and produces the platform package.
+- The Linux workflow runs the audits before it builds, because they are the rules this project writes for itself and they need no tool whose version the runner decides.
+- The formatting check and Cppcheck stay local, because the runner ships versions two releases apart from the ones the project is written against and either would refuse code that is correct.
 - Every platform workflow validates the produced package before uploading its artifact.
 - Every workflow job declares its own timeout, because a runner that stalls installing a dependency would otherwise hold the job for the six hours the platform allows by default.
 - macOS signing and notarization run only when the repository provides the signing certificate, the signing identity and the notarization credentials, and the build falls back to an ad-hoc signature for unsigned validation builds.
