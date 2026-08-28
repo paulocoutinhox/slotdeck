@@ -575,6 +575,33 @@ TEST(WebServerPluginTest, SerializesStartsAndCancelsThePendingRuntimeOperation) 
     EXPECT_EQ(cancelled.error().code, QStringLiteral("web_server_start_cancelled"));
     EXPECT_FALSE(plugin.webServerRunning(QStringLiteral("server-1")));
 }
+// A terminal that is no longer there takes its link and nothing else, because a server is configured independently of the terminal it was created from.
+TEST(WebServerPluginTest, DropsALinkWhoseTerminalIsGoneAndKeepsTheServerItBelongedTo) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    test::TestPluginHost host;
+    WebServerTestsHelper::configureWebDatabase(host, {{{QStringLiteral("id"), QStringLiteral("server-1")}, {QStringLiteral("name"), QStringLiteral("Preview")}, {QStringLiteral("root"), directory.path()}, {QStringLiteral("bind_host"), QStringLiteral("127.0.0.1")}, {QStringLiteral("port"), 8080}, {QStringLiteral("terminal_id"), QStringLiteral("terminal-1")}}});
+
+    // The workspace the product comes back to no longer holds the terminal that server was created from.
+    const QJsonObject withoutIt{{QStringLiteral("activeTerminalId"), QStringLiteral("terminal-2")}, {QStringLiteral("terminals"), QJsonArray{QJsonObject{{QStringLiteral("id"), QStringLiteral("terminal-2")}, {QStringLiteral("name"), QStringLiteral("Another")}, {QStringLiteral("cwd"), directory.path()}}}}};
+    WebServerTestsHelper::configureSnapshotReply(host, withoutIt);
+    plugins::webserver::WebServerPlugin plugin;
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    ASSERT_TRUE(plugin.webServerConfigured(QStringLiteral("server-1")));
+    EXPECT_EQ(plugin.webServerTerminalId(QStringLiteral("server-1")), QStringLiteral("terminal-1"));
+    QApplication::processEvents();
+
+    // The link is gone and the server is not, with its name, its root and its port exactly as they were.
+    EXPECT_TRUE(plugin.webServerConfigured(QStringLiteral("server-1")));
+    EXPECT_TRUE(plugin.webServerTerminalId(QStringLiteral("server-1")).isEmpty());
+    EXPECT_EQ(plugin.webServerName(QStringLiteral("server-1")), QStringLiteral("Preview"));
+    EXPECT_EQ(plugin.webServerPort(QStringLiteral("server-1")), 8080);
+
+    // What is written back keeps the configuration rather than removing it.
+    ASSERT_FALSE(host.databaseExecutions.isEmpty());
+    EXPECT_TRUE(host.databaseExecutions.last().value(QStringLiteral("statement")).toString().startsWith(QStringLiteral("INSERT INTO web_server_configurations")));
+}
+
 TEST(WebServerPluginTest, ValidatesEventsSnapshotsRemovalAndSettingsPersistence) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());

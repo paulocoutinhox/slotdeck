@@ -1535,6 +1535,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] The application keeps its data where the platform says unless the reader names a directory, and every way of naming one badly is refused.
 - [x] A database the previous version of the product left keeps its workspaces, its tasks and its runs when the AI schema gains its second version, proven against the real schema rather than a sample one.
 - [x] A group of three bookmarks removed beside an existing ungrouped one keeps all four, keeps their order and writes them numbered from zero.
+- [x] A workspace that comes back without the terminal a server was created from drops that link and keeps the server, with its name, its root and its port as they were.
 - [x] The cost of a run reaches the reader in the execution history, proven through the fake that answers the columns the real schema has.
 - [x] The price of every model the catalog carries reaches it, a model nobody priced reports no cost, and a price of the wrong shape or below zero rejects the plugin.
 - [x] The view follows the reader instead of dragging them to the end of every message that arrives.
