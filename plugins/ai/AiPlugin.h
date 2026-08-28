@@ -159,6 +159,7 @@ class AiPlugin final : public QObject, public PluginInterface {
     void reportSending(const QString& taskId);
     void reportThrottle(const QString& taskId, const QString& executionId, ThrottleReason reason, qint64 milliseconds);
     void releaseSummaryClient(const QString& taskId, AiChatClient* client);
+    void recordUsage(const QString& taskId, ChatUsage usage);
     void applySummary(const QString& taskId, const QString& executionId, const FittedConversation& fitted, const QString& summary);
     void handleToolCalls(const QString& taskId, const QString& content, const QVector<ToolCall>& calls);
     void dispatchPendingTools(const QString& taskId, const QString& executionId);

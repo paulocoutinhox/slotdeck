@@ -738,6 +738,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A provider nobody limited stores nothing, because a limit of zeros is what the absence already means.
 - A run that is waiting says so on its card and records the wait in its execution log, because a card that only says sending explains nothing.
 - Every run is recorded as an execution with its UTC start, UTC finish, status, token usage, finish reason, error message and returned content.
+- The call that summarises a conversation is part of the run that needed it, so what it spent is counted with everything else that run spent and reaches the cost the reader is shown.
 - A run is recorded with the provider and the model it really spoke to, so what it cost is answered from the price of that model rather than from a connection that may have moved since.
 - The catalog carries the price a service publishes per token, and a model nobody published one for reports no cost at all rather than one that reads as free.
 - A price written in a shape nobody declares rejects the complete plugin, exactly like every other value of the catalog.
@@ -1545,6 +1546,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Every write still waiting when the executor is destroyed reaches the disk, and a folder opened the moment before the product closes is there when it opens again.
 - [x] Every owner that keeps a committed copy guards it by revision, proven for the editor and for the AI by cases that roll back to the older value without that guard.
 - [x] Every one of the hundred and twenty eight continuations names the object it reaches or reaches nothing at all, and the lint command now refuses any other.
+- [x] A run that compacted reports the tokens its summary spent, and a command line agent reports no cost at all.
+- [x] Every plugin releases what it already took before returning a failure from initialization, checked against all eight.
 - [x] The cost of a run reaches the reader in the execution history, proven through the fake that answers the columns the real schema has.
 - [x] The price of every model the catalog carries reaches it, a model nobody priced reports no cost, and a price of the wrong shape or below zero rejects the plugin.
 - [x] The view follows the reader instead of dragging them to the end of every message that arrives.

@@ -1692,7 +1692,7 @@ void AiPlugin::summarizeDroppedTurns(const QString& taskId, const FittedConversa
 
     // clang-format off
     connect(client, &AiChatClient::throttled, this, [this, taskId, executionId](ThrottleReason reason, qint64 milliseconds) { reportThrottle(taskId, executionId, reason, milliseconds); });
-    connect(client, &AiChatClient::finished, this, [this, taskId, executionId, client, fitted](const QString& content, const QVector<ToolCall>&, ChatUsage, const QString&) { releaseSummaryClient(taskId, client); applySummary(taskId, executionId, fitted, content); });
+    connect(client, &AiChatClient::finished, this, [this, taskId, executionId, client, fitted](const QString& content, const QVector<ToolCall>&, ChatUsage usage, const QString&) { releaseSummaryClient(taskId, client); recordUsage(taskId, usage); applySummary(taskId, executionId, fitted, content); });
     connect(client, &AiChatClient::failed, this, [this, taskId, executionId, client, fitted](const utils::Error& error) { releaseSummaryClient(taskId, client); appendLog(executionId, ExecutionLogLevel::Warning, ExecutionLogKind::Compacted, error.message); applySummary(taskId, executionId, fitted, {}); });
     const auto translate = [this](const QString& key) { return m_host->translate(key); };
     // clang-format on
@@ -1733,6 +1733,18 @@ void AiPlugin::releaseSummaryClient(const QString& taskId, AiChatClient* client)
     }
 
     client->deleteLater();
+}
+
+// The call that summarises a conversation is part of the run that needed it, so what it spent is counted with everything else the run spent.
+void AiPlugin::recordUsage(const QString& taskId, ChatUsage usage) {
+    const std::shared_ptr<ActiveExecution> position = m_active.value(taskId);
+
+    if (position == nullptr) {
+        return;
+    }
+
+    position->record.inputTokens += usage.inputTokens;
+    position->record.outputTokens += usage.outputTokens;
 }
 
 void AiPlugin::applySummary(const QString& taskId, const QString& executionId, const FittedConversation& fitted, const QString& summary) {

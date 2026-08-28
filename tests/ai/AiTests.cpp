@@ -644,6 +644,16 @@ TEST(AiProviderCatalogTest, LoadsEveryModelDeclaredByTheCatalogFile) {
     ASSERT_TRUE(spent.has_value());
     EXPECT_DOUBLE_EQ(spent.value(), 1000.0 * priced->inputCostPerToken.value() + 500.0 * priced->outputCostPerToken.value());
     EXPECT_FALSE(runCost(QStringLiteral("openai"), QStringLiteral("a-model-nobody-declares"), 10, 10).has_value());
+
+    // A command line agent is invoked rather than billed, so no run of one reports a cost.
+    for (const auto& descriptor : providerCatalog()) {
+        if (descriptor.protocol != WireProtocol::CommandLine) {
+            continue;
+        }
+        for (const auto& model : descriptor.models) {
+            EXPECT_FALSE(runCost(descriptor.id, model.id, 1000, 500).has_value()) << descriptor.id.toStdString() << " / " << model.id.toStdString();
+        }
+    }
     EXPECT_FALSE(runCost(QStringLiteral("a-provider-nobody-declares"), QStringLiteral("gpt-4o"), 10, 10).has_value());
 
     // The tunable limits come from the catalog as well, each inside the range that keeps it sane.
@@ -1230,6 +1240,18 @@ TEST(AiPluginTest, SummarizesTheTurnsThatNoLongerFitInsteadOfLosingThem) {
     // clang-format off
     ASSERT_TRUE(test::waitUntil([&]() { return plugin.runState(task.id) == TaskRunState::Idle; }));
     // clang-format on
+
+    // The call that summarised the conversation is part of the run, so what it spent is counted with everything else the run spent.
+    ASSERT_FALSE(host.databaseExecutions.isEmpty());
+    qint64 recordedInput = 0;
+
+    for (const auto& executed : host.databaseExecutions) {
+        if (executed.value(QStringLiteral("statement")).toString().startsWith(QStringLiteral("UPDATE ai_tasks_executions"))) {
+            recordedInput = executed.value(QStringLiteral("bindings")).toList().at(2).toLongLong();
+        }
+    }
+
+    EXPECT_GE(recordedInput, 11) << recordedInput;
 
     // The summary joins the conversation as the turn that replaces the ones it summarized, so the next run never summarizes them again.
     const QVector<ConversationMessage> conversation = plugin.conversation(task.id);
