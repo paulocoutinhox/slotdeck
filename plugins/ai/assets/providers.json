@@ -1958,6 +1958,8 @@
       "command": {
         "program": "grok",
         "arguments": [
+          "--model",
+          "{model}",
           "--no-auto-update",
           "--cwd",
           "{workdir}",
@@ -1978,7 +1980,7 @@
       "requiresApiKey": false,
       "userDefinedTraits": [],
       "preferredModels": [
-        "grok-cli"
+        "grok-4.6"
       ]
     },
     {
@@ -1988,6 +1990,8 @@
       "command": {
         "program": "claude",
         "arguments": [
+          "--model",
+          "{model}",
           "-p",
           "{prompt}",
           "--dangerously-skip-permissions",
@@ -2008,7 +2012,7 @@
       "requiresApiKey": false,
       "userDefinedTraits": [],
       "preferredModels": [
-        "claude-cli"
+        "claude-opus-5"
       ]
     },
     {
@@ -2019,6 +2023,8 @@
         "program": "codex",
         "arguments": [
           "exec",
+          "--model",
+          "{model}",
           "--yolo",
           "--ephemeral",
           "--color",
@@ -2037,7 +2043,7 @@
       "requiresApiKey": false,
       "userDefinedTraits": [],
       "preferredModels": [
-        "codex-cli"
+        "gpt-5.4"
       ]
     },
     {
@@ -2047,6 +2053,8 @@
       "command": {
         "program": "agy",
         "arguments": [
+          "--model",
+          "{model}",
           "-p",
           "{prompt}",
           "--dangerously-skip-permissions",
@@ -2065,7 +2073,7 @@
       "requiresApiKey": false,
       "userDefinedTraits": [],
       "preferredModels": [
-        "antigravity-cli"
+        "gemini-3.1-pro-high"
       ]
     },
     {
@@ -2075,6 +2083,8 @@
       "command": {
         "program": "kimi",
         "arguments": [
+          "--model",
+          "{model}",
           "--work-dir",
           "{workdir}",
           "--prompt",
@@ -2092,7 +2102,7 @@
       "requiresApiKey": false,
       "userDefinedTraits": [],
       "preferredModels": [
-        "kimi-cli"
+        "kimi-k3"
       ]
     }
   ]

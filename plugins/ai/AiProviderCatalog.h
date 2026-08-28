@@ -18,6 +18,7 @@ enum class WireProtocol { OpenAiCompatible, Anthropic, CommandLine };
 
 inline constexpr auto commandLinePromptPlaceholder = "{prompt}";
 inline constexpr auto commandLineWorkdirPlaceholder = "{workdir}";
+inline constexpr auto commandLineModelPlaceholder = "{model}";
 
 // A command line agent runs its own tools and answers plain text, so it is invoked rather than requested.
 struct CommandLineDescriptor final {

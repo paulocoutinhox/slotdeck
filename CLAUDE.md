@@ -669,6 +669,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A program that is not installed is an explicit failure naming it, and a task with no working directory cannot run a command line agent.
 - The process runs in the directory the task declares, whether or not that provider also takes it as an argument.
 - A command line agent runs its own tools, so none is declared to it and its run is one turn that ends when the program does.
+- A command line agent is told which model to answer with, because every one of them takes that as an argument, so the model of the connection replaces the mark the provider declares for it.
+- No command line agent reports what it spent, so what it was given and what it answered are counted at the four characters a token averages, which is an estimate the reader is given rather than a measurement.
 - The conversation is rendered into the prompt, because these agents are invoked without a session and keep nothing between runs.
 - A command line provider declares no address, no credential and no parameter, and a provider reached over a wire declares no program.
 - Nothing is ever written to the input of a command line agent, so that input is closed the moment the process starts rather than left open for a program that waits to be piped to.
@@ -1566,6 +1568,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Every call that formats a sentence passes exactly what that sentence declares, and the lint command refuses any other, including the shape where one branch takes an argument and the other does not.
 - [x] An agent saved with no identifier is given one spelled from its name, and nothing is written into that field while the name is typed.
 - [x] A card dropped into Doing whose agent is gone names that agent, proven against the message about a card that could not be saved.
+- [x] A command line agent is given the model the connection names and reports an estimate of what it spent, since it reports nothing itself.
 - [x] Every plugin releases what it already took before returning a failure from initialization, checked against all eight.
 - [x] The cost of a run reaches the reader in the execution history, proven through the fake that answers the columns the real schema has.
 - [x] The price of every model the catalog carries reaches it, a model nobody priced reports no cost, and a price of the wrong shape or below zero rejects the plugin.

@@ -11,6 +11,8 @@
 
 namespace slotdeck::plugins::ai {
 
+constexpr qint64 charactersPerEstimatedToken = 4;
+
 class AiCliChatClientHelper final {
   public:
     static QString roleHeading(const QString& role);
@@ -54,7 +56,7 @@ QString resolveCommandLineProgram(const QString& program) {
     return onPath.isEmpty() ? QStandardPaths::findExecutable(program, commandLineSearchDirectories()) : onPath;
 }
 
-QStringList commandLineArguments(const CommandLineDescriptor& descriptor, const QString& prompt, const QString& workdir) {
+QStringList commandLineArguments(const CommandLineDescriptor& descriptor, const QString& prompt, const QString& workdir, const QString& model) {
     QStringList arguments;
     arguments.reserve(descriptor.arguments.size());
 
@@ -69,10 +71,20 @@ QStringList commandLineArguments(const CommandLineDescriptor& descriptor, const 
             continue;
         }
 
+        if (argument == QString::fromLatin1(commandLineModelPlaceholder)) {
+            arguments.append(model);
+            continue;
+        }
+
         arguments.append(argument);
     }
 
     return arguments;
+}
+
+// No command line agent reports what it spent, so a token is counted as the four characters one averages and the number is an estimate rather than a measurement.
+qint64 estimatedTokens(const QString& text) {
+    return static_cast<qint64>(text.size()) / charactersPerEstimatedToken;
 }
 
 QString renderConversationPrompt(const QJsonArray& messages) {
@@ -123,7 +135,8 @@ void AiCliChatClient::send(const ChatRequest& request, const std::function<QStri
     }
 
     const QString prompt = renderConversationPrompt(request.messages);
-    const QStringList arguments = commandLineArguments(provider->commandLine, prompt, request.workdir);
+    m_prompt = prompt;
+    const QStringList arguments = commandLineArguments(provider->commandLine, prompt, request.workdir, request.connection.modelId);
     m_running = true;
     emit started();
     emit requestSent(program, arguments.join(QLatin1Char('\n')));
@@ -139,7 +152,10 @@ void AiCliChatClient::completeRun(int exitCode, const QString& output) {
         return;
     }
 
-    emit finished(output.trimmed(), {}, {}, QStringLiteral("stop"));
+    // A command line agent reports no usage, so what it was given and what it answered are counted at the four characters a token averages.
+    const QString answer = output.trimmed();
+    const ChatUsage estimated{estimatedTokens(m_prompt), estimatedTokens(answer)};
+    emit finished(answer, {}, estimated, QStringLiteral("stop"));
 }
 
 void AiCliChatClient::cancel() {

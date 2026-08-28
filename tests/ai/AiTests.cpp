@@ -3277,7 +3277,7 @@ TEST(AiProviderCatalogTest, RefusesEveryMalformedCommandLineProviderItDeclaresAR
     QFile providersFile(QStringLiteral(":/slotdeck/ai/assets/providers.json"));
     ASSERT_TRUE(providersFile.open(QIODevice::ReadOnly));
     const QJsonObject shipped = QJsonDocument::fromJson(providersFile.readAll()).object();
-    const QByteArray models = QJsonDocument(QJsonObject{{QStringLiteral("providers"), QJsonObject{{QStringLiteral("claude-cli"), QJsonArray{QJsonObject{{QStringLiteral("id"), QStringLiteral("claude-cli")}, {QStringLiteral("context"), 1000000}, {QStringLiteral("output"), 128000}, {QStringLiteral("traits"), QJsonArray{}}}}}}}}).toJson(QJsonDocument::Compact);
+    const QByteArray models = QJsonDocument(QJsonObject{{QStringLiteral("providers"), QJsonObject{{QStringLiteral("claude-cli"), QJsonArray{QJsonObject{{QStringLiteral("id"), QStringLiteral("claude-opus-5")}, {QStringLiteral("context"), 1000000}, {QStringLiteral("output"), 128000}, {QStringLiteral("traits"), QJsonArray{}}}}}}}}).toJson(QJsonDocument::Compact);
 
     // clang-format off
     const auto onlyThis = [&shipped](const QJsonObject& replacement) {
@@ -3401,21 +3401,28 @@ TEST(AiCliChatClientTest, PassesAPromptAShellWouldHaveActedOnExactlyAsItIsWritte
     EXPECT_EQ(provider->protocol, WireProtocol::CommandLine);
 
     const QString hostile = QStringLiteral("say \"$HOME\" && rm -rf / ; `whoami` | tee $(id) 'quoted'\nsecond line\ttabbed\\backslash");
-    const QStringList arguments = commandLineArguments(provider->commandLine, hostile, QStringLiteral("/tmp/project"));
+    const QStringList arguments = commandLineArguments(provider->commandLine, hostile, QStringLiteral("/tmp/project"), QStringLiteral("claude-opus-5"));
 
     EXPECT_TRUE(arguments.contains(hostile)) << "the prompt was altered on its way to the agent";
     EXPECT_EQ(arguments.count(hostile), 1);
     EXPECT_FALSE(arguments.contains(QString::fromLatin1(commandLinePromptPlaceholder)));
     EXPECT_EQ(arguments.size(), provider->commandLine.arguments.size());
-    EXPECT_EQ(arguments.at(0), QStringLiteral("-p"));
-    EXPECT_EQ(arguments.at(1), hostile);
+    // The prompt follows the flag the provider declares for it, whatever position the catalog gives that pair.
+    const qsizetype promptAt = arguments.indexOf(hostile);
+    ASSERT_GT(promptAt, 0);
+    EXPECT_EQ(arguments.at(promptAt - 1), QStringLiteral("-p"));
+
+    // The model the connection names replaces its placeholder rather than reaching the agent as the mark itself.
+    EXPECT_TRUE(arguments.contains(QStringLiteral("claude-opus-5")));
+    EXPECT_FALSE(arguments.contains(QString::fromLatin1(commandLineModelPlaceholder)));
 
     const ProviderDescriptor* codex = findProvider(QStringLiteral("codex-cli"));
     ASSERT_NE(codex, nullptr);
-    const QStringList placed = commandLineArguments(codex->commandLine, hostile, QStringLiteral("/tmp/project"));
+    const QStringList placed = commandLineArguments(codex->commandLine, hostile, QStringLiteral("/tmp/project"), QStringLiteral("gpt-5.4"));
     EXPECT_TRUE(placed.contains(QStringLiteral("/tmp/project")));
     EXPECT_TRUE(placed.contains(hostile));
     EXPECT_FALSE(placed.contains(QString::fromLatin1(commandLineWorkdirPlaceholder)));
+    EXPECT_TRUE(placed.contains(QStringLiteral("gpt-5.4")));
 
     const QJsonArray messages{QJsonObject{{QStringLiteral("role"), QStringLiteral("system")}, {QStringLiteral("content"), QStringLiteral("be brief")}}, QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QStringLiteral("first")}}, QJsonObject{{QStringLiteral("role"), QStringLiteral("assistant")}, {QStringLiteral("content"), QStringLiteral("answered")}}, QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QString{}}}};
     const QString rendered = renderConversationPrompt(messages);
@@ -3438,11 +3445,12 @@ TEST(AiCliChatClientTest, RunsTheProgramWhereTheTaskSaysAndAnswersWithWhatItPrin
     qputenv("ANTHROPIC_API_KEY", QByteArrayLiteral("a-key-the-agent-must-not-see"));
     AiCliChatClient client(resolver, nullptr);
 
+    ChatUsage reported;
     QString answered;
     utils::Error failure;
     bool finished = false;
     // clang-format off
-    QObject::connect(&client, &AiChatClient::finished, &client, [&answered, &finished](const QString& content, const QVector<ToolCall>&, ChatUsage, const QString&) { answered = content; finished = true; });
+    QObject::connect(&client, &AiChatClient::finished, &client, [&answered, &finished, &reported](const QString& content, const QVector<ToolCall>&, ChatUsage usage, const QString&) { answered = content; reported = usage; finished = true; });
     QObject::connect(&client, &AiChatClient::failed, &client, [&failure, &finished](const utils::Error& error) { failure = error; finished = true; });
     const auto translate = [](const QString& key) { return key; };
     // clang-format on
@@ -3472,6 +3480,12 @@ TEST(AiCliChatClientTest, RunsTheProgramWhereTheTaskSaysAndAnswersWithWhatItPrin
 
     // The input of the agent is closed at once, so a program that reads what it was piped is not left waiting for something nobody sends.
     EXPECT_TRUE(answered.contains(QStringLiteral("stdin: closed"))) << answered.toStdString();
+
+    // No command line agent reports what it spent, so what it was given and what it answered are counted at the four characters a token averages.
+    EXPECT_EQ(reported.outputTokens, static_cast<qint64>(answered.size()) / 4);
+    // What is sent is the rendered conversation, so it counts at least what the prompt alone would.
+    EXPECT_GE(reported.inputTokens, static_cast<qint64>(prompt.size()) / 4);
+    EXPECT_GT(reported.inputTokens, 0);
     EXPECT_FALSE(answered.contains(QStringLiteral("a-key-the-agent-must-not-see"))) << answered.toStdString();
     qunsetenv("ANTHROPIC_API_KEY");
     qunsetenv("SLOTDECK_TEST_CLI_AGENT");

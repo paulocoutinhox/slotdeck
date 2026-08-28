@@ -13,7 +13,7 @@ namespace slotdeck::plugins::ai {
 // A window opened by the desktop does not inherit the path a shell has, so the install directories of the platform are searched after it.
 [[nodiscard]] QStringList commandLineSearchDirectories();
 [[nodiscard]] QString resolveCommandLineProgram(const QString& program);
-[[nodiscard]] QStringList commandLineArguments(const CommandLineDescriptor& descriptor, const QString& prompt, const QString& workdir);
+[[nodiscard]] QStringList commandLineArguments(const CommandLineDescriptor& descriptor, const QString& prompt, const QString& workdir, const QString& model);
 // These agents are invoked without a session, so the conversation they are given is the whole of what they know.
 [[nodiscard]] QString renderConversationPrompt(const QJsonArray& messages);
 
@@ -36,6 +36,7 @@ class AiCliChatClient final : public AiChatClient {
 
     CommandLineResolver m_resolver;
     AiCommandRunner m_runner;
+    QString m_prompt;
     bool m_running{false};
 };
 
