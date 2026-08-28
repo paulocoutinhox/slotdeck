@@ -45,7 +45,7 @@ class TerminalWidget final : public QWidget {
 
   signals:
     void focused();
-    void interactionError(const QString& message);
+    void interactionError(const utils::Error& error);
     void linkActivated(const QString& address);
 
   protected:

@@ -353,7 +353,7 @@ void TerminalWidget::reportFocus(bool gained) {
     const auto result = m_session->sendFocus(gained);
 
     if (!result.hasValue()) {
-        emit interactionError(result.error().message);
+        emit interactionError(result.error());
     }
 }
 
@@ -392,7 +392,7 @@ void TerminalWidget::dropEvent(QDropEvent* event) {
     const auto result = m_session->writeLocalPaths(paths);
 
     if (!result.hasValue()) {
-        emit interactionError(result.error().message);
+        emit interactionError(result.error());
         event->ignore();
         return;
     }
@@ -477,7 +477,7 @@ void TerminalWidget::keyPressEvent(QKeyEvent* event) {
     const auto result = m_session->sendKey(*event);
 
     if (!result.hasValue()) {
-        emit interactionError(result.error().message);
+        emit interactionError(result.error());
     }
 
     event->accept();
@@ -499,7 +499,7 @@ void TerminalWidget::pasteClipboard() {
     const auto result = m_session->paste(payload);
 
     if (!result.hasValue()) {
-        emit interactionError(result.error().message);
+        emit interactionError(result.error());
     }
 }
 
@@ -541,7 +541,7 @@ void TerminalWidget::inputMethodEvent(QInputMethodEvent* event) {
         m_session->scrollToBottom();
         const auto result = m_session->write(event->commitString().toUtf8());
         if (!result.hasValue()) {
-            emit interactionError(result.error().message);
+            emit interactionError(result.error());
         }
     }
 
@@ -746,7 +746,7 @@ void TerminalWidget::reportMouse(terminalcore::MouseAction action, terminalcore:
     const auto result = m_session->sendMouse(report);
 
     if (!result.hasValue()) {
-        emit interactionError(result.error().message);
+        emit interactionError(result.error());
     }
 }
 
@@ -757,7 +757,7 @@ void TerminalWidget::startSelection(QMouseEvent& event) {
     const auto result = m_session->beginSelection(gridPosition(event.position()), timeNanoseconds, repeatInterval, QApplication::startDragDistance(), event.modifiers().testFlag(Qt::AltModifier));
 
     if (!result.hasValue()) {
-        emit interactionError(result.error().message);
+        emit interactionError(result.error());
     }
 }
 
@@ -810,7 +810,7 @@ void TerminalWidget::mouseMoveEvent(QMouseEvent* event) {
         m_autoscrollRectangle = event->modifiers().testFlag(Qt::AltModifier);
         const auto result = m_session->extendSelection(gridPosition(event->position()), m_autoscrollRectangle);
         if (!result.hasValue()) {
-            emit interactionError(result.error().message);
+            emit interactionError(result.error());
         }
         updateAutoscroll();
         event->accept();
@@ -866,7 +866,7 @@ void TerminalWidget::advanceAutoscroll() {
     const auto result = m_session->advanceSelectionAutoscroll(gridPosition(m_autoscrollPosition), m_autoscrollRectangle);
 
     if (!result.hasValue()) {
-        emit interactionError(result.error().message);
+        emit interactionError(result.error());
     }
 
     updateAutoscroll();
@@ -948,7 +948,7 @@ void TerminalWidget::updateTerminalSize() {
     const auto result = m_session->resize(columns, rows, m_cellWidth, m_cellHeight);
 
     if (!result.hasValue()) {
-        emit interactionError(result.error().message);
+        emit interactionError(result.error());
     }
 }
 

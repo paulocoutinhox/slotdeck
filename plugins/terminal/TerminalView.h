@@ -20,6 +20,9 @@ class WorkspaceView;
 
 namespace slotdeck::plugins::terminalplugin {
 
+// A notification carries a sentence of the catalog while a fault of the emulator stays in the log.
+[[nodiscard]] QString terminalInteractionMessage(const utils::Error& error, PluginHost& host);
+
 class TerminalView final : public QWidget {
     Q_OBJECT
 

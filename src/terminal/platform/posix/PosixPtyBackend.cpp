@@ -192,7 +192,7 @@ PosixPtyBackend::~PosixPtyBackend() {
 
 utils::Result<void> PosixPtyBackend::start(const ShellProfile& profile, const QString& workingDirectory, const QString& historyFile, int columns, int rows) {
     if (running()) {
-        return utils::Result<void>::failure({"pty_already_running", "The terminal process is already running", {}});
+        return utils::Result<void>::failure({"terminal_already_running", "The terminal process is already running", {}});
     }
     if (!QFileInfo(profile.executable).isExecutable()) {
         return utils::Result<void>::failure({"shell_not_executable", "The selected shell is not executable", profile.executable});
@@ -201,7 +201,7 @@ utils::Result<void> PosixPtyBackend::start(const ShellProfile& profile, const QS
         return utils::Result<void>::failure({"terminal_working_directory_missing", "The working directory does not exist", workingDirectory});
     }
     if (!validTerminalGrid(columns, rows)) {
-        return utils::Result<void>::failure({"pty_size_invalid", "The pseudo-terminal dimensions are invalid", QStringLiteral("%1x%2").arg(columns).arg(rows)});
+        return utils::Result<void>::failure({"terminal_size_invalid", "The pseudo-terminal dimensions are invalid", QStringLiteral("%1x%2").arg(columns).arg(rows)});
     }
 
     const QByteArray executable = QFile::encodeName(profile.executable);
@@ -262,7 +262,7 @@ utils::Result<void> PosixPtyBackend::start(const ShellProfile& profile, const QS
     const pid_t child = forkpty(&m_descriptor, nullptr, nullptr, &size);
 
     if (child < 0) {
-        return PosixPtyBackendHelper::systemFailure(QStringLiteral("pty_spawn_failed"), QStringLiteral("The pseudo-terminal could not be created"));
+        return PosixPtyBackendHelper::systemFailure(QStringLiteral("terminal_spawn_failed"), QStringLiteral("The pseudo-terminal could not be created"));
     }
 
     if (child == 0) {
@@ -299,10 +299,10 @@ utils::Result<void> PosixPtyBackend::start(const ShellProfile& profile, const QS
 
 utils::Result<void> PosixPtyBackend::write(const QByteArray& bytes) {
     if (!running()) {
-        return utils::Result<void>::failure({"pty_not_running", "The terminal process is not running", {}});
+        return utils::Result<void>::failure({"terminal_not_running", "The terminal process is not running", {}});
     }
     if (bytes.size() > maximumInputQueueSize - m_pendingInput.size()) {
-        return utils::Result<void>::failure({"pty_input_queue_full", "The terminal input queue is full", {}});
+        return utils::Result<void>::failure({"terminal_input_queue_full", "The terminal input queue is full", {}});
     }
 
     m_pendingInput.append(bytes);
@@ -312,10 +312,10 @@ utils::Result<void> PosixPtyBackend::write(const QByteArray& bytes) {
 
 utils::Result<void> PosixPtyBackend::resize(int columns, int rows, int cellWidth, int cellHeight) {
     if (!running()) {
-        return utils::Result<void>::failure({"pty_not_running", "The terminal process is not running", {}});
+        return utils::Result<void>::failure({"terminal_not_running", "The terminal process is not running", {}});
     }
     if (!validTerminalGrid(columns, rows) || !validTerminalCellSize(cellWidth, cellHeight)) {
-        return utils::Result<void>::failure({"pty_size_invalid", "The pseudo-terminal dimensions are invalid", QStringLiteral("%1x%2 at %3x%4").arg(columns).arg(rows).arg(cellWidth).arg(cellHeight)});
+        return utils::Result<void>::failure({"terminal_size_invalid", "The pseudo-terminal dimensions are invalid", QStringLiteral("%1x%2 at %3x%4").arg(columns).arg(rows).arg(cellWidth).arg(cellHeight)});
     }
 
     winsize size{};
@@ -325,7 +325,7 @@ utils::Result<void> PosixPtyBackend::resize(int columns, int rows, int cellWidth
     size.ws_ypixel = static_cast<unsigned short>(std::clamp(static_cast<qint64>(rows) * cellHeight, qint64{0}, qint64{65535}));
 
     if (::ioctl(m_descriptor, TIOCSWINSZ, &size) != 0) {
-        return PosixPtyBackendHelper::systemFailure(QStringLiteral("pty_resize_failed"), QStringLiteral("The pseudo-terminal could not be resized"));
+        return PosixPtyBackendHelper::systemFailure(QStringLiteral("terminal_resize_failed"), QStringLiteral("The pseudo-terminal could not be resized"));
     }
 
     return utils::Result<void>::success();

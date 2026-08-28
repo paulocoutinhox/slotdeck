@@ -40,7 +40,7 @@ class TerminalPane final : public QFrame, public SessionDragSource {
     void focusModeRequested(const QString& sessionId);
     void shelfRequested(const QString& sessionId);
     void slotDropRequested(const QString& sessionId, int slotIndex);
-    void interactionError(const QString& message);
+    void interactionError(const utils::Error& error);
 
   protected:
     [[nodiscard]] bool eventFilter(QObject* watched, QEvent* event) override;

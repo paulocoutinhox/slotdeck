@@ -71,6 +71,17 @@ void TerminalView::resizeEvent(QResizeEvent* event) {
     m_layoutButton->setToolButtonStyle(compact ? Qt::ToolButtonIconOnly : Qt::ToolButtonTextBesideIcon);
 }
 
+QString terminalInteractionMessage(const utils::Error& error, PluginHost& host) {
+    static const QHash<QString, QString> keys{
+        {QStringLiteral("terminal_input_queue_full"), QStringLiteral("terminal.error.input-queue-full")},
+        {QStringLiteral("terminal_not_running"), QStringLiteral("terminal.error.not-running")},
+    };
+    const QString key = keys.value(error.code);
+
+    // A fault of the emulator is written for the log, because nothing the reader can do answers it.
+    return key.isEmpty() ? error.message : host.translate(key);
+}
+
 void TerminalView::createTerminal() {
     const QString terminalId = m_manager.createTerminal();
     m_workspaceView->focusTerminal(terminalId);
@@ -291,7 +302,7 @@ void TerminalView::createInterface() {
     connect(addTabButton, &QToolButton::clicked, this, &TerminalView::createTab);
     connect(m_workspaceView, &ui::WorkspaceView::closeTerminalRequested, this, &TerminalView::requestCloseTerminal);
     // clang-format off
-    connect(m_workspaceView, &ui::WorkspaceView::interactionError, this, [this](const QString& message) { m_host.notify(m_host.translate(QStringLiteral("terminal.error.interaction")), message, plugins::AlertSeverity::Error); });
+    connect(m_workspaceView, &ui::WorkspaceView::interactionError, this, [this](const utils::Error& error) { m_host.notify(m_host.translate(QStringLiteral("terminal.error.interaction")), terminalInteractionMessage(error, m_host), plugins::AlertSeverity::Error); });
     // clang-format on
 }
 

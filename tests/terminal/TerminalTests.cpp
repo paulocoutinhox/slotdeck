@@ -1767,3 +1767,16 @@ TEST(TerminalTranslationsTest, SpellsEveryKeyInEveryLanguageTheSelectorOffers) {
     slotdeck::plugins::terminalplugin::TerminalPlugin plugin;
     slotdeck::test::expectCompleteCatalog(QStringLiteral("terminal"), plugin.translations());
 }
+
+// A toast never shows the diagnostic of the engine, so the two conditions a reader reaches carry a sentence of the catalog.
+TEST(TerminalInteractionTest, SaysWhatStoppedTheInputInTheLanguageOfTheReader) {
+    slotdeck::test::TestPluginHost host;
+    host.translations.insert(QStringLiteral("terminal.error.input-queue-full"), QStringLiteral("O terminal ainda esta lendo"));
+    host.translations.insert(QStringLiteral("terminal.error.not-running"), QStringLiteral("O shell terminou"));
+
+    EXPECT_EQ(slotdeck::plugins::terminalplugin::terminalInteractionMessage({"terminal_input_queue_full", QStringLiteral("The terminal input queue is full"), {}}, host), QStringLiteral("O terminal ainda esta lendo"));
+    EXPECT_EQ(slotdeck::plugins::terminalplugin::terminalInteractionMessage({"terminal_not_running", QStringLiteral("The terminal process is not running"), {}}, host), QStringLiteral("O shell terminou"));
+
+    // A fault of the emulator is written for the log, because nothing the reader can do answers it.
+    EXPECT_EQ(slotdeck::plugins::terminalplugin::terminalInteractionMessage({"ghostty_key_encoding_failed", QStringLiteral("The key event could not be encoded"), {}}, host), QStringLiteral("The key event could not be encoded"));
+}

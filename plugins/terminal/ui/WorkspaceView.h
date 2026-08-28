@@ -25,7 +25,7 @@ class WorkspaceView final : public QWidget {
 
   signals:
     void closeTerminalRequested(const QString& sessionId, const QString& name);
-    void interactionError(const QString& message);
+    void interactionError(const utils::Error& error);
 
   private slots:
     void synchronize();

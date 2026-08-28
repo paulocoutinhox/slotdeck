@@ -94,7 +94,7 @@ ConPtyBackend::~ConPtyBackend() {
 
 utils::Result<void> ConPtyBackend::start(const ShellProfile& profile, const QString& workingDirectory, const QString&, int columns, int rows) {
     if (running()) {
-        return utils::Result<void>::failure({"conpty_already_running", "The terminal process is already running", {}});
+        return utils::Result<void>::failure({"terminal_already_running", "The terminal process is already running", {}});
     }
     if (!QFileInfo(profile.executable).isExecutable()) {
         return utils::Result<void>::failure({"shell_not_executable", "The selected shell is not executable", profile.executable});
@@ -103,7 +103,7 @@ utils::Result<void> ConPtyBackend::start(const ShellProfile& profile, const QStr
         return utils::Result<void>::failure({"terminal_working_directory_missing", "The working directory does not exist", workingDirectory});
     }
     if (!validTerminalGrid(columns, rows)) {
-        return utils::Result<void>::failure({"conpty_size_invalid", "The pseudo-console dimensions are invalid", QStringLiteral("%1x%2").arg(columns).arg(rows)});
+        return utils::Result<void>::failure({"terminal_size_invalid", "The pseudo-console dimensions are invalid", QStringLiteral("%1x%2").arg(columns).arg(rows)});
     }
 
     terminate();
@@ -175,7 +175,7 @@ utils::Result<void> ConPtyBackend::start(const ShellProfile& profile, const QStr
     if (!created) {
         const DWORD errorCode = GetLastError();
         terminate();
-        return ConPtyBackendHelper::windowsFailure(QStringLiteral("conpty_spawn_failed"), QStringLiteral("The shell process could not be created"), errorCode);
+        return ConPtyBackendHelper::windowsFailure(QStringLiteral("terminal_spawn_failed"), QStringLiteral("The shell process could not be created"), errorCode);
     }
 
     CloseHandle(process.hThread);
@@ -192,14 +192,14 @@ utils::Result<void> ConPtyBackend::start(const ShellProfile& profile, const QStr
 
 utils::Result<void> ConPtyBackend::write(const QByteArray& bytes) {
     if (!running()) {
-        return utils::Result<void>::failure({"conpty_not_running", "The terminal process is not running", {}});
+        return utils::Result<void>::failure({"terminal_not_running", "The terminal process is not running", {}});
     }
 
     {
         const std::lock_guard lock(m_inputMutex);
 
         if (bytes.size() > maximumInputQueueSize - m_pendingInput.size()) {
-            return utils::Result<void>::failure({"conpty_input_queue_full", "The terminal input queue is full", {}});
+            return utils::Result<void>::failure({"terminal_input_queue_full", "The terminal input queue is full", {}});
         }
 
         m_pendingInput.append(bytes);
@@ -210,16 +210,16 @@ utils::Result<void> ConPtyBackend::write(const QByteArray& bytes) {
 
 utils::Result<void> ConPtyBackend::resize(int columns, int rows, int, int) {
     if (!running() || m_handles == nullptr || m_handles->pseudoConsole == nullptr) {
-        return utils::Result<void>::failure({"conpty_not_running", "The terminal process is not running", {}});
+        return utils::Result<void>::failure({"terminal_not_running", "The terminal process is not running", {}});
     }
     if (!validTerminalGrid(columns, rows)) {
-        return utils::Result<void>::failure({"conpty_size_invalid", "The pseudo-console dimensions are invalid", QStringLiteral("%1x%2").arg(columns).arg(rows)});
+        return utils::Result<void>::failure({"terminal_size_invalid", "The pseudo-console dimensions are invalid", QStringLiteral("%1x%2").arg(columns).arg(rows)});
     }
 
     const COORD size{static_cast<SHORT>(columns), static_cast<SHORT>(rows)};
 
     if (FAILED(ResizePseudoConsole(m_handles->pseudoConsole, size))) {
-        return ConPtyBackendHelper::windowsFailure(QStringLiteral("conpty_resize_failed"), QStringLiteral("The pseudo-console could not be resized"));
+        return ConPtyBackendHelper::windowsFailure(QStringLiteral("terminal_resize_failed"), QStringLiteral("The pseudo-console could not be resized"));
     }
 
     return utils::Result<void>::success();

@@ -469,6 +469,9 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A shell runs every line a plain paste delivers, so text is handed over between the markers whenever the program asked to receive it that way, and the confirmation warns about text that would run rather than about text that merely wraps.
 - Terminal view shortcuts are active only while focus is inside the Terminal plugin view.
 - The terminal status bar reports the workspace count and the terminal count instead of the active workspace name.
+- A gesture the terminal refuses travels to the plugin as the structured error it was, so the plugin that owns the catalog decides what the reader is told rather than receiving a sentence already rendered.
+- The two conditions a reader reaches, which are input the terminal has not read yet and a shell that has ended, carry a sentence of the catalog while every fault of the emulator stays in the log.
+- The two pseudo-terminal backends report a shared condition by one name, so nothing that reads a failure has to know which platform produced it.
 - The terminal actions offer the directory the shell is standing in to the Code Editor and to the Web Server, and offer each one only while its plugin is available.
 - Paste shortcuts use Command on macOS, Control on Windows and Control with Shift on Linux according to native terminal conventions.
 - Qt reports the macOS Command key as the control modifier and the physical Control key as the meta modifier, and the shortcut contract maps both explicitly.
@@ -1711,6 +1714,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A command line provider whose argument list never carries the model is refused from text, so the model the reader chose can never be dropped in silence.
 - [x] A command that timed out, overflowed its output, found no working directory, did not start or ended abnormally reads on the card in the language of the interface rather than in the English of the log.
 - [x] Every condition the filesystem service reports reads in the editor as a sentence of its catalog naming the path, proven for the complete set the service can answer with.
+- [x] A paste the terminal has not finished reading and a shell that ended read in the language of the interface, while a fault of the emulator stays in the log.
+- [x] The POSIX and the Windows pseudo-terminal backends name their six shared conditions identically, which they did not before.
 - [x] A command task runs a real process for both endings, moving to Done on a zero exit code and back to the board with its reason on any other, and the directory it ran in is proven by a command that only succeeds beside a file that directory holds.
 - [x] A paste the reader refused writes nothing to the shell, a confirmed one reaches it, text that only wraps is never asked about and the setting turned off writes without asking, all driven through the key a reader presses.
 - [x] A selection is indented and unindented as whole lines, leaving a line nobody selected alone and answering a document resolved to tabs with a tab.
