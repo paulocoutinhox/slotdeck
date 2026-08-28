@@ -44,6 +44,14 @@ Every item below is read-only analysis. None of them changes a file.
 
 ## Unexplained intermittent failure
 
+- `CodeWorkspaceViewTest.SurvivesManyDocumentsOpenedEditedSavedAndClosedInOneWorkspace` ended with
+  SIGTRAP once on 2026-08-28, on the local machine, inside a run of the whole suite at ten parallel
+  jobs. It has not returned in twelve runs of that case alone, eighteen concurrent runs of it beside
+  the other stress cases, or the full suite since, in Debug and under the sanitizers.
+  Nothing points at a cause yet. The next step, if it returns, is to capture the output of the run
+  that traps rather than only its status, because SIGTRAP on this platform is a fatal from Qt or an
+  assertion rather than a memory fault the sanitizers would already have named.
+
 - `LanguageServerClientTest.KeepsEveryRequestInsideTheCapabilitiesTheServerDeclares` segfaulted on
   the macOS release runner on 2026-08-20 and again on 2026-08-21, passing on the same runner in the
   pushes around both. The case builds a client for a server that does not exist and never starts it,
