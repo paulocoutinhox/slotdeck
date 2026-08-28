@@ -1260,6 +1260,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A comment sits on the declaration it explains, so a comment followed by a blank line explains nothing and does not exist in the project.
 - The lint command refuses a comment separated from what it explains, a comment dividing a sentence with a semicolon and a comment that does not end its sentence, across the sources and the suite alike.
 - The lint command refuses a translation catalog whose language is built from another one, because no case reading the finished map can tell that apart.
+- The lint command refuses a translation key nothing reaches, accepting one the code names itself and one composed from a family the code names, because a sentence no caller asks for is one the reader never sees.
 - The lint command refuses a future continuation that captures something without naming the object it reaches, because that object is what cancels it.
 - The lint command refuses a call whose arguments do not match the sentence it formats, counting what each call really passes and holding both branches of a call that chooses between two sentences to the same count.
 - Complex methods use short intent comments only at important responsibility boundaries.

@@ -334,6 +334,32 @@ def inherited_catalogs() -> list[str]:
     return found
 
 
+def unreachable_translations() -> list[str]:
+    catalogs = sorted(ROOT.glob("plugins/*/*Translations.h")) + [ROOT / "src" / "plugins" / "CoreTranslations.h"]
+    declared: dict[str, str] = {}
+
+    for path in catalogs:
+        for key in re.findall(r'QStringLiteral\("([a-z0-9-]+\.[a-z0-9-]+\.[a-z0-9-]+)"\)', path.read_text(encoding="utf-8")):
+            declared[key] = str(path.relative_to(ROOT))
+
+    sources = ""
+
+    for directory in ("src", "plugins"):
+        for path in sorted((ROOT / directory).rglob("*")):
+            if path.suffix not in (".cpp", ".h", ".json") or path.name.endswith("Translations.h"):
+                continue
+            sources += path.read_text(encoding="utf-8", errors="ignore")
+
+    unreachable = []
+
+    for key, owner in sorted(declared.items()):
+        family = key[: key.rfind(".") + 1]
+        if key not in sources and family not in sources:
+            unreachable.append(f"{key} in {owner}")
+
+    return unreachable
+
+
 def divergent_backend_conditions() -> list[str]:
     backends = (
         ROOT / "src" / "terminal" / "platform" / "posix" / "PosixPtyBackend.cpp",
@@ -423,6 +449,11 @@ def task_lint(_: Context) -> None:
 
     if inherited:
         raise RuntimeError("Every language declares the keys it spells, because a catalog built from another one cannot be told from one that forgot a sentence:\n  " + "\n  ".join(inherited))
+
+    unreachable = unreachable_translations()
+
+    if unreachable:
+        raise RuntimeError("A sentence nothing reaches is one the reader never sees, so every key is named by the code or composed from a family it names:\n  " + "\n  ".join(unreachable))
 
     divergent = divergent_backend_conditions()
 
