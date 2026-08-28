@@ -21,6 +21,8 @@
 #include "ui/WorkspaceView.h"
 #include "workspace/LayoutManager.h"
 #include "workspace/WorkspaceManager.h"
+#include <QDropEvent>
+#include <QMimeData>
 #include <QWheelEvent>
 
 #include <QAction>
@@ -1849,6 +1851,40 @@ TEST(TerminalWidgetTests, ReportsEveryWheelNotchToAProgramReadingTheMouseOnBothA
     // clang-format off
     ASSERT_TRUE(test::waitUntil([&written]() { return written().contains(QByteArrayLiteral("\x1b[<67;")); })) << written().toStdString();
     // clang-format on
+}
+
+// A path a drop delivers is written to the shell, so a drop carrying anything the shell would act on delivers nothing at all.
+TEST(TerminalWidgetTests, DeliversADroppedPathAndRefusesADropThatWouldRunSomething) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const QString dropped = QDir(directory.path()).absoluteFilePath(QStringLiteral("a file.txt"));
+
+    // clang-format off
+    const auto delivered = [](const QList<QUrl>& urls) {
+        QMimeData payload;
+        payload.setUrls(urls);
+        return ui::localPathsFromDrop(payload);
+    };
+    // clang-format on
+
+    EXPECT_EQ(delivered({QUrl::fromLocalFile(dropped)}), QStringList{dropped});
+
+    // A drop that carries no address at all delivers nothing.
+    QMimeData empty;
+    EXPECT_TRUE(ui::localPathsFromDrop(empty).isEmpty());
+
+    // A line break would end the command the path was written into and start another, so the whole drop is refused.
+    EXPECT_TRUE(delivered({QUrl::fromLocalFile(dropped), QUrl::fromLocalFile(directory.path() + QStringLiteral("/one\ntwo"))}).isEmpty());
+    EXPECT_TRUE(delivered({QUrl::fromLocalFile(directory.path() + QStringLiteral("/one\rtwo"))}).isEmpty());
+
+    // An address the shell has no path for is refused, and one bad entry refuses the drop it arrived in.
+    EXPECT_TRUE(delivered({QUrl(QStringLiteral("https://example.com"))}).isEmpty());
+    EXPECT_TRUE(delivered({QUrl::fromLocalFile(dropped), QUrl(QStringLiteral("https://example.com"))}).isEmpty());
+
+    // What a refused drop would have written is what makes refusing it worth doing.
+    terminalcore::ShellProfile profile;
+    profile.id = QStringLiteral("zsh");
+    EXPECT_EQ(terminalcore::formatLocalPathsForShell(profile, {dropped}), QStringLiteral("'%1' ").arg(dropped));
 }
 
 } // namespace slotdeck

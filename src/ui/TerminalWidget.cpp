@@ -529,7 +529,7 @@ void TerminalWidget::pasteClipboard() {
     }
 }
 
-QStringList TerminalWidget::localPathsFromDrop(const QMimeData& mimeData) {
+QStringList localPathsFromDrop(const QMimeData& mimeData) {
     if (!mimeData.hasUrls()) {
         return {};
     }

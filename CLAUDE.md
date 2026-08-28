@@ -423,6 +423,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - New terminals receive input focus when their pane becomes available.
 - Terminal-owned Control and Alt sequences take precedence while the terminal has focus.
 - Output is selected by dragging over it and by double clicking the word under the pointer, and the selection is anchored to the row of the scrollback it covers so scrolling moves it with that text.
+- A file dropped on the terminal writes its quoted path to the shell, and a drop carrying anything the shell would act on as more than a path delivers nothing at all.
 - A selected row copies only the text it carries, because the blanks padding it to the width of the terminal are not content.
 - Copying answers only while something is selected, so the combination that interrupts the shell still reaches it, and it uses the application modifier on macOS and Windows and the shifted control combination on Linux.
 - Closing the focused terminal uses the platform close combination on macOS and the shifted one elsewhere, because Control with W deletes the previous word in a shell.
@@ -1722,6 +1723,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Every condition the filesystem service reports reads in the editor as a sentence of its catalog naming the path, proven for the complete set the service can answer with.
 - [x] A paste the terminal has not finished reading and a shell that ended read in the language of the interface, while a fault of the emulator stays in the log.
 - [x] Every wheel notch reaches a program reading the mouse on both axes, proven by a case that read nothing sideways before the horizontal notch was reported.
+- [x] A drop carrying a line break, a carriage return or an address the shell has no path for delivers nothing, and one bad entry refuses the drop it arrived in.
 - [x] The POSIX and the Windows pseudo-terminal backends name their six shared conditions identically and describe them in one sentence, which the lint command now refuses to let drift.
 - [x] The stored schema version is read by the name of its column through the shared strict reader rather than by dereferencing the first iterator of the row.
 - [x] A command task runs a real process for both endings, moving to Done on a zero exit code and back to the board with its reason on any other, and the directory it ran in is proven by a command that only succeeds beside a file that directory holds.

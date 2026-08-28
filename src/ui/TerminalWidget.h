@@ -26,6 +26,9 @@ class QWheelEvent;
 
 namespace slotdeck::ui {
 
+// A path a drop delivers is written to the shell, so a drop carrying anything the shell would act on delivers nothing at all.
+[[nodiscard]] QStringList localPathsFromDrop(const QMimeData& mimeData);
+
 class TerminalWidget final : public QWidget {
     Q_OBJECT
 
@@ -99,7 +102,6 @@ class TerminalWidget final : public QWidget {
     [[nodiscard]] terminalcore::MouseButton draggedButton() const;
     [[nodiscard]] static terminalcore::MouseButton mouseButtonOf(Qt::MouseButton button);
     [[nodiscard]] int viewportRows() const;
-    [[nodiscard]] static QStringList localPathsFromDrop(const QMimeData& mimeData);
 
     QPointer<terminalcore::TerminalSession> m_session;
     plugins::PluginHost& m_host;
