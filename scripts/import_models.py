@@ -41,6 +41,44 @@ def wire_id(key: str, slug: str) -> str:
     return key
 
 
+# a command line agent answers with the same model the service does, so its window and its output bound are read from that model rather than declared again.
+COMMAND_LINE_SOURCES = {
+    "claude-cli": ("anthropic", ["claude-opus-5", "claude-sonnet-5", "claude-opus-4-8", "claude-sonnet-4-6"]),
+    "codex-cli": ("openai", ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini"]),
+    "grok-cli": ("xai", ["grok-4.6", "grok-4.5", "grok-4.3", "grok-build-0.1"]),
+    "kimi-cli": ("moonshot", ["kimi-k3", "kimi-k2.6"]),
+    "antigravity-cli": ("gemini", ["gemini-3.1-pro-high", "gemini-3.1-pro-low", "gemini-3.6-flash-high", "gemini-3.6-flash-medium", "gemini-3.5-flash-high"]),
+}
+
+EFFORT_SUFFIXES = ("-high", "-medium", "-low")
+
+
+def source_model(models: list[dict], identifier: str) -> dict | None:
+    by_id = {model["id"]: model for model in models}
+    candidates = [identifier]
+    for suffix in EFFORT_SUFFIXES:
+        if identifier.endswith(suffix):
+            candidates.append(identifier[: -len(suffix)])
+    candidates += [f"{candidate}-preview" for candidate in list(candidates)]
+    for candidate in candidates:
+        if candidate in by_id:
+            return by_id[candidate]
+    return None
+
+
+def command_line_models(catalog: dict[str, list[dict]]) -> None:
+    for provider, (source, identifiers) in COMMAND_LINE_SOURCES.items():
+        declared_models = []
+        for identifier in identifiers:
+            found = source_model(catalog.get(source, []), identifier)
+            # a model the catalog does not know is left out rather than declared with a window nobody published.
+            if found is None:
+                print(f"leaving {provider}/{identifier} out, because {source} declares no such model")
+                continue
+            declared_models.append({"id": identifier, "context": found["context"], "output": found["output"], "traits": []})
+        catalog[provider] = declared_models
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         print(__doc__)
@@ -98,6 +136,8 @@ def main() -> int:
                 if (provider, model["id"]) not in seen and (provider, model["id"]) not in declared:
                     seen.add((provider, model["id"]))
                     catalog.setdefault(provider, []).append(model)
+
+    command_line_models(catalog)
 
     for models in catalog.values():
         models.sort(key=lambda model: model["id"])

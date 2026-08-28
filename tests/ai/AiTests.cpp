@@ -646,6 +646,17 @@ TEST(AiProviderCatalogTest, LoadsEveryModelDeclaredByTheCatalogFile) {
     EXPECT_DOUBLE_EQ(spent.value(), 1000.0 * priced->inputCostPerToken.value() + 500.0 * priced->outputCostPerToken.value());
     EXPECT_FALSE(runCost(QStringLiteral("openai"), QStringLiteral("a-model-nobody-declares"), 10, 10).has_value());
 
+    // A command line agent answers with the same model the service does, so its window and its output bound are the ones that model publishes.
+    for (const auto& descriptor : providerCatalog()) {
+        if (descriptor.protocol != WireProtocol::CommandLine) {
+            continue;
+        }
+        for (const auto& model : descriptor.models) {
+            EXPECT_GT(model.contextWindow, 0) << descriptor.id.toStdString() << " / " << model.id.toStdString();
+            EXPECT_GT(model.maximumOutputTokens, 0) << descriptor.id.toStdString() << " / " << model.id.toStdString();
+        }
+    }
+
     // A command line agent is invoked rather than billed, so no run of one reports a cost.
     for (const auto& descriptor : providerCatalog()) {
         if (descriptor.protocol != WireProtocol::CommandLine) {

@@ -342,59 +342,33 @@
     ],
     "antigravity-cli": [
       {
-        "context": 200000,
+        "context": 1048576,
         "id": "gemini-3.1-pro-high",
-        "name": "Gemini 3.1 Pro high",
-        "output": 64000,
+        "output": 65536,
         "traits": []
       },
       {
-        "context": 200000,
+        "context": 1048576,
         "id": "gemini-3.1-pro-low",
-        "name": "Gemini 3.1 Pro low",
-        "output": 64000,
+        "output": 65536,
         "traits": []
       },
       {
-        "context": 200000,
-        "id": "gemini-3.6-flash-high",
-        "name": "Gemini 3.6 Flash high",
-        "output": 64000,
-        "traits": []
-      },
-      {
-        "context": 200000,
-        "id": "gemini-3.6-flash-medium",
-        "name": "Gemini 3.6 Flash medium",
-        "output": 64000,
-        "traits": []
-      },
-      {
-        "context": 200000,
+        "context": 1048576,
         "id": "gemini-3.5-flash-high",
-        "name": "Gemini 3.5 Flash high",
-        "output": 64000,
+        "output": 65535,
         "traits": []
       },
       {
-        "context": 200000,
-        "id": "claude-sonnet-4-6",
-        "name": "Claude Sonnet 4.6",
-        "output": 64000,
+        "context": 1048576,
+        "id": "gemini-3.6-flash-high",
+        "output": 65536,
         "traits": []
       },
       {
-        "context": 200000,
-        "id": "claude-opus-4-6-thinking",
-        "name": "Claude Opus 4.6 thinking",
-        "output": 64000,
-        "traits": []
-      },
-      {
-        "context": 200000,
-        "id": "gpt-oss-120b-medium",
-        "name": "GPT-OSS 120b medium",
-        "output": 64000,
+        "context": 1048576,
+        "id": "gemini-3.6-flash-medium",
+        "output": 65536,
         "traits": []
       }
     ],
@@ -486,117 +460,65 @@
     ],
     "claude-cli": [
       {
-        "context": 200000,
-        "id": "claude-opus-5",
-        "name": "Claude Opus 5",
-        "output": 64000,
-        "traits": []
-      },
-      {
-        "context": 200000,
-        "id": "claude-sonnet-5",
-        "name": "Claude Sonnet 5",
-        "output": 64000,
-        "traits": []
-      },
-      {
-        "context": 200000,
+        "context": 1000000,
         "id": "claude-opus-4-8",
-        "name": "Claude Opus 4.8",
-        "output": 64000,
+        "output": 128000,
         "traits": []
       },
       {
-        "context": 200000,
+        "context": 1000000,
+        "id": "claude-opus-5",
+        "output": 128000,
+        "traits": []
+      },
+      {
+        "context": 1000000,
         "id": "claude-sonnet-4-6",
-        "name": "Claude Sonnet 4.6",
-        "output": 64000,
+        "output": 128000,
         "traits": []
       },
       {
-        "context": 200000,
-        "id": "opus",
-        "name": "Opus (alias)",
-        "output": 64000,
-        "traits": []
-      },
-      {
-        "context": 200000,
-        "id": "sonnet",
-        "name": "Sonnet (alias)",
-        "output": 64000,
-        "traits": []
-      },
-      {
-        "context": 200000,
-        "id": "haiku",
-        "name": "Haiku (alias)",
-        "output": 64000,
-        "traits": []
-      },
-      {
-        "context": 200000,
-        "id": "fable",
-        "name": "Fable (alias)",
-        "output": 64000,
-        "traits": []
-      },
-      {
-        "context": 200000,
-        "id": "opusplan",
-        "name": "Opus plan (alias)",
-        "output": 64000,
+        "context": 1000000,
+        "id": "claude-sonnet-5",
+        "output": 128000,
         "traits": []
       }
     ],
     "codex-cli": [
       {
-        "context": 200000,
-        "id": "gpt-5.6-sol",
-        "name": "GPT-5.6 Sol",
-        "output": 64000,
-        "traits": []
-      },
-      {
-        "context": 200000,
-        "id": "gpt-5.6-terra",
-        "name": "GPT-5.6 Terra",
-        "output": 64000,
-        "traits": []
-      },
-      {
-        "context": 200000,
-        "id": "gpt-5.6-luna",
-        "name": "GPT-5.6 Luna",
-        "output": 64000,
-        "traits": []
-      },
-      {
-        "context": 200000,
-        "id": "gpt-5.5",
-        "name": "GPT-5.5",
-        "output": 64000,
-        "traits": []
-      },
-      {
-        "context": 200000,
+        "context": 1050000,
         "id": "gpt-5.4",
-        "name": "GPT-5.4",
-        "output": 64000,
+        "output": 128000,
         "traits": []
       },
       {
-        "context": 200000,
+        "context": 272000,
         "id": "gpt-5.4-mini",
-        "name": "GPT-5.4 mini",
-        "output": 64000,
+        "output": 128000,
         "traits": []
       },
       {
-        "context": 200000,
-        "id": "gpt-5.3-codex-spark",
-        "name": "GPT-5.3 Codex Spark",
-        "output": 64000,
+        "context": 1050000,
+        "id": "gpt-5.5",
+        "output": 128000,
+        "traits": []
+      },
+      {
+        "context": 922000,
+        "id": "gpt-5.6-luna",
+        "output": 128000,
+        "traits": []
+      },
+      {
+        "context": 922000,
+        "id": "gpt-5.6-sol",
+        "output": 128000,
+        "traits": []
+      },
+      {
+        "context": 922000,
+        "id": "gpt-5.6-terra",
+        "output": 128000,
         "traits": []
       }
     ],
@@ -2585,45 +2507,27 @@
     ],
     "grok-cli": [
       {
-        "context": 200000,
-        "id": "grok-4.6",
-        "name": "Grok 4.6",
-        "output": 64000,
-        "traits": []
-      },
-      {
-        "context": 200000,
-        "id": "grok-4.5",
-        "name": "Grok 4.5",
-        "output": 64000,
-        "traits": []
-      },
-      {
-        "context": 200000,
+        "context": 1000000,
         "id": "grok-4.3",
-        "name": "Grok 4.3",
-        "output": 64000,
+        "output": 1000000,
         "traits": []
       },
       {
-        "context": 200000,
+        "context": 500000,
+        "id": "grok-4.5",
+        "output": 500000,
+        "traits": []
+      },
+      {
+        "context": 500000,
+        "id": "grok-4.6",
+        "output": 500000,
+        "traits": []
+      },
+      {
+        "context": 256000,
         "id": "grok-build-0.1",
-        "name": "Grok Build 0.1",
-        "output": 64000,
-        "traits": []
-      },
-      {
-        "context": 200000,
-        "id": "grok-4.20-0309-reasoning",
-        "name": "Grok 4.20 reasoning",
-        "output": 64000,
-        "traits": []
-      },
-      {
-        "context": 200000,
-        "id": "grok-4.20-0309-non-reasoning",
-        "name": "Grok 4.20 non-reasoning",
-        "output": 64000,
+        "output": 256000,
         "traits": []
       }
     ],
@@ -2766,31 +2670,15 @@
     ],
     "kimi-cli": [
       {
-        "context": 200000,
-        "id": "kimi-k3",
-        "name": "Kimi K3",
-        "output": 64000,
-        "traits": []
-      },
-      {
-        "context": 200000,
-        "id": "kimi-k2.7-code",
-        "name": "Kimi K2.7 Code",
-        "output": 64000,
-        "traits": []
-      },
-      {
-        "context": 200000,
-        "id": "kimi-k2.7-code-highspeed",
-        "name": "Kimi K2.7 Code high speed",
-        "output": 64000,
-        "traits": []
-      },
-      {
-        "context": 200000,
+        "context": 262144,
         "id": "kimi-k2.6",
-        "name": "Kimi K2.6",
-        "output": 64000,
+        "output": 262144,
+        "traits": []
+      },
+      {
+        "context": 1048576,
+        "id": "kimi-k3",
+        "output": 1048576,
         "traits": []
       }
     ],
