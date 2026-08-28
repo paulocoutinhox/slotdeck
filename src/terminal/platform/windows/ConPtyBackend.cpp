@@ -103,7 +103,7 @@ utils::Result<void> ConPtyBackend::start(const ShellProfile& profile, const QStr
         return utils::Result<void>::failure({"terminal_working_directory_missing", "The working directory does not exist", workingDirectory});
     }
     if (!validTerminalGrid(columns, rows)) {
-        return utils::Result<void>::failure({"terminal_size_invalid", "The pseudo-console dimensions are invalid", QStringLiteral("%1x%2").arg(columns).arg(rows)});
+        return utils::Result<void>::failure({"terminal_size_invalid", "The terminal dimensions are invalid", QStringLiteral("%1x%2").arg(columns).arg(rows)});
     }
 
     terminate();
@@ -175,7 +175,7 @@ utils::Result<void> ConPtyBackend::start(const ShellProfile& profile, const QStr
     if (!created) {
         const DWORD errorCode = GetLastError();
         terminate();
-        return ConPtyBackendHelper::windowsFailure(QStringLiteral("terminal_spawn_failed"), QStringLiteral("The shell process could not be created"), errorCode);
+        return ConPtyBackendHelper::windowsFailure(QStringLiteral("terminal_spawn_failed"), QStringLiteral("The shell process could not be started"), errorCode);
     }
 
     CloseHandle(process.hThread);
@@ -213,13 +213,13 @@ utils::Result<void> ConPtyBackend::resize(int columns, int rows, int, int) {
         return utils::Result<void>::failure({"terminal_not_running", "The terminal process is not running", {}});
     }
     if (!validTerminalGrid(columns, rows)) {
-        return utils::Result<void>::failure({"terminal_size_invalid", "The pseudo-console dimensions are invalid", QStringLiteral("%1x%2").arg(columns).arg(rows)});
+        return utils::Result<void>::failure({"terminal_size_invalid", "The terminal dimensions are invalid", QStringLiteral("%1x%2").arg(columns).arg(rows)});
     }
 
     const COORD size{static_cast<SHORT>(columns), static_cast<SHORT>(rows)};
 
     if (FAILED(ResizePseudoConsole(m_handles->pseudoConsole, size))) {
-        return ConPtyBackendHelper::windowsFailure(QStringLiteral("terminal_resize_failed"), QStringLiteral("The pseudo-console could not be resized"));
+        return ConPtyBackendHelper::windowsFailure(QStringLiteral("terminal_resize_failed"), QStringLiteral("The terminal could not be resized"));
     }
 
     return utils::Result<void>::success();

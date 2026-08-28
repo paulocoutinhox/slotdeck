@@ -326,6 +326,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The write-ahead log of that database goes with it, because what was committed last is only there, and it never stays beside the database that replaced it.
 - The database that was set aside is named to the reader once, because the file it was kept in is where its data still is.
 - The core schema is validated by comparing the stored table definitions with the current ones after normalizing the quoting that SQLite applies to renamed tables.
+- Every value read from a database row is reached by the name of its column through the shared strict readers, because a row read by the position of an iterator has no name to fail by.
 - Storage has exactly two shapes: a typed table for what is queried, related or paged, and one settings document per owner for what is only read whole and written whole.
 - Every settings document lives in the core owned `plugin_settings` table keyed by the identity of its owner, and a plugin reaches it only through the scoped host, never through SQL.
 - A settings document is read for what its owner declares, so adding a setting is a change of code and never a change of schema.
@@ -473,7 +474,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The terminal status bar reports the workspace count and the terminal count instead of the active workspace name.
 - A gesture the terminal refuses travels to the plugin as the structured error it was, so the plugin that owns the catalog decides what the reader is told rather than receiving a sentence already rendered.
 - The two conditions a reader reaches, which are input the terminal has not read yet and a shell that has ended, carry a sentence of the catalog while every fault of the emulator stays in the log.
-- The two pseudo-terminal backends report a shared condition by one name, so nothing that reads a failure has to know which platform produced it.
+- The two pseudo-terminal backends report a shared condition by one name and in one sentence, so nothing that reads a failure has to know which platform produced it.
+- The lint command refuses a shared condition the two backends spell differently, because only one of them compiles per platform and no case can compare them.
 - The terminal actions offer the directory the shell is standing in to the Code Editor and to the Web Server, and offer each one only while its plugin is available.
 - Paste shortcuts use Command on macOS, Control on Windows and Control with Shift on Linux according to native terminal conventions.
 - Qt reports the macOS Command key as the control modifier and the physical Control key as the meta modifier, and the shortcut contract maps both explicitly.
@@ -1719,7 +1721,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Every condition the filesystem service reports reads in the editor as a sentence of its catalog naming the path, proven for the complete set the service can answer with.
 - [x] A paste the terminal has not finished reading and a shell that ended read in the language of the interface, while a fault of the emulator stays in the log.
 - [x] Every wheel notch reaches a program reading the mouse on both axes, proven by a case that read nothing sideways before the horizontal notch was reported.
-- [x] The POSIX and the Windows pseudo-terminal backends name their six shared conditions identically, which they did not before.
+- [x] The POSIX and the Windows pseudo-terminal backends name their six shared conditions identically and describe them in one sentence, which the lint command now refuses to let drift.
+- [x] The stored schema version is read by the name of its column through the shared strict reader rather than by dereferencing the first iterator of the row.
 - [x] A command task runs a real process for both endings, moving to Done on a zero exit code and back to the board with its reason on any other, and the directory it ran in is proven by a command that only succeeds beside a file that directory holds.
 - [x] A paste the reader refused writes nothing to the shell, a confirmed one reaches it, text that only wraps is never asked about and the setting turned off writes without asking, all driven through the key a reader presses.
 - [x] A selection is indented and unindented as whole lines, leaving a line nobody selected alone and answering a document resolved to tabs with a tab.

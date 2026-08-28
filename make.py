@@ -334,6 +334,30 @@ def inherited_catalogs() -> list[str]:
     return found
 
 
+def divergent_backend_conditions() -> list[str]:
+    backends = (
+        ROOT / "src" / "terminal" / "platform" / "posix" / "PosixPtyBackend.cpp",
+        ROOT / "src" / "terminal" / "platform" / "windows" / "ConPtyBackend.cpp",
+    )
+    spoken: dict[str, set[tuple[str, str]]] = {}
+
+    for path in backends:
+        text = path.read_text(encoding="utf-8")
+        found = re.findall(r'"(terminal_[a-z_]+)",\s*"([^"]+)"', text)
+        found += re.findall(r'QStringLiteral\("(terminal_[a-z_]+)"\),\s*QStringLiteral\("([^"]+)"\)', text)
+
+        for code, message in found:
+            spoken.setdefault(code, set()).add((path.name, message))
+
+    divergent = []
+
+    for code, said in sorted(spoken.items()):
+        if len({message for _, message in said}) > 1:
+            divergent.append(code + " is " + " and ".join(f"{message!r} in {name}" for name, message in sorted(said)))
+
+    return divergent
+
+
 def stray_comments() -> list[str]:
     found: list[str] = []
 
@@ -399,6 +423,11 @@ def task_lint(_: Context) -> None:
 
     if inherited:
         raise RuntimeError("Every language declares the keys it spells, because a catalog built from another one cannot be told from one that forgot a sentence:\n  " + "\n  ".join(inherited))
+
+    divergent = divergent_backend_conditions()
+
+    if divergent:
+        raise RuntimeError("Two implementations of one backend report a shared condition by one name, because only one of them compiles per platform:\n  " + "\n  ".join(divergent))
 
     run([
         executable("cppcheck"),

@@ -531,7 +531,13 @@ utils::Result<void> StateStore::initializeCoreSchema() {
         return utils::Result<void>::failure(versionRows.hasValue() ? utils::Error{"database_schema_invalid", "The application database schema version is unavailable", {}} : versionRows.error());
     }
 
-    const int version = versionRows.value().first().constBegin().value().toInt();
+    qint64 storedVersion = 0;
+
+    if (!readStoredInteger(versionRows.value().first().value(QStringLiteral("user_version")), storedVersion)) {
+        return utils::Result<void>::failure({"database_schema_invalid", "The application database schema version is invalid", {}});
+    }
+
+    const int version = static_cast<int>(storedVersion);
 
     if (version == coreDatabaseSchemaVersion) {
         return validateCoreSchema();
