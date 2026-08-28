@@ -4,6 +4,7 @@
 #include "TestFuture.h"
 #include "TestPluginHost.h"
 #include "TestTranslations.h"
+#include "persistence/StateStore.h"
 #include "ui/Icons.h"
 
 #include <QComboBox>
@@ -16,6 +17,7 @@
 #include <QSignalSpy>
 #include <QStackedWidget>
 #include <QTabWidget>
+#include <QTemporaryDir>
 #include <QTimer>
 #include <QTreeWidget>
 
@@ -619,6 +621,68 @@ TEST(BrowserBookmarksViewTest, OffersTheUngroupedChoiceFirstAndTheGroupsSortedAf
     EXPECT_EQ(plugin.bookmarks().first().name, QStringLiteral("Docs"));
     EXPECT_EQ(plugin.bookmarks().first().url, QUrl(QStringLiteral("https://qt.io")));
     EXPECT_EQ(plugin.bookmarks().first().groupId, beta.value());
+}
+
+// A double reproduces the statement and not the semantics that answer it, so what the browser keeps is written to a real database and read from it.
+TEST(BrowserPluginTest, KeepsItsTabsAndBookmarksThroughARealDatabase) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    persistence::StateStore store(directory.filePath(QStringLiteral("slotdeck.sqlite3")));
+    ASSERT_TRUE(store.initialize().hasValue());
+
+    QString workGroupId;
+    QString bookmarkId;
+    QString secondTabId;
+    {
+        auto host = BrowserTestsHelper::browserHost();
+        host.useDatabase(store, QStringLiteral("browser"));
+        BrowserPlugin plugin;
+        ASSERT_TRUE(plugin.initialize(host).hasValue());
+
+        ASSERT_TRUE(plugin.setHomepage(QStringLiteral("https://slotdeck.local/start")).hasValue());
+        const auto second = plugin.createTab(QUrl(QStringLiteral("https://qt.io/docs")), true);
+        ASSERT_TRUE(second.hasValue());
+        secondTabId = second.value();
+        ASSERT_TRUE(plugin.updateTabTitle(secondTabId, QStringLiteral("Qt Documentation")).hasValue());
+
+        const auto group = plugin.createBookmarkGroup(QStringLiteral("Work"));
+        ASSERT_TRUE(group.hasValue());
+        workGroupId = group.value();
+        const auto bookmark = plugin.createBookmark(QStringLiteral("Qt"), QStringLiteral("https://qt.io"), workGroupId);
+        ASSERT_TRUE(bookmark.hasValue());
+        bookmarkId = bookmark.value();
+        plugin.shutdown();
+    }
+
+    // A second start reads what the first one wrote, which is what a restart really does.
+    auto host = BrowserTestsHelper::browserHost();
+    host.useDatabase(store, QStringLiteral("browser"));
+    BrowserPlugin reopened;
+    ASSERT_TRUE(reopened.initialize(host).hasValue());
+
+    ASSERT_EQ(reopened.tabs().size(), 2);
+    const BrowserTab* restored = nullptr;
+    for (const auto& tab : reopened.tabs()) {
+        if (tab.id == secondTabId) {
+            restored = &tab;
+        }
+    }
+    ASSERT_NE(restored, nullptr);
+    EXPECT_EQ(restored->title, QStringLiteral("Qt Documentation"));
+    EXPECT_EQ(restored->url, QUrl(QStringLiteral("https://qt.io/docs")));
+    EXPECT_TRUE(restored->active);
+    EXPECT_TRUE(restored->createdAtUtc.isValid());
+    EXPECT_TRUE(restored->updatedAtUtc.isValid());
+
+    ASSERT_EQ(reopened.bookmarkGroups().size(), 1);
+    EXPECT_EQ(reopened.bookmarkGroups().first().id, workGroupId);
+    EXPECT_EQ(reopened.bookmarkGroups().first().name, QStringLiteral("Work"));
+    ASSERT_EQ(reopened.bookmarks().size(), 1);
+    EXPECT_EQ(reopened.bookmarks().first().id, bookmarkId);
+    EXPECT_EQ(reopened.bookmarks().first().name, QStringLiteral("Qt"));
+    EXPECT_EQ(reopened.bookmarks().first().url, QUrl(QStringLiteral("https://qt.io")));
+    EXPECT_EQ(reopened.bookmarks().first().groupId, workGroupId);
+    reopened.shutdown();
 }
 
 test::TestPluginHost BrowserTestsHelper::browserHost() {

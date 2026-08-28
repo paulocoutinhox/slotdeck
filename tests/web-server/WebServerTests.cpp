@@ -7,6 +7,7 @@
 #include "WebServerPlugin.h"
 #include "WebServerTranslations.h"
 #include "WebServerView.h"
+#include "persistence/StateStore.h"
 
 #include <QApplication>
 #include <QDialog>
@@ -516,6 +517,50 @@ TEST(WebServerPluginTest, RejectsInvalidPersistentStateAndStorageFailures) {
     EXPECT_EQ(unknownSettings.splitRatio(), 420);
     unknownSettings.shutdown();
 }
+// A double reproduces the statement and not the semantics that answer it, so a configuration is written to a real database and read from it.
+TEST(WebServerPluginTest, KeepsItsConfigurationsThroughARealDatabase) {
+    QTemporaryDir root;
+    QTemporaryDir data;
+    ASSERT_TRUE(root.isValid());
+    ASSERT_TRUE(data.isValid());
+    WebServerTestsHelper::writeFile(root.filePath(QStringLiteral("index.html")), QByteArrayLiteral("content"));
+    persistence::StateStore store(data.filePath(QStringLiteral("slotdeck.sqlite3")));
+    ASSERT_TRUE(store.initialize().hasValue());
+
+    const QString served = QFileInfo(root.path()).canonicalFilePath();
+    QTcpServer portProbe;
+    ASSERT_TRUE(portProbe.listen(QHostAddress::LocalHost, 0));
+    const quint16 port = portProbe.serverPort();
+    portProbe.close();
+    {
+        test::TestPluginHost host;
+        host.translations = plugins::webserver::translations::english();
+        host.useDatabase(store, QStringLiteral("web-server"));
+        plugins::webserver::WebServerPlugin plugin;
+        ASSERT_TRUE(plugin.initialize(host).hasValue());
+        ASSERT_TRUE(test::awaitFuture(plugin.configureAndStartWebServer(QStringLiteral("server-1"), QStringLiteral("Preview"), served, QStringLiteral("127.0.0.1"), port)).hasValue());
+        EXPECT_EQ(plugin.webServerPort(QStringLiteral("server-1")), port);
+        plugin.shutdown();
+    }
+
+    // A second start reads what the first one wrote, which is what a restart really does.
+    test::TestPluginHost host;
+    host.translations = plugins::webserver::translations::english();
+    host.useDatabase(store, QStringLiteral("web-server"));
+    plugins::webserver::WebServerPlugin reopened;
+    ASSERT_TRUE(reopened.initialize(host).hasValue());
+
+    EXPECT_TRUE(reopened.webServerConfigured(QStringLiteral("server-1")));
+    EXPECT_EQ(reopened.webServerName(QStringLiteral("server-1")), QStringLiteral("Preview"));
+    EXPECT_EQ(reopened.webServerRoot(QStringLiteral("server-1")), served);
+    EXPECT_EQ(reopened.webServerHost(QStringLiteral("server-1")), QStringLiteral("127.0.0.1"));
+    EXPECT_EQ(reopened.webServerPort(QStringLiteral("server-1")), port);
+
+    // A configuration is stopped when the product opens, because nothing runs until the reader asks for it.
+    EXPECT_FALSE(reopened.webServerRunning(QStringLiteral("server-1")));
+    reopened.shutdown();
+}
+
 TEST(WebServerPluginTest, ValidatesConfigurationRunsServerAndPreservesStateOnFailures) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());

@@ -1318,6 +1318,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A database fake answers only the columns the statement it received names, because a reader that forgot to select a column must fail in the suite exactly as it fails against the real database.
 - It answers the rows that statement selects and in the order it names, because a reader presenting the newest first must be exercised against the newest first.
 - A reader whose answer depends on real SQL is exercised against the real database rather than a double, because a double reproduces the statement and not the semantics that answer it.
+- What a plugin keeps between starts is written to a real database and read from a second start of that plugin, because a double enforces no column that must not be null, no value a check refuses and no row a cascade removes.
 - Integration tests load the real bundled plugin libraries and exercise discovery, dependency
   ordering, localization, navigation, settings and application composition.
 - Network tests bind only to ephemeral loopback ports, never contact external hosts and answer only after the request arrives, because a server that writes before the client speaks is not answering a request.
@@ -1468,6 +1469,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A stored settings value the owner cannot use is the declared default and every other value still loads, and a key nobody declares changes nothing.
 - [x] Every field of the AI, terminal and editor settings survives the document and comes back, proven against the writer that forgot one.
 - [x] Every field of a task, its schedule included, survives the database and comes back, proven against the reader that stopped selecting a column.
+- [x] The tabs, the bookmarks and the web server configurations survive a real database and a second start of their plugin, which nothing exercised before.
 - [x] A second consecutive external edit reaches the open document, proven by a case that was intermittent while the watch was not rearmed.
 - [x] The shared page header, data grid, tool button, section title, empty state and timestamp primitives are owned by the core and consumed by every plugin.
 - [x] First-run language selection follows complete system locale, base language and English order.
