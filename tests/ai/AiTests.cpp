@@ -134,6 +134,80 @@ TEST(AiTaskRepositoryTest, KeepsTheWorkspacesAndTasksAReaderAlreadyHasWhenTheSch
     EXPECT_TRUE(runs.value().first().value(QStringLiteral("provider_id")).toString().isEmpty());
 }
 
+// A column the writer fills and the reader never selects is data the reader loses, so every field of a task travels through real SQL and back.
+TEST(AiTaskRepositoryTest, CarriesEveryFieldOfATaskThroughTheDatabaseAndBack) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    persistence::StateStore store(directory.filePath(QStringLiteral("slotdeck.sqlite3")));
+    ASSERT_TRUE(store.initialize().hasValue());
+
+    test::TestPluginHost host;
+    host.useDatabase(store, QStringLiteral("ai"));
+    AiTaskRepository repository(host);
+    ASSERT_TRUE(repository.initialize().hasValue());
+
+    const QDateTime created = QDateTime::currentDateTimeUtc().addSecs(-3600);
+    const QDateTime updated = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, created, updated};
+    ASSERT_TRUE(test::awaitFuture(repository.createWorkspace(workspace)).hasValue());
+
+    TaskSchedule schedule;
+    schedule.kind = ScheduleKind::Cron;
+    schedule.enabled = true;
+    schedule.cronExpression = QStringLiteral("30 4 1 1 0");
+    schedule.timeZoneId = QByteArrayLiteral("America/Sao_Paulo");
+    schedule.nextRunAtUtc = updated.addDays(1);
+    schedule.lastTriggeredAtUtc = created;
+
+    AiTask written;
+    written.id = QStringLiteral("task-1");
+    written.workspaceId = workspace.id;
+    written.title = QStringLiteral("Ship the report");
+    written.description = QStringLiteral("Everything the reader asked for");
+    written.prompt = QStringLiteral("Write the report and file it");
+    written.issueUrl = QStringLiteral("https://issues.example.com/42");
+    written.agentId = AiTestsHelper::testAgent().id;
+    written.executionKind = TaskExecutionKind::Agent;
+    written.workdir = QStringLiteral("/tmp/project");
+    written.commandTimeoutSeconds = 900;
+    written.column = TaskColumn::Review;
+    written.position = 3;
+    written.createdAtUtc = created;
+    written.updatedAtUtc = updated;
+    written.schedule = schedule;
+
+    ASSERT_TRUE(test::awaitFuture(repository.saveTask(written)).hasValue());
+
+    const auto tasks = repository.tasks();
+    ASSERT_TRUE(tasks.hasValue());
+    ASSERT_EQ(tasks.value().size(), 1);
+    const AiTask read = tasks.value().first();
+
+    EXPECT_EQ(read.id, written.id);
+    EXPECT_EQ(read.workspaceId, written.workspaceId);
+    EXPECT_EQ(read.title, written.title);
+    EXPECT_EQ(read.description, written.description);
+    EXPECT_EQ(read.prompt, written.prompt);
+    EXPECT_EQ(read.issueUrl, written.issueUrl);
+    EXPECT_EQ(read.agentId, written.agentId);
+    EXPECT_EQ(read.executionKind, written.executionKind);
+    EXPECT_EQ(read.workdir, written.workdir);
+    EXPECT_EQ(read.command, written.command);
+    EXPECT_EQ(read.commandTimeoutSeconds, written.commandTimeoutSeconds);
+    EXPECT_EQ(read.column, written.column);
+    EXPECT_EQ(read.position, written.position);
+    EXPECT_EQ(read.createdAtUtc.toMSecsSinceEpoch(), written.createdAtUtc.toMSecsSinceEpoch());
+    EXPECT_EQ(read.updatedAtUtc.toMSecsSinceEpoch(), written.updatedAtUtc.toMSecsSinceEpoch());
+
+    ASSERT_TRUE(read.schedule.has_value());
+    EXPECT_EQ(read.schedule->kind, schedule.kind);
+    EXPECT_EQ(read.schedule->enabled, schedule.enabled);
+    EXPECT_EQ(read.schedule->cronExpression, schedule.cronExpression);
+    EXPECT_EQ(read.schedule->timeZoneId, schedule.timeZoneId);
+    EXPECT_EQ(read.schedule->nextRunAtUtc.toMSecsSinceEpoch(), schedule.nextRunAtUtc.toMSecsSinceEpoch());
+    EXPECT_EQ(read.schedule->lastTriggeredAtUtc.toMSecsSinceEpoch(), schedule.lastTriggeredAtUtc.toMSecsSinceEpoch());
+}
+
 TEST(AiTaskRepositoryTest, DeclaresConsecutiveMigrationsAndRoundTripsWorkspacesTasksAndQueue) {
     test::TestPluginHost host;
     AiTaskRepository repository(host);

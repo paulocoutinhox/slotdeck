@@ -359,6 +359,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Every rebuilt feature is named to the reader once, because the data it held is gone.
 - Every multi-statement domain mutation uses the host transaction API and rolls back completely on failure.
 - Plugins validate identifiers, enum values, timestamps, JSON fields and paging boundaries before persistence.
+- Every field of a persisted entity travels through real SQL and back, proven by a case that writes each of them away from its default, because a column the reader stops selecting is data the reader loses.
 - Timestamps are stored as UTC ISO 8601 values with milliseconds.
 - The shared `slotdeck::persistence` stored-value contract is the only implementation of the stored timestamp format, its parsing, its validation and strict integer reading.
 - Timestamps are converted to the current system timezone and locale only at presentation time.
@@ -1466,6 +1467,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Every shared component, stored-value and payload contract has direct coverage for its success, rejection and boundary cases.
 - [x] A stored settings value the owner cannot use is the declared default and every other value still loads, and a key nobody declares changes nothing.
 - [x] Every field of the AI, terminal and editor settings survives the document and comes back, proven against the writer that forgot one.
+- [x] Every field of a task, its schedule included, survives the database and comes back, proven against the reader that stopped selecting a column.
 - [x] A second consecutive external edit reaches the open document, proven by a case that was intermittent while the watch was not rearmed.
 - [x] The shared page header, data grid, tool button, section title, empty state and timestamp primitives are owned by the core and consumed by every plugin.
 - [x] First-run language selection follows complete system locale, base language and English order.
