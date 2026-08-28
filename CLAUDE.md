@@ -1662,6 +1662,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
 - [x] The registered suite reports 445 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] That number is held to what the suite really registers by the lint command, because a number nobody keeps is a number nobody believes.
+- [x] Every case holds in a random order, proven across five schedules of the whole suite, three of them parallel and two one case at a time, which nothing had exercised before.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the lint command refuses any other rather than leaving it to a reading.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
