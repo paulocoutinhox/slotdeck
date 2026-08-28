@@ -1523,6 +1523,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Invalid configuration transfers preserve the current database and report explicit errors.
 - [x] Interrupted import finalization cannot reapply a database that was already rejected and rolled back.
 - [x] The process lock prevents concurrent writers.
+- [x] A start refused by that lock or by a data directory it cannot create is torn down without having built anything, and takes nothing from the instance that holds the lock.
 - [x] Each plugin owns one embedded creating migration for its prefixed tables and indexes.
 - [x] Composed plugin writes use rollback-safe database transactions.
 - [x] Logs load newest first in bounded pages and support filtering and explicit clearing.

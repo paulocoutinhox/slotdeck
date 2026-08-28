@@ -1857,6 +1857,47 @@ TEST(CalendarPopupTest, OpensFromTheIndicatorAndPaintsEveryDayOfTheMonthItIsRead
     EXPECT_FALSE(calendar->isVisible());
 }
 
+// A start that fails must leave nothing behind, because the reader retries it and the process lock is what keeps two writers apart.
+TEST(ApplicationTest, TearsDownAfterAFailedStartAndKeepsTheLockOfTheOneThatHasIt) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+
+    app::Application running(directory.path(), nullptr);
+    ASSERT_TRUE(running.initialize().hasValue());
+
+    {
+        // A second instance on the same data must be refused rather than take the lock away from the first.
+        app::Application second(directory.path(), nullptr);
+        const auto refused = second.initialize();
+        ASSERT_FALSE(refused.hasValue());
+        EXPECT_EQ(refused.error().code, QStringLiteral("application_already_running"));
+    }
+
+    // The one that has the lock still has it, so the refusal took nothing from it.
+    app::Application third(directory.path(), nullptr);
+    EXPECT_EQ(third.initialize().error().code, QStringLiteral("application_already_running"));
+
+    // A data directory that cannot be created is refused by name and destroyed without having built anything.
+    const QString blocked = directory.filePath(QStringLiteral("occupied"));
+    QFile occupant(blocked);
+    ASSERT_TRUE(occupant.open(QIODevice::WriteOnly));
+    occupant.write(QByteArrayLiteral("not a directory"));
+    occupant.close();
+    {
+        app::Application unusable(QDir(blocked).filePath(QStringLiteral("data")), nullptr);
+        const auto refused = unusable.initialize();
+        ASSERT_FALSE(refused.hasValue());
+        EXPECT_EQ(refused.error().code, QStringLiteral("application_data_directory_failed"));
+    }
+
+    running.shutdown();
+
+    // Once it has gone the next instance opens, which is what makes the refusal a lock rather than a wall.
+    app::Application after(directory.path(), nullptr);
+    EXPECT_TRUE(after.initialize().hasValue());
+    after.shutdown();
+}
+
 TEST(ApplicationTest, EndsQuietlyWhenTheWindowIsClosedWhileItIsStillLoading) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());
