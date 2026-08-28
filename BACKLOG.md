@@ -42,6 +42,20 @@ Every item below is read-only analysis. None of them changes a file.
   shared implementation that must edit several files atomically, including files that are not open,
   with a single undo step and without breaking the language server synchronization.
 
+## The reaper a destructor builds
+
+The POSIX backend reaps its child through a singleton whose thread is created the first time a
+terminal is terminated, and that first call is reached from `~PosixPtyBackend`. A destructor is
+implicitly noexcept, so a thread the system refuses to create ends the process rather than being
+reported.
+
+Moving the construction to `start()` only moves the throw, because this project has no try and no
+catch anywhere and its whole error model is `utils::Result`. Handling it would mean the one
+exception handler in the codebase, for a condition where the system is already refusing threads.
+
+The boundary is named here rather than hidden. If it has to be answered, the step is to reap the
+child from the event loop the backend already runs on instead of from a thread of its own.
+
 ## The thread sanitizer
 
 Running the registered suite under `-fsanitize=thread` on 2026-08-28 reported 298 warnings and

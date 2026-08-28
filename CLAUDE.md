@@ -1779,6 +1779,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 
 - Static analysis runs clang-tidy with the bugprone, performance, misc and clang-analyzer checks over the compile database, and its reports are triaged rather than applied, because a sink parameter taken by value and moved is correct even when a check calls it a copy.
 - A widening report over a literal that already fits, a narrowing report over a flag set the drawing call takes as an integer and a multilevel pointer report over a C interop argument stay unapplied for the same reason, while a report that the value behind an optional was read without the analyzer seeing the guard is applied, because that one reads as a doubt in the code itself.
+- A result a future continuation receives by value is the shape that library hands it, so a copy report over one is not applied, and neither is a report over a value that is only ever implicitly shared.
+- A report over a source only one platform compiles is read against that platform before it is believed, because the parse that produced it resolved the preprocessor branches of another one.
 - A lambda parameter never repeats the name of a parameter of the function that contains it, because GCC rejects it as a shadow while Clang accepts it and the failure only appears on the Linux build.
 - A sweep driven by the compiler covers only what the running platform compiles, so a change that touches a shared type is also searched by hand through the sources the other platforms own.
 - The argument vector a command line provider declares is verified against the help of the installed program, because a flag that program does not accept is refused before any work and ends every run of that provider.
