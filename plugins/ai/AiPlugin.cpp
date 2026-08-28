@@ -1660,6 +1660,11 @@ qint64 AiPlugin::reservedContextTokens(const ModelConnection& connection) const 
     // clang-format off
     const auto translate = [this](const QString& key) { return m_host->translate(key); };
     // clang-format on
+    // A command line agent is handed a prompt and runs its own tools, so neither an answer budget nor a tool declaration travels and neither takes room from the window.
+    if (connectionProtocol(connection) == WireProtocol::CommandLine) {
+        return 0;
+    }
+
     const qint64 tools = m_tools == nullptr ? 0 : estimateTokens(serializeTools(connectionProtocol(connection), m_tools->schemas(), translate));
     return tools + std::max<qint64>(outputBudget(connection), 0);
 }

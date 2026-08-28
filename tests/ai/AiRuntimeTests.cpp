@@ -2030,6 +2030,27 @@ TEST(AiToolRegistryTest, DiscoversSkillsInThePublishedLayoutAndDisclosesThemProg
 }
 
 // A model whose answer budget takes its whole window leaves no room, and a conversation nobody fits overflows the model instead of compacting.
+// A command line agent is handed a prompt and runs its own tools, so nothing takes room from its window and a long conversation still reaches it.
+TEST(AiToolContractTest, LeavesTheWholeWindowToAConversationBoundForACommandLineAgent) {
+    const ProviderDescriptor* provider = findProvider(QStringLiteral("grok-cli"));
+    ASSERT_NE(provider, nullptr);
+
+    // The service publishes the same number for what this model reads and for what it may answer.
+    const ModelDescriptor* model = findModel(*provider, QStringLiteral("grok-4.6"));
+    ASSERT_NE(model, nullptr);
+    EXPECT_EQ(model->maximumOutputTokens, model->contextWindow);
+
+    // Reserving what it may answer would leave nothing at all.
+    const std::optional<qint64> reserved = fittingTokenLimit(model->contextWindow, model->maximumOutputTokens);
+    ASSERT_TRUE(reserved.has_value());
+    EXPECT_EQ(reserved.value(), 0);
+
+    // Reserving none of it leaves the conversation the window it really has.
+    const std::optional<qint64> whole = fittingTokenLimit(model->contextWindow, 0);
+    ASSERT_TRUE(whole.has_value());
+    EXPECT_GT(whole.value(), model->contextWindow / 2);
+}
+
 TEST(AiToolContractTest, FitsTheConversationWhenTheReservationTakesTheWholeWindow) {
     QJsonArray conversation;
     conversation.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("system")}, {QStringLiteral("content"), QStringLiteral("instructions")}});
