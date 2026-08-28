@@ -1357,7 +1357,8 @@ TEST(CodeEditorRepositoryTest, CarriesEveryFieldOfItsSettingsThroughTheDocumentA
     CodeEditorSettings written;
     written.wordWrap = true;
     written.languageServersEnabled = false;
-    written.fontFamily = QStringLiteral("Courier New");
+    // The family has to be one this system really has, because the reader keeps only an installed monospaced family.
+    written.fontFamily = ui::monospacedFontFamilies().isEmpty() ? ui::defaultMonospacedFontFamily() : ui::monospacedFontFamilies().last();
     written.fontSize = 19;
     written.defaultCharset = TextCharset::Utf16Be;
     written.colorSchemeId = CodeColorSchemeCatalog::schemes().last().id;
