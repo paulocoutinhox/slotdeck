@@ -392,6 +392,31 @@ TEST(TerminalSettingsTest, TakesTheDeclaredDefaultForEveryStoredValueItCannotUse
     EXPECT_EQ(writeHost.notifications.first().severity, plugins::AlertSeverity::Error);
 }
 
+// A field the writer or the reader forgot is a preference the reader loses on the next start, so every one of them travels both ways.
+TEST(TerminalSettingsStoreTest, CarriesEveryFieldOfItsSettingsThroughTheDocumentAndBack) {
+    test::TestPluginHost host;
+    plugins::terminalplugin::TerminalSettingsStore store(host);
+    ASSERT_TRUE(store.initialize().hasValue());
+
+    const QString family = ui::monospacedFontFamilies().isEmpty() ? ui::defaultMonospacedFontFamily() : ui::monospacedFontFamilies().last();
+    store.setFontFamily(family);
+    store.setFontSize(19);
+    store.setThemeId(QStringLiteral("vivid"));
+    store.setConfirmMultilinePaste(false);
+    store.setAllowClipboardWrite(true);
+
+    ASSERT_FALSE(host.savedSettings.isEmpty());
+    host.settingsDocument = host.savedSettings.last();
+
+    plugins::terminalplugin::TerminalSettingsStore reopened(host);
+    ASSERT_TRUE(reopened.initialize().hasValue());
+    EXPECT_EQ(reopened.fontFamily(), family);
+    EXPECT_EQ(reopened.fontSize(), 19);
+    EXPECT_EQ(reopened.themeId(), QStringLiteral("vivid"));
+    EXPECT_FALSE(reopened.confirmMultilinePaste());
+    EXPECT_TRUE(reopened.allowClipboardWrite());
+}
+
 TEST(ShellProfileTest, QuotesLocalPathsAndResolvesExecutableProfiles) {
     const terminalcore::ShellProfile profile{QStringLiteral("zsh"), QStringLiteral("zsh"), QStringLiteral("/bin/zsh"), {}};
 #ifdef Q_OS_WIN

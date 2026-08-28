@@ -1349,6 +1349,32 @@ TEST(CodeEditorViewTest, ReconcilesItsWorkspaceTabsInsteadOfBuildingThemAgain) {
     EXPECT_EQ(destroyed.count(), 0) << "the workspace the reader kept was built again";
 }
 
+// A field the writer or the reader forgot is a preference the reader loses on the next start, so every one of them travels both ways.
+TEST(CodeEditorRepositoryTest, CarriesEveryFieldOfItsSettingsThroughTheDocumentAndBack) {
+    test::TestPluginHost host;
+    CodeEditorRepository repository(host);
+
+    CodeEditorSettings written;
+    written.wordWrap = true;
+    written.languageServersEnabled = false;
+    written.fontFamily = QStringLiteral("Courier New");
+    written.fontSize = 19;
+    written.defaultCharset = TextCharset::Utf16Be;
+    written.colorSchemeId = CodeColorSchemeCatalog::schemes().last().id;
+
+    ASSERT_TRUE(test::awaitFuture(repository.saveSettings(written)).hasValue());
+    ASSERT_FALSE(host.savedSettings.isEmpty());
+    host.settingsDocument = host.savedSettings.last();
+
+    const CodeEditorSettings read = repository.loadSettings();
+    EXPECT_EQ(read.wordWrap, written.wordWrap);
+    EXPECT_EQ(read.languageServersEnabled, written.languageServersEnabled);
+    EXPECT_EQ(read.fontFamily, written.fontFamily);
+    EXPECT_EQ(read.fontSize, written.fontSize);
+    EXPECT_EQ(read.defaultCharset, written.defaultCharset);
+    EXPECT_EQ(read.colorSchemeId, written.colorSchemeId);
+}
+
 TEST(CodeEditorPluginTest, OpensAFolderOnceAndRevealsItselfWhenAnotherPluginAsks) {
     test::TestPluginHost host;
     filesystem::FileSystemService service;

@@ -1135,6 +1135,89 @@ TEST(AiToolRegistryTest, PublishesServerToolsUnderAQualifiedNameAndRoutesTheCall
     EXPECT_TRUE(results.at(6).failed);
 }
 
+// A field the writer or the reader forgot is a setting the reader loses on the next start, so every one of them travels both ways.
+TEST(AiTaskRepositoryTest, CarriesEveryFieldOfItsSettingsThroughTheDocumentAndBack) {
+    test::TestPluginHost host;
+    AiTaskRepository repository(host);
+
+    ModelConnection connection = AiTestsHelper::testConnection();
+    connection.displayName = QStringLiteral("The one I named");
+    connection.extraParameters = QJsonObject{{QStringLiteral("seed"), 7}};
+
+    AiAgent agent = AiTestsHelper::testAgent();
+    agent.description = QStringLiteral("Reads the issue and answers it");
+    agent.maximumIterations = 21;
+
+    McpServerDescriptor server;
+    server.id = QStringLiteral("issues");
+    server.transport = McpTransport::Http;
+    server.url = QStringLiteral("https://issues.example.com/mcp");
+    server.apiKey = QStringLiteral("{env.ISSUES_TOKEN}");
+    server.roots = QStringList({QStringLiteral("/tmp/project")});
+    server.samplingEnabled = true;
+    server.samplingMaximumTokens = 2048;
+
+    ProviderRateLimit limit;
+    limit.providerId = QStringLiteral("openai");
+    limit.minimumIntervalMs = 250;
+    limit.maximumRequestsPerMinute = 30;
+    limit.maximumConcurrentRequests = 2;
+
+    AiSettings written;
+    written.connections = {connection};
+    written.defaultConnectionKey = connectionKey(connection);
+    written.execution = {17, 900, 4, 15};
+    written.search = {SearchProvider::SearxNg, QStringLiteral("https://search.example.com"), QStringLiteral("{env.SEARX_TOKEN}")};
+    written.speech = {SpeechProvider::OpenAi, QStringLiteral("alloy"), QStringLiteral("{env.SPEECH_TOKEN}")};
+    written.mcpServers = {server};
+    written.rateLimits = {limit};
+    written.agents = {agent};
+
+    ASSERT_TRUE(test::awaitFuture(repository.saveSettings(written)).hasValue());
+    ASSERT_EQ(host.savedSettings.size(), 1);
+    host.settingsDocument = host.savedSettings.first();
+
+    const AiSettings read = repository.settings();
+
+    ASSERT_EQ(read.connections.size(), 1);
+    EXPECT_EQ(read.connections.first().providerId, connection.providerId);
+    EXPECT_EQ(read.connections.first().modelId, connection.modelId);
+    EXPECT_EQ(read.connections.first().displayName, connection.displayName);
+    EXPECT_EQ(read.connections.first().apiKey, connection.apiKey);
+    EXPECT_EQ(read.connections.first().address, connection.address);
+    EXPECT_EQ(read.connections.first().parameters, connection.parameters);
+    EXPECT_EQ(read.connections.first().extraParameters, connection.extraParameters);
+    EXPECT_EQ(read.defaultConnectionKey, written.defaultConnectionKey);
+
+    EXPECT_EQ(read.execution.maximumIterations, 17);
+    EXPECT_EQ(read.execution.commandTimeoutSeconds, 900);
+    EXPECT_EQ(read.execution.parallelExecutions, 4);
+    EXPECT_EQ(read.execution.chatFontSize, 15);
+
+    EXPECT_EQ(read.search.provider, SearchProvider::SearxNg);
+    EXPECT_EQ(read.search.instanceUrl, written.search.instanceUrl);
+    EXPECT_EQ(read.search.apiKey, written.search.apiKey);
+
+    EXPECT_EQ(read.speech.provider, SpeechProvider::OpenAi);
+    EXPECT_EQ(read.speech.voiceId, written.speech.voiceId);
+    EXPECT_EQ(read.speech.apiKey, written.speech.apiKey);
+
+    ASSERT_EQ(read.mcpServers.size(), 1);
+    EXPECT_EQ(read.mcpServers.first().id, server.id);
+    EXPECT_EQ(read.mcpServers.first().transport, server.transport);
+    EXPECT_EQ(read.mcpServers.first().url, server.url);
+    EXPECT_EQ(read.mcpServers.first().apiKey, server.apiKey);
+    EXPECT_EQ(read.mcpServers.first().roots, server.roots);
+    EXPECT_EQ(read.mcpServers.first().samplingEnabled, server.samplingEnabled);
+    EXPECT_EQ(read.mcpServers.first().samplingMaximumTokens, server.samplingMaximumTokens);
+
+    ASSERT_EQ(read.rateLimits.size(), 1);
+    EXPECT_EQ(read.rateLimits.first(), limit);
+
+    ASSERT_EQ(read.agents.size(), 1);
+    EXPECT_EQ(read.agents.first(), agent);
+}
+
 TEST(AiTaskRepositoryTest, StoresEveryDeclaredMcpServerAndRejectsAnIncompleteOne) {
     test::TestPluginHost host;
     AiTaskRepository repository(host);

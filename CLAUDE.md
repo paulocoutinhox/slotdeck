@@ -1248,6 +1248,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A member variable carries the `m_` prefix and no identifier begins or ends with an underscore.
 - A value object holding configuration is named `<Owner>Settings`, a type that only loads and saves it is named `<Owner>SettingsStore`, a type that persists the entities of a plugin is named `<Owner>Repository` and carries the settings document of that plugin, and a settings surface is named `<Owner>SettingsView`.
 - The conversion between a settings document and its value object is named `settingsFromDocument` and `settingsDocument` in every owner that has such a value object, and an owner holding a single stored value needs none.
+- Every field of such a value object travels both ways through that pair, proven by a case that writes each of them away from its default and reads them all back, because a field either half forgot is a setting the reader loses on the next start.
 - Descriptive names make routine comments unnecessary.
 - Every comment is a complete sentence starting with a capital letter and ending with a period.
 - A sentence that must start with an identifier written in lowercase keeps its exact spelling, and the sentence is preferably rewritten so that identifier is not at the start.
@@ -1464,6 +1465,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Every style sheet resolves its theme values through the single token substitution, no token is defined without a style sheet that consumes it and no style sheet writes one nothing substitutes, which the lint command now refuses.
 - [x] Every shared component, stored-value and payload contract has direct coverage for its success, rejection and boundary cases.
 - [x] A stored settings value the owner cannot use is the declared default and every other value still loads, and a key nobody declares changes nothing.
+- [x] Every field of the AI, terminal and editor settings survives the document and comes back, proven against the writer that forgot one.
 - [x] A second consecutive external edit reaches the open document, proven by a case that was intermittent while the watch was not rearmed.
 - [x] The shared page header, data grid, tool button, section title, empty state and timestamp primitives are owned by the core and consumed by every plugin.
 - [x] First-run language selection follows complete system locale, base language and English order.
