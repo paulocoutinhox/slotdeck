@@ -283,6 +283,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Destructors do not join workers while the interface is interactive.
 - Final process teardown may join owned threads only after the main window and plugin views have been destroyed.
 - The database executor drains its serialized queue before plugin libraries unload so cancelled continuations are released while their code is still mapped.
+- That drain runs what is already waiting rather than discarding it, because the last thing a plugin writes as the product closes is what the next start reads.
 - The filesystem service drains its serialized queue during final teardown before plugin libraries unload so cancelled continuations are released while their code is still mapped.
 - Background failure paths return structured errors, restore consistent state and notify through the shared alert system.
 
@@ -1538,6 +1539,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A group of three bookmarks removed beside an existing ungrouped one keeps all four, keeps their order and writes them numbered from zero.
 - [x] A workspace that comes back without the terminal a server was created from drops that link and keeps the server, with its name, its root and its port as they were.
 - [x] Two snapshots of the tabs answering out of order leave the later one standing, and a failure after them rolls back to it rather than to the earlier one.
+- [x] Every write still waiting when the executor is destroyed reaches the disk, and a folder opened the moment before the product closes is there when it opens again.
 - [x] The cost of a run reaches the reader in the execution history, proven through the fake that answers the columns the real schema has.
 - [x] The price of every model the catalog carries reaches it, a model nobody priced reports no cost, and a price of the wrong shape or below zero rejects the plugin.
 - [x] The view follows the reader instead of dragging them to the end of every message that arrives.

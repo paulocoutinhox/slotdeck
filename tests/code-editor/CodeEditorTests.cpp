@@ -1735,6 +1735,37 @@ TEST(CodeEditorRepositoryTest, MigratesLoadsAndPersistsStrictWorkspaceState) {
     EXPECT_EQ(repository.load().value().size(), 1);
 }
 
+// Closing the product writes what the editor holds even when the wait before saving has not elapsed, because a workspace opened a moment before closing is still a workspace the reader opened.
+TEST(CodeEditorPluginTest, WritesWhatItHoldsWhenTheProductClosesBeforeThePersistenceWaitElapses) {
+    QTemporaryDir root;
+    ASSERT_TRUE(root.isValid());
+    QTemporaryDir data;
+    ASSERT_TRUE(data.isValid());
+    const QString path = data.filePath(QStringLiteral("slotdeck.sqlite3"));
+    persistence::StateStore store(path);
+    ASSERT_TRUE(store.initialize().hasValue());
+
+    test::TestPluginHost host;
+    host.useDatabase(store, QStringLiteral("code-editor"));
+    filesystem::FileSystemService files;
+    host.useFileSystem(files);
+
+    {
+        CodeEditorPlugin plugin;
+        ASSERT_TRUE(plugin.initialize(host).hasValue());
+        ASSERT_TRUE(plugin.openWorkspace(root.path()).hasValue());
+        ASSERT_EQ(plugin.workspaces().size(), 1);
+
+        // Nothing waits for the debounce, which is what closing the window in the moment after opening a folder really does.
+        plugin.shutdown();
+    }
+
+    const auto rows = store.queryPluginDatabase(QStringLiteral("code-editor"), QStringLiteral("SELECT root_path FROM code_editor_workspaces"), {});
+    ASSERT_TRUE(rows.hasValue()) << rows.error().message.toStdString();
+    ASSERT_EQ(rows.value().size(), 1);
+    EXPECT_EQ(rows.value().first().value(QStringLiteral("root_path")).toString(), QFileInfo(root.path()).canonicalFilePath());
+}
+
 TEST(CodeEditorPluginTest, PublishesMetadataAndManagesFolderTabs) {
     test::TestPluginHost host;
     CodeEditorPlugin plugin;

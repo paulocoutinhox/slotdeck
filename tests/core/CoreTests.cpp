@@ -251,6 +251,35 @@ TEST(StateStoreTest, ReportsPathMigrationAndTransactionErrors) {
     EXPECT_EQ(valid.pluginSchemaVersion(QStringLiteral("sample")).value(), 1);
 }
 
+// A write queued as the product closes is what the next start reads, so the executor runs what is waiting before it closes rather than discarding it.
+TEST(DatabaseExecutorTest, RunsEveryWriteStillWaitingWhenItIsDestroyed) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("slotdeck.sqlite3"));
+    {
+        persistence::StateStore store(path);
+        ASSERT_TRUE(store.initialize().hasValue());
+        ASSERT_TRUE(store.migratePluginDatabase(QStringLiteral("sample"), {{1, {QStringLiteral("CREATE TABLE sample_values(id INTEGER PRIMARY KEY, value TEXT NOT NULL)")}}}).hasValue());
+    }
+
+    constexpr int queued = 40;
+    {
+        persistence::DatabaseExecutor executor(path);
+
+        for (int index = 0; index < queued; ++index) {
+            // The future is dropped exactly as a plugin closing its state drops it, so nothing here waits for the write.
+            [[maybe_unused]] auto pending = executor.executePluginDatabase(QStringLiteral("sample"), QStringLiteral("INSERT INTO sample_values(id, value) VALUES(?, ?)"), {index, QStringLiteral("kept")});
+        }
+    }
+
+    // Every one of them is on disk, because the executor closes behind what it was already given.
+    persistence::StateStore reopened(path);
+    ASSERT_TRUE(reopened.initialize().hasValue());
+    const auto rows = reopened.queryPluginDatabase(QStringLiteral("sample"), QStringLiteral("SELECT id FROM sample_values"), {});
+    ASSERT_TRUE(rows.hasValue()) << rows.error().message.toStdString();
+    EXPECT_EQ(rows.value().size(), queued);
+}
+
 TEST(DatabaseExecutorTest, SerializesRuntimeQueriesAndReportsStorageErrorsAsynchronously) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());
