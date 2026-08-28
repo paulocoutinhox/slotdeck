@@ -1664,6 +1664,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Typing while a large file is being read keeps what was typed and reports the conflict instead of losing it.
 - [x] A second save asked for while the first is still being written reaches the file.
 - [x] A connection that bursts more than any request may occupy is refused and the server keeps serving.
+- [x] A client that opens a request and never finishes it is closed at the deadline the server declares, and the next request is answered.
 - [x] The real pseudo-terminal starts a shell, delivers what it wrote and reports its exit after it.
 - [x] Nothing destroys a socket notifier from inside the read that notifier is delivering.
 - [x] A completed plugin request leaves no guard behind on the context it was given.

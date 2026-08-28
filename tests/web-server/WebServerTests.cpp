@@ -233,6 +233,33 @@ TEST(WebServerInstanceTest, RefusesABurstLargerThanAnyRequestAndKeepsServing) {
     EXPECT_TRUE(server.running());
 }
 
+// A client that opens a connection and never finishes its request holds it until the deadline the server declares.
+TEST(WebServerInstanceTest, ClosesAConnectionThatNeverFinishesItsRequest) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    WebServerTestsHelper::writeFile(directory.filePath(QStringLiteral("index.html")), QByteArrayLiteral("content"));
+    plugins::webserver::WebServerInstance server;
+    ASSERT_TRUE(server.start(directory.path(), QStringLiteral("127.0.0.1"), 0));
+
+    QTcpSocket stalled;
+    stalled.connectToHost(QHostAddress::LocalHost, server.port());
+    ASSERT_TRUE(stalled.waitForConnected(2000));
+
+    // The request opens and never ends, which is what a client holding a connection open looks like.
+    stalled.write(QByteArrayLiteral("GET / HTTP/1.1\r\nHost: localhost\r\n"));
+    ASSERT_TRUE(stalled.waitForBytesWritten(2000));
+
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&stalled]() { return stalled.state() != QAbstractSocket::ConnectedState; }, 20000)) << "the server held the connection past its deadline";
+    // clang-format on
+
+    // The server kept serving, so expiring one connection cost nothing to the next.
+    const QByteArray answered = WebServerTestsHelper::request(server, QByteArrayLiteral("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n"));
+    EXPECT_TRUE(answered.startsWith(QByteArrayLiteral("HTTP/1.1 200 OK"))) << answered.toStdString();
+    EXPECT_TRUE(server.running());
+    server.stop();
+}
+
 TEST(WebServerInstanceTest, KeepsServingThroughManyConnectionsIncludingOnesThatLeaveEarly) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());
