@@ -324,6 +324,54 @@ TEST(BrowserPluginTest, ManagesOrderedBookmarkGroupsAndBookmarksWithStrictValida
     EXPECT_EQ(plugin.bookmarks().size(), 1);
     EXPECT_GT(host.databaseTransactions.size(), 6);
 }
+// Removing a group keeps every bookmark it held, in the order they were in, because a group is a way of arranging them and not a thing that owns them.
+TEST(BrowserPluginTest, KeepsEveryBookmarkOfAGroupInOrderWhenThatGroupIsRemoved) {
+    auto host = BrowserTestsHelper::browserHost();
+    BrowserPlugin plugin;
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+
+    const auto group = plugin.createBookmarkGroup(QStringLiteral("Reading"));
+    ASSERT_TRUE(group.hasValue());
+    const auto loose = plugin.createBookmark(QStringLiteral("Loose"), QStringLiteral("https://example.com/loose"), {});
+    const auto first = plugin.createBookmark(QStringLiteral("First"), QStringLiteral("https://example.com/first"), group.value());
+    const auto second = plugin.createBookmark(QStringLiteral("Second"), QStringLiteral("https://example.com/second"), group.value());
+    const auto third = plugin.createBookmark(QStringLiteral("Third"), QStringLiteral("https://example.com/third"), group.value());
+    ASSERT_TRUE(loose.hasValue() && first.hasValue() && second.hasValue() && third.hasValue());
+    ASSERT_EQ(plugin.bookmarks().size(), 4);
+
+    const QVector<QString> before = QVector<QString>{first.value(), second.value(), third.value()};
+    ASSERT_TRUE(plugin.removeBookmarkGroup(group.value()).hasValue());
+    EXPECT_TRUE(plugin.bookmarkGroups().isEmpty());
+    ASSERT_EQ(plugin.bookmarks().size(), 4);
+
+    QVector<QString> after;
+
+    for (const auto& bookmark : plugin.bookmarks()) {
+        EXPECT_TRUE(bookmark.groupId.isEmpty()) << bookmark.name.toStdString();
+        if (before.contains(bookmark.id)) {
+            after.append(bookmark.id);
+        }
+    }
+
+    EXPECT_EQ(after, before);
+
+    // What is written back numbers the ungrouped collection from zero without a gap, which is what the next start demands of it.
+    ASSERT_FALSE(host.databaseTransactions.isEmpty());
+    QVector<int> written;
+
+    for (const auto& statement : host.databaseTransactions.constLast()) {
+        if (statement.statement.contains(QStringLiteral("INSERT INTO browser_bookmarks"))) {
+            written.append(statement.bindings.at(2).toInt());
+        }
+    }
+
+    ASSERT_EQ(written.size(), 4);
+
+    for (int index = 0; index < written.size(); ++index) {
+        EXPECT_EQ(written.at(index), index);
+    }
+}
+
 TEST(BrowserPluginTest, RestoresCompleteBookmarkStateAndRejectsCorruptRows) {
     const QString created = QStringLiteral("2026-08-14T12:00:00.000Z");
     const QString updated = QStringLiteral("2026-08-14T12:01:00.000Z");

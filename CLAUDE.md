@@ -929,6 +929,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Users can create, edit and remove groups and bookmarks through the Browser-owned panel without exposing storage details to the core.
 - The bookmarks panel is hidden by default and is shown or hidden from the toolbar toggle.
 - Removing a group preserves its bookmarks by moving them to the ungrouped collection in their existing relative order.
+- The position of a bookmark inside its container is numbered by the write rather than carried by the bookmark, so a collection that gains the bookmarks of a removed group is still numbered from zero without a gap, which is what the next start demands of it.
 - Bookmarks can be dragged between groups, reordered within a group or dropped into the ungrouped collection.
 - Every drag result must contain every known group and bookmark exactly once and must reject unknown or duplicate identifiers.
 - A bookmark opens explicitly in the focused current tab or in a newly activated tab and double-click opens it in the current tab.
@@ -1533,6 +1534,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A database two versions along refuses an older build by name instead of being rebuilt, and a schema that really cannot be used is still rebuilt.
 - [x] The application keeps its data where the platform says unless the reader names a directory, and every way of naming one badly is refused.
 - [x] A database the previous version of the product left keeps its workspaces, its tasks and its runs when the AI schema gains its second version, proven against the real schema rather than a sample one.
+- [x] A group of three bookmarks removed beside an existing ungrouped one keeps all four, keeps their order and writes them numbered from zero.
 - [x] The cost of a run reaches the reader in the execution history, proven through the fake that answers the columns the real schema has.
 - [x] The price of every model the catalog carries reaches it, a model nobody priced reports no cost, and a price of the wrong shape or below zero rejects the plugin.
 - [x] The view follows the reader instead of dragging them to the end of every message that arrives.
