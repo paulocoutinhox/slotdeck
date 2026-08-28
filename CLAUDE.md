@@ -1500,6 +1500,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Diagnostics are underlined in the text, presented in the tooltip and forgotten when their document closes.
 - [x] An `.editorconfig` that appears, changes or disappears reindents the open documents of that workspace immediately.
 - [x] Configuration export waits behind pending database writes and produces one consistent SQLite snapshot.
+- [x] An export says it started and says it finished, leaves a database this version opens carrying what the shell held, and releases the transfer so the next one is not refused.
 - [x] Configuration import validates and stages the complete database before orderly restart and atomic replacement.
 - [x] Invalid configuration transfers preserve the current database and report explicit errors.
 - [x] Interrupted import finalization cannot reapply a database that was already rejected and rolled back.

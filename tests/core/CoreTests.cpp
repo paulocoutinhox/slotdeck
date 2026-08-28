@@ -492,6 +492,36 @@ TEST(ConfigurationManagerTest, RejectsConcurrentConfigurationTransfers) {
     EXPECT_FALSE(stateChanged.last().first().toBool());
 }
 
+// Exporting says it started and says it finished, and what it left behind is a database the product can open.
+TEST(ConfigurationManagerTest, ExportsTheConfigurationAndReleasesTheTransferItHeld) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const QString databasePath = directory.filePath(QStringLiteral("slotdeck.sqlite3"));
+    persistence::StateStore store(databasePath);
+    ASSERT_TRUE(store.initialize().hasValue());
+    ASSERT_TRUE(store.saveSettings(QStringLiteral("core"), QJsonObject{{QStringLiteral("language"), QStringLiteral("pt-br")}}).hasValue());
+    persistence::DatabaseExecutor executor(databasePath);
+    app::ConfigurationManager manager(executor, directory.filePath(QStringLiteral("pending.sqlite3")), {});
+    QSignalSpy stateChanged(&manager, &app::ConfigurationManager::transferStateChanged);
+
+    const QString exported = directory.filePath(QStringLiteral("export.sqlite3"));
+    ASSERT_TRUE(test::awaitFuture(manager.exportConfiguration(exported)).hasValue());
+
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&stateChanged]() { return stateChanged.count() == 2; }));
+    // clang-format on
+    EXPECT_TRUE(stateChanged.first().first().toBool());
+    EXPECT_FALSE(stateChanged.last().first().toBool());
+
+    // What was written is a database this version opens, carrying what the settings of the shell held.
+    persistence::StateStore snapshot(exported);
+    ASSERT_TRUE(snapshot.initialize().hasValue());
+    EXPECT_EQ(snapshot.settings(QStringLiteral("core")).value(QStringLiteral("language")).toString(), QStringLiteral("pt-br"));
+
+    // The transfer was released, so the next one is not refused as one that is already running.
+    ASSERT_TRUE(test::awaitFuture(manager.exportConfiguration(directory.filePath(QStringLiteral("again.sqlite3")))).hasValue());
+}
+
 TEST(ApplicationSettingsTest, LoadsPersistsAndValidatesTheApplicationSettingsDocument) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());
