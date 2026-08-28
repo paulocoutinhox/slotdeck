@@ -1703,6 +1703,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A full review with the sanitizers, Cppcheck, clang-tidy and hand inspection found no orphan translation key, no unused theme role or icon, no legacy marker and no plugin that clears its host before its asynchronous context.
 - [x] The language-server transport disconnects from the process it abandons, so a read already queued never reaches it without one.
 - [x] A request that was given its turn and stopped before hearing about it returns that turn, so a provider limited to one request at a time keeps admitting.
+- [x] Forty rounds of holders that withdraw, are destroyed mid-wait or release the ordinary way leave the gate holding nothing and still admitting, proven against a withdraw that keeps the place.
 - [x] No source is compiled by more than one target and every consumer links `SlotDeckUi` for the shared visual primitives.
 - [x] The README describes the plugin-first product, the SQLite persistence and the current repository commands.
 - [x] A plugin reveals its own navigation destination through the scoped host and the shell refuses a destination that plugin does not declare.

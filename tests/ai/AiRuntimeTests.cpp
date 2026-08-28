@@ -1498,6 +1498,62 @@ TEST(AiTaskRepositoryTest, RoundTripsTheAgentsAndRejectsAStoredOneNobodyCouldRun
     EXPECT_TRUE(repository.settings().agents.isEmpty());
 }
 
+// A gate that keeps a place nobody withdrew admits nobody afterwards, and that stops every task of that provider forever.
+TEST(AiRequestGateTest, NeverWedgesThroughManyHoldersThatStopWithdrawOrAreDestroyed) {
+    AiRequestGate gate;
+    gate.setLimits({{QStringLiteral("openai"), 0, 0, 2}, {QStringLiteral("anthropic"), 0, 0, 1}});
+
+    const QStringList providers{QStringLiteral("openai"), QStringLiteral("anthropic")};
+    // The one that withdraws outlives every round, so a place kept for it is a place the gate never gives back.
+    QObject patient;
+    int admitted = 0;
+
+    for (int round = 0; round < 40; ++round) {
+        const QString providerId = providers.at(round % providers.size());
+        QVector<QObject*> holders;
+
+        for (int index = 0; index < 4; ++index) {
+            auto* holder = new QObject;
+            holders.append(holder);
+            // clang-format off
+            gate.acquire(providerId, holder, [&admitted]() { ++admitted; });
+            // clang-format on
+        }
+
+        QCoreApplication::processEvents();
+
+        // One that stays alive withdraws before its turn, one is destroyed while it waits or holds, and the rest release the ordinary way.
+        // clang-format off
+        gate.acquire(providerId, &patient, [&admitted]() { ++admitted; });
+        // clang-format on
+        gate.withdraw(providerId, &patient);
+        delete holders.at(0);
+
+        for (int index = 1; index < holders.size(); ++index) {
+            gate.release(providerId, holders.at(index));
+            delete holders.at(index);
+        }
+
+        QCoreApplication::processEvents();
+    }
+
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&gate, &providers]() { return gate.inFlight(providers.at(0)) == 0 && gate.waiting(providers.at(0)) == 0 && gate.inFlight(providers.at(1)) == 0 && gate.waiting(providers.at(1)) == 0; }));
+    // clang-format on
+    EXPECT_GT(admitted, 0);
+
+    // Every place came back, so the gate still admits rather than holding one for a holder that is gone.
+    for (const auto& providerId : providers) {
+        QObject owner;
+        bool answered = false;
+        // clang-format off
+        gate.acquire(providerId, &owner, [&answered]() { answered = true; });
+        ASSERT_TRUE(test::waitUntil([&answered]() { return answered; })) << providerId.toStdString() << " admits nobody after the run";
+        // clang-format on
+        gate.release(providerId, &owner);
+    }
+}
+
 TEST(AiRequestGateTest, PacesEveryRequestOfOneProviderThroughOneQueue) {
     AiRequestGate gate;
     QObject owner;
