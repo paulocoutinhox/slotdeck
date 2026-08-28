@@ -20,7 +20,14 @@ int main(int argc, char* argv[]) {
 #endif
     QApplication::setStyle(new slotdeck::ui::AppStyle(QStyleFactory::create("Fusion")));
     QApplication::setPalette(slotdeck::ui::AppStyle::applicationPalette());
-    slotdeck::app::Application slotDeckApplication;
+    const auto dataPath = slotdeck::app::Application::resolveDataPath(QCoreApplication::arguments());
+
+    if (!dataPath.hasValue()) {
+        qCritical().noquote() << dataPath.error().message << dataPath.error().detail;
+        return 1;
+    }
+
+    slotdeck::app::Application slotDeckApplication(dataPath.value(), nullptr);
     const auto initialization = slotDeckApplication.initialize();
 
     if (!initialization.hasValue()) {

@@ -14,6 +14,8 @@
 #include <QStandardPaths>
 #include <QTimer>
 
+#include <QCommandLineOption>
+#include <QCommandLineParser>
 #include <memory>
 #include <utility>
 
@@ -22,6 +24,29 @@ namespace slotdeck::app {
 Application::Application(QObject* parent) : Application(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation), parent) {}
 
 Application::Application(QString dataPath, QObject* parent) : QObject(parent), m_dataPath(std::move(dataPath)) {}
+
+utils::Result<QString> Application::resolveDataPath(const QStringList& arguments) {
+    QCommandLineParser parser;
+    const QCommandLineOption dataDirectory(QStringLiteral("data-dir"), QStringLiteral("Keep the application data in this absolute directory."), QStringLiteral("path"));
+    parser.addOption(dataDirectory);
+    parser.addHelpOption();
+    parser.addVersionOption();
+
+    if (!parser.parse(arguments)) {
+        return utils::Result<QString>::failure({"application_arguments_invalid", "The application arguments are invalid", parser.errorText()});
+    }
+    if (!parser.isSet(dataDirectory)) {
+        return utils::Result<QString>::success(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation));
+    }
+
+    const QString chosen = parser.value(dataDirectory);
+
+    if (chosen.isEmpty() || !QDir::isAbsolutePath(chosen) || !QDir().mkpath(chosen)) {
+        return utils::Result<QString>::failure({"application_data_path_invalid", "The application data directory must be an absolute path that can be created", chosen});
+    }
+
+    return utils::Result<QString>::success(QDir(chosen).absolutePath());
+}
 
 Application::~Application() {
     shutdown();

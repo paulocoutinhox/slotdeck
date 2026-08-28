@@ -311,6 +311,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A structural change adds the next version and never rewrites the creating one, because what a plugin recorded is data the reader owns and rewriting that migration drops the schema and takes it with them.
 - The schema a plugin declares is what its migrations produce rather than the text they are written as, so it is built once in memory and read back, and a table a later version altered is compared against what that alteration really made.
 - Application data uses the native writable local data location selected by the operating system and never assumes a writable home-directory layout.
+- A reader who wants the application to keep its data elsewhere names an absolute directory with `data-dir`, which is what makes a run against isolated state possible without touching what they already have.
+- A directory that is not absolute, one that is empty and one that cannot be created are refused by name rather than answered with the platform location, and the argument survives the restart an import asks for.
 - The creating migration declares the complete set of tables and indexes, and every later version alters what it declared instead of being folded back into it.
 - Core schema evolution uses SQLite `PRAGMA user_version` and creates the complete schema when the version is zero.
 - A stored database this version cannot read is set aside under a name of its own and a new one takes its place, because nothing stored may keep the application from opening.
@@ -1529,6 +1531,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Every turn a summary replaced is still stored after the run that compacted it, because the history of a task is the memory of its agent.
 - [x] A plugin schema that gains a version keeps every row the previous one stored, proven by a case that loses the row against the comparison that read the migrations as text.
 - [x] A database two versions along refuses an older build by name instead of being rebuilt, and a schema that really cannot be used is still rebuilt.
+- [x] The application keeps its data where the platform says unless the reader names a directory, and every way of naming one badly is refused.
 - [x] The cost of a run reaches the reader in the execution history, proven through the fake that answers the columns the real schema has.
 - [x] The price of every model the catalog carries reaches it, a model nobody priced reports no cost, and a price of the wrong shape or below zero rejects the plugin.
 - [x] The view follows the reader instead of dragging them to the end of every message that arrives.

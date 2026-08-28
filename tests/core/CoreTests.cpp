@@ -51,6 +51,7 @@
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QStackedWidget>
+#include <QStandardPaths>
 #include <QStyleFactory>
 #include <QTabWidget>
 #include <QTableWidget>
@@ -1875,6 +1876,35 @@ TEST(ConfigurationTransferTest, RejectsReadableDatabasesWithCorruptedCoreState) 
     const auto invalidVersions = test::awaitFuture(persistence::ConfigurationTransfer::stageImport(versionsPath, directory.filePath(QStringLiteral("versions-pending.sqlite3")), {}));
     EXPECT_EQ(invalidVersions.error().code, QStringLiteral("configuration_database_invalid"));
 }
+// A reader who wants the application to keep its data somewhere of their own says where, which is what makes a run against isolated state possible at all.
+TEST(ApplicationTest, KeepsItsDataWhereThePlatformSaysUnlessTheReaderNamesADirectory) {
+    const QString platform = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    const auto byDefault = app::Application::resolveDataPath({QStringLiteral("SlotDeck")});
+    ASSERT_TRUE(byDefault.hasValue());
+    EXPECT_EQ(byDefault.value(), platform);
+
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const QString chosen = QDir(directory.path()).filePath(QStringLiteral("profile"));
+    const auto named = app::Application::resolveDataPath({QStringLiteral("SlotDeck"), QStringLiteral("--data-dir"), chosen});
+    ASSERT_TRUE(named.hasValue()) << named.error().message.toStdString();
+    EXPECT_EQ(named.value(), QDir(chosen).absolutePath());
+    EXPECT_TRUE(QFileInfo(chosen).isDir());
+
+    // A directory that is not absolute, one that is empty and an argument nobody declares are refused rather than answered with the platform location.
+    const auto relative = app::Application::resolveDataPath({QStringLiteral("SlotDeck"), QStringLiteral("--data-dir"), QStringLiteral("profile")});
+    ASSERT_FALSE(relative.hasValue());
+    EXPECT_EQ(relative.error().code, QStringLiteral("application_data_path_invalid"));
+
+    const auto empty = app::Application::resolveDataPath({QStringLiteral("SlotDeck"), QStringLiteral("--data-dir"), QString{}});
+    ASSERT_FALSE(empty.hasValue());
+    EXPECT_EQ(empty.error().code, QStringLiteral("application_data_path_invalid"));
+
+    const auto unknown = app::Application::resolveDataPath({QStringLiteral("SlotDeck"), QStringLiteral("--nothing-declares-this")});
+    ASSERT_FALSE(unknown.hasValue());
+    EXPECT_EQ(unknown.error().code, QStringLiteral("application_arguments_invalid"));
+}
+
 TEST(ApplicationTest, ValidatesStartupLockInterfaceLifecycleAndRecovery) {
     app::Application invalid(QString{}, nullptr);
     EXPECT_EQ(invalid.loadInterface().error().code, QStringLiteral("application_not_initialized"));

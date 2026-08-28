@@ -26,6 +26,9 @@ class Application final : public QObject {
     Application(QString dataPath, QObject* parent);
     ~Application() override;
 
+    // Where the application keeps its data, which is what the platform says unless the reader named a directory of their own.
+    [[nodiscard]] static utils::Result<QString> resolveDataPath(const QStringList& arguments);
+
     [[nodiscard]] utils::Result<void> initialize();
     [[nodiscard]] utils::Result<void> loadInterface();
     [[nodiscard]] utils::Result<void> completeStartup();
