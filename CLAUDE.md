@@ -584,6 +584,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A model that does not read an image receives the text of that result with an explicit sentence saying the picture was not sent, instead of a result that silently lost it.
 - A picture belongs to the run that read it rather than to the stored text of that result, so it travels with the run and a later start reads it again instead of finding it in a conversation that never carried bytes.
 - An edit names the exact passage it replaces instead of rewriting the whole file, because a rewrite spends the output budget of the model on text nobody asked to change and loses what the model failed to copy back.
+- A file whose bytes are not UTF-8 is refused by name rather than answered with the character that stands for what the decoding lost, because reading it tells the model something the file does not say and editing it writes that loss back over every byte it could not read.
 - A passage the file does not carry is refused, and a passage appearing more than once is refused with its count unless the agent explicitly asks for every occurrence.
 - The read tool returns a whole file, everything from one line or a closed range of lines, because a large file must not enter the context in full.
 - The agent owns a command tool that runs inside the same working directory with its own time limit and returns the exit code together with the output.
@@ -1506,6 +1507,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A window whose reservation leaves no room fits the conversation down to the instructions and the task, and a model that declares no window still passes it whole.
 - [x] An import applied over a database whose log a crash left behind reads what the import brought, proven by a case that reads back the previous value without the replacement that discards it.
 - [x] Every byte a text file may carry survives being opened and saved, and a non-breaking space of a UTF-8 source file is still there afterwards.
+- [x] An agent asked to edit a file that is not UTF-8 is refused by name and every byte of that file is still where it was.
 - [x] The view follows the reader instead of dragging them to the end of every message that arrives.
 - [x] AI tasks are grouped into renameable workspace tabs and rendered across the To Do, Doing, Blocked, Review and Done columns.
 - [x] AI task cards keep their own margin, use the filled play symbol and expose Play, Stop, Edit and Remove.

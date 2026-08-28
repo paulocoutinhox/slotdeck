@@ -11,6 +11,7 @@
 #include <QNetworkRequest>
 #include <QRegularExpression>
 #include <QSet>
+#include <QStringDecoder>
 #include <QTimeZone>
 #include <QUrl>
 #include <QUrlQuery>
@@ -18,6 +19,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <optional>
 #include <utility>
 
 namespace slotdeck::plugins::ai {
@@ -84,6 +86,7 @@ class AiToolRegistryHelper final {
     static ToolResult failure(const ToolCall& call, const QString& message);
     static QString selectedLines(const QString& content, int firstLine, int lastLine);
     static QString boundedText(const QString& text);
+    static std::optional<QString> decodedText(const QByteArray& bytes);
     static bool pathsOverlap(const QString& first, const QString& second);
     static QString qualifiedToolName(const QString& serverId, const QString& toolName);
     static ToolResult mcpToolResult(const ToolCall& call, const QJsonObject& payload);
@@ -364,6 +367,13 @@ QString AiToolRegistryHelper::selectedLines(const QString& content, int firstLin
 }
 
 // A tool result travels straight into the model context, so an oversized one is truncated, and what a command reports last is what explains its failure so its end is kept with its beginning.
+// A file that is not UTF-8 is refused rather than answered with the character that stands for every byte the decoding lost.
+std::optional<QString> AiToolRegistryHelper::decodedText(const QByteArray& bytes) {
+    QStringDecoder decoder(QStringDecoder::Utf8);
+    QString text = decoder(bytes);
+    return decoder.hasError() ? std::nullopt : std::optional<QString>{std::move(text)};
+}
+
 QString AiToolRegistryHelper::boundedText(const QString& text) {
     if (text.size() <= maximumResultCharacters) {
         return text;
@@ -886,7 +896,20 @@ void AiToolRegistry::readFile(const ToolCall& call, const QString& sandboxRoot, 
 
     auto future = m_host.readFile(resolved.value(), maximumReadBytes);
     // clang-format off
-    future.then(this, [call, completion, firstLine, lastLine](utils::Result<QByteArray> result) { completion(result.hasValue() ? ToolResult{call.id, AiToolRegistryHelper::boundedText(AiToolRegistryHelper::selectedLines(QString::fromUtf8(result.value()), firstLine, lastLine)), false} : AiToolRegistryHelper::failure(call, result.error().message)); });
+    const QString notText = m_host.translate(QStringLiteral("ai.error.tool-not-text")).arg(resolved.value());
+    const auto answerRead = [call, completion, firstLine, lastLine, notText](utils::Result<QByteArray> result) {
+        if (!result.hasValue()) {
+            completion(AiToolRegistryHelper::failure(call, result.error().message));
+            return;
+        }
+        const auto content = AiToolRegistryHelper::decodedText(result.value());
+        if (!content.has_value()) {
+            completion(AiToolRegistryHelper::failure(call, notText));
+            return;
+        }
+        completion({call.id, AiToolRegistryHelper::boundedText(AiToolRegistryHelper::selectedLines(content.value(), firstLine, lastLine)), false});
+    };
+    future.then(this, answerRead);
     // clang-format on
 }
 
@@ -1083,7 +1106,13 @@ void AiToolRegistry::editFile(const ToolCall& call, const QString& sandboxRoot, 
             return;
         }
 
-        const QString content = QString::fromUtf8(result.value());
+        const auto decoded = AiToolRegistryHelper::decodedText(result.value());
+        if (!decoded.has_value()) {
+            completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-not-text")).arg(path)));
+            return;
+        }
+
+        const QString content = decoded.value();
         const qsizetype occurrences = content.count(oldText);
         if (occurrences == 0) {
             completion(AiToolRegistryHelper::failure(call, m_host.translate(QStringLiteral("ai.error.tool-edit-absent")).arg(path)));

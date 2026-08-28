@@ -1782,6 +1782,49 @@ TEST(AiChatClientTest, WithdrawsFromTheQueueWhenTheRunIsStoppedBeforeItsTurnCame
     EXPECT_FALSE(waiting.running());
 }
 
+// A tool that reads bytes it cannot decode would answer the model with what the decoding lost, and an edit would write that loss back to the file.
+TEST(AiToolRegistryTest, RefusesAFileThatIsNotTextInsteadOfRewritingWhatItHolds) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    filesystem::FileSystemService files;
+    host.useFileSystem(files);
+    AiToolRegistry registry(host);
+
+    QTemporaryDir root;
+    ASSERT_TRUE(root.isValid());
+    const QString sandbox = QDir(root.path()).canonicalPath();
+    const QString name = QStringLiteral("legacy.php");
+    const QByteArray content = QByteArrayLiteral("<?php $mes = 'mar\xE7o'; $ano = 2026;\n");
+    QFile source(QDir(sandbox).filePath(name));
+    ASSERT_TRUE(source.open(QIODevice::WriteOnly));
+    ASSERT_EQ(source.write(content), content.size());
+    source.close();
+
+    QVector<ToolResult> results;
+    // clang-format off
+    const auto collect = [&results](ToolResult result) { results.append(std::move(result)); };
+    // clang-format on
+
+    registry.invoke({QStringLiteral("r1"), QStringLiteral("read_file"), QJsonObject{{QStringLiteral("path"), name}}}, sandbox, collect);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&results]() { return results.size() == 1; }));
+    // clang-format on
+    EXPECT_TRUE(results.first().failed);
+    EXPECT_TRUE(results.first().text.contains(name)) << results.first().text.toStdString();
+
+    registry.invoke({QStringLiteral("e1"), QStringLiteral("edit_file"), QJsonObject{{QStringLiteral("path"), name}, {QStringLiteral("old_text"), QStringLiteral("2026")}, {QStringLiteral("new_text"), QStringLiteral("2027")}}}, sandbox, collect);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&results]() { return results.size() == 2; }));
+    // clang-format on
+    EXPECT_TRUE(results.at(1).failed);
+    EXPECT_TRUE(results.at(1).text.contains(name)) << results.at(1).text.toStdString();
+
+    // The refused edit left every byte of the file where it was.
+    QFile written(QDir(sandbox).filePath(name));
+    ASSERT_TRUE(written.open(QIODevice::ReadOnly));
+    EXPECT_EQ(written.readAll(), content);
+}
+
 TEST(AiToolRegistryTest, DeclaresValidSchemasAndKeepsEveryPathInsideTheWorkingDirectory) {
     test::TestPluginHost host;
     host.translations = translations::english();
