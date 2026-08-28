@@ -842,6 +842,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Nothing else removes what a task recorded, because that history is the memory of the agent, so a conversation is emptied only by that reset and by removing the task or the workspace it belongs to.
 - A summary replaces the turns it covers only in the request that is sent, and every one of those turns stays stored, so compacting a long conversation costs the model its detail and never costs the reader their history.
 - The conversation is fitted to the context window of the selected model before every turn, estimated from the serialized message size.
+- Every message is measured once and the fitting reads the total it keeps, because measuring one serializes it and doing that again for every turn it drops freezes the thread that draws.
 - The fitting aims at a share of what remains rather than at the whole of it, because an estimate made from the size of the text underestimates what the model really counts, so a turn compacts under pressure instead of at the moment it overflows.
 - The window has to hold the answer and the tool declarations as well as the conversation, so the output budget and the serialized tools are reserved before anything is fitted into what is left.
 - A model that declares no window bounds nothing, and a window whose reservation leaves no room bounds everything, so the two are answered apart instead of by one number that would mean both.
@@ -1590,6 +1591,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A command line agent is offered neither model discovery nor extra parameters, and coming back to a provider reached over a wire restores both.
 - [x] Every one of the nine catalogs declares both languages itself, so the case that reads them back can fail, and the five provider names that were only inherited are declared.
 - [x] A window whose reservation leaves no room fits the conversation down to the instructions and the task, and a model that declares no window still passes it whole.
+- [x] Fitting a conversation of eight hundred messages costs two milliseconds rather than the second it cost while every drop measured the whole conversation again.
 - [x] An import applied over a database whose log a crash left behind reads what the import brought, proven by a case that reads back the previous value without the replacement that discards it.
 - [x] Every byte a text file may carry survives being opened and saved, and a non-breaking space of a UTF-8 source file is still there afterwards.
 - [x] An agent asked to edit a file that is not UTF-8 is refused by name and every byte of that file is still where it was.
@@ -1660,7 +1662,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 445 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 446 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] That number is held to what the suite really registers by the lint command, because a number nobody keeps is a number nobody believes.
 - [x] Every case holds in a random order, proven across five schedules of the whole suite, three of them parallel and two one case at a time, which nothing had exercised before.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.

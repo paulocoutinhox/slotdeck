@@ -1957,6 +1957,35 @@ TEST(AiToolRegistryTest, StopsFetchingAPageLargerThanTheBoundInsteadOfHoldingItW
     EXPECT_LT(sentChunks, offeredChunks) << "the server sent everything it offered";
 }
 
+// Fitting runs on the thread that draws before every turn, so measuring a message once is what keeps a long conversation from freezing it.
+TEST(AiToolContractTest, FitsALongConversationWithoutMeasuringItAgainForEveryTurnItDrops) {
+    QJsonArray messages;
+    messages.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("system")}, {QStringLiteral("content"), QStringLiteral("instructions")}});
+    messages.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), QStringLiteral("the task")}});
+
+    const QString body(2000, QLatin1Char('x'));
+
+    for (int index = 0; index < 400; ++index) {
+        messages.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("assistant")}, {QStringLiteral("content"), body}});
+        messages.append(QJsonObject{{QStringLiteral("role"), QStringLiteral("user")}, {QStringLiteral("content"), body}});
+    }
+
+    QElapsedTimer clock;
+    clock.start();
+    const FittedConversation fitted = fitConversation(messages, 2000);
+    const qint64 elapsed = clock.elapsed();
+
+    // The instructions and the task are kept whatever had to go, and the newest turns fill what is left.
+    ASSERT_GE(fitted.messages.size(), 2);
+    EXPECT_EQ(fitted.preservedHead, 2);
+    EXPECT_EQ(fitted.messages.at(0).toObject().value(QStringLiteral("content")).toString(), QStringLiteral("instructions"));
+    EXPECT_EQ(fitted.messages.at(1).toObject().value(QStringLiteral("content")).toString(), QStringLiteral("the task"));
+    EXPECT_EQ(fitted.messages.size() + fitted.dropped.size(), messages.size());
+
+    // Measuring the whole conversation again for every turn it drops costs nearly a second here, which is a second of frozen interface.
+    EXPECT_LT(elapsed, 250) << "fitting " << messages.size() << " messages took " << elapsed << "ms";
+}
+
 // A tool that reads bytes it cannot decode would answer the model with what the decoding lost, and an edit would write that loss back to the file.
 TEST(AiToolRegistryTest, RefusesAFileThatIsNotTextInsteadOfRewritingWhatItHolds) {
     test::TestPluginHost host;

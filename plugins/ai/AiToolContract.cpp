@@ -155,13 +155,17 @@ QJsonObject AiToolContractHelper::prunedToolResult(const QJsonObject& message, b
 
 // What a tool returned long ago is the cheapest thing to shorten, so its middle goes before any turn is dropped and before a model is asked for a summary.
 qsizetype pruneToolResults(QJsonArray& messages, std::optional<qint64> limit) {
-    if (!limit.has_value() || estimateTokens(messages) <= limit.value()) {
+    if (!limit.has_value()) {
         return 0;
     }
 
-    // The conversation is measured again only when a result was actually shortened, because measuring it serializes every message.
-    qsizetype pruned = 0;
     qint64 current = estimateTokens(messages);
+
+    if (current <= limit.value()) {
+        return 0;
+    }
+
+    qsizetype pruned = 0;
 
     for (qsizetype index = 0; index < messages.size() && current > limit.value(); ++index) {
         const QJsonObject message = messages.at(index).toObject();
@@ -171,8 +175,9 @@ qsizetype pruneToolResults(QJsonArray& messages, std::optional<qint64> limit) {
         bool changed = false;
         const QJsonObject shortened = AiToolContractHelper::prunedToolResult(message, changed);
         if (changed) {
+            // Measuring a message serializes it, so what the total lost is read from the two sizes rather than from the whole conversation again.
+            current -= AiToolContractHelper::messageTokens(message) - AiToolContractHelper::messageTokens(shortened);
             messages.replace(index, shortened);
-            current = estimateTokens(messages);
             ++pruned;
         }
     }
@@ -181,7 +186,17 @@ qsizetype pruneToolResults(QJsonArray& messages, std::optional<qint64> limit) {
 }
 
 FittedConversation fitConversation(const QJsonArray& messages, std::optional<qint64> limit) {
-    if (!limit.has_value() || estimateTokens(messages) <= limit.value()) {
+    // Measuring a message serializes it, so every size is taken once and the loop below reads the total it keeps.
+    QList<qint64> sizes;
+    sizes.reserve(messages.size());
+    qint64 total = 0;
+
+    for (const auto& value : messages) {
+        sizes.append(AiToolContractHelper::messageTokens(value.toObject()));
+        total += sizes.constLast();
+    }
+
+    if (!limit.has_value() || total <= limit.value()) {
         return {messages, {}, 0};
     }
 
@@ -199,27 +214,24 @@ FittedConversation fitConversation(const QJsonArray& messages, std::optional<qin
         ++start;
     }
 
-    QJsonArray remaining;
-
-    for (qsizetype index = start; index < messages.size(); ++index) {
-        remaining.append(messages.at(index));
-    }
-
     QJsonArray dropped;
+    qsizetype first = start;
 
-    while (!remaining.isEmpty() && estimateTokens(preserved) + estimateTokens(remaining) > limit.value()) {
-        dropped.append(remaining.first());
-        remaining.removeFirst();
-        while (!remaining.isEmpty() && AiToolContractHelper::answersToolCalls(remaining.first().toObject())) {
-            dropped.append(remaining.first());
-            remaining.removeFirst();
+    while (first < messages.size() && total > limit.value()) {
+        dropped.append(messages.at(first));
+        total -= sizes.at(first);
+        ++first;
+        while (first < messages.size() && AiToolContractHelper::answersToolCalls(messages.at(first).toObject())) {
+            dropped.append(messages.at(first));
+            total -= sizes.at(first);
+            ++first;
         }
     }
 
     const qsizetype preservedHead = preserved.size();
 
-    for (const auto& value : remaining) {
-        preserved.append(value);
+    for (qsizetype index = first; index < messages.size(); ++index) {
+        preserved.append(messages.at(index));
     }
 
     return {preserved, dropped, preservedHead};
