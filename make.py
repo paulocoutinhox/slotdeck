@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import os
 import re
 import shutil
@@ -334,6 +335,60 @@ def inherited_catalogs() -> list[str]:
     return found
 
 
+def crowded_scopes() -> list[str]:
+    found: list[str] = []
+
+    for directory in ("src", "plugins", "tests"):
+        for path in sorted((ROOT / directory).rglob("*")):
+            if path.suffix not in (".cpp", ".h"):
+                continue
+
+            lines = path.read_text(encoding="utf-8").split("\n")
+            where = str(path.relative_to(ROOT))
+
+            for index in range(len(lines) - 1):
+                head = lines[index].strip()
+                tail = lines[index + 1].strip()
+
+                # A namespace, a class and an aggregate open a scope the project deliberately spaces out.
+                opens_block = head.endswith("{") and not re.match(r"^(namespace|class|struct|enum|union|extern|template)\b", head) and not head.startswith("} ")
+
+                if opens_block and not tail:
+                    found.append(f"{where}:{index + 1} leaves a blank line after the brace that opens the scope")
+
+                if not head and tail.startswith("}") and not tail.startswith("};") and "// namespace" not in tail:
+                    found.append(f"{where}:{index + 2} leaves a blank line before the brace that closes the scope")
+
+    return found
+
+
+def repeated_comments() -> list[str]:
+    found: list[str] = []
+
+    for directory in ("src", "plugins", "tests"):
+        for path in sorted((ROOT / directory).rglob("*")):
+            if path.suffix not in (".cpp", ".h"):
+                continue
+
+            lines = path.read_text(encoding="utf-8").split("\n")
+
+            for index in range(len(lines) - 1):
+                first = lines[index].strip()
+                second = lines[index + 1].strip()
+
+                if not first.startswith("//") or not second.startswith("//"):
+                    continue
+                if first.startswith("// clang-format") or second.startswith("// clang-format"):
+                    continue
+
+                shared = difflib.SequenceMatcher(None, first, second).find_longest_match(0, len(first), 0, len(second))
+
+                if shared.size >= 40:
+                    found.append(f"{path.relative_to(ROOT)}:{index + 1} says {first[shared.a:shared.a + shared.size].strip()!r} twice")
+
+    return found
+
+
 def misgrouped_includes() -> list[str]:
     order = {"project": 1, "qt": 2, "platform": 3, "standard": 4}
 
@@ -571,6 +626,16 @@ def task_audit(_: Context) -> None:
 
     if inherited:
         raise RuntimeError("Every language declares the keys it spells, because a catalog built from another one cannot be told from one that forgot a sentence:\n  " + "\n  ".join(inherited))
+
+    crowded = crowded_scopes()
+
+    if crowded:
+        raise RuntimeError("A scope begins and ends at its brace, so no blank line sits against either one:\n  " + "\n  ".join(crowded))
+
+    repeated = repeated_comments()
+
+    if repeated:
+        raise RuntimeError("Two comments that say the same clause are one comment, because the second explains nothing the first did not:\n  " + "\n  ".join(repeated))
 
     misgrouped = misgrouped_includes()
 

@@ -92,10 +92,9 @@ CodeSyntaxHighlighter::CodeSyntaxHighlighter(QTextDocument* document, LanguageDe
 }
 
 // The server knows what a name really is, so its token wins over the pattern that only guessed from the shape of the text.
-// Repainting the whole document on every answer costs the file, so only the lines whose tokens really changed are invalidated.
-// The tokens arrive already decoded and grouped, so only the lines whose tokens really changed are invalidated.
+// The tokens arrive already decoded and grouped, so this only decides which lines changed.
+// Repainting the whole document on every answer costs the file, so nothing else is invalidated.
 void CodeSyntaxHighlighter::setSemanticTokens(const SemanticTokenSet& tokens) {
-
     QSet<int> changed;
 
     for (auto entry = tokens.constBegin(); entry != tokens.constEnd(); ++entry) {

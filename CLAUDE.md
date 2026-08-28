@@ -1241,6 +1241,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A branch or a loop that spans lines is separated from the statements around it by one blank line, because a block glued to the paragraph above it reads as one more line of that paragraph.
 - Consecutive guard clauses stay together, because a run of validations that each return is one block rather than several.
 - No blank line follows the brace that opens a scope and none precedes the brace that closes it, because the scope already begins and ends there.
+- The lint command refuses either one, because a scope the formatter never touches drifts wherever it is edited.
 - A method that accumulates responsibilities is split into small named methods, and a linear sequence or a mapping table stays whole because splitting it would hide the flow.
 - Includes are one group for the header of the file, one group for project headers, one group for Qt headers, one group for platform and third-party headers and one group for standard headers, in that order.
 - The formatter owns the order inside a group, so the sorting is the case-sensitive one it applies and never a hand-made ordering.
@@ -1262,6 +1263,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A comment needing more than one sentence ends the current one with a period before the next one begins on the following line.
 - The `// clang-format off` and `// clang-format on` markers are formatter directives rather than comments and stay lowercase.
 - Comments explain context or intent and never narrate literal behavior.
+- Two comments never say the same clause, because the second explains nothing the first did not, and the lint command refuses the repetition.
 - Headers contain no comments describing methods, members or artificial sections.
 - A comment sits on the declaration it explains, so a comment followed by a blank line explains nothing and does not exist in the project.
 - The lint command refuses a comment separated from what it explains, a comment dividing a sentence with a semicolon and a comment that does not end its sentence, across the sources and the suite alike.
