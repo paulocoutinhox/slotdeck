@@ -1,4 +1,5 @@
 #include "CodeWorkspaceView.h"
+#include "FileSystemFailure.h"
 
 #include "FileFinder.h"
 #include "FileWatch.h"
@@ -1077,7 +1078,7 @@ QString CodeWorkspaceView::containedPath(const QString& path) const {
 
 void CodeWorkspaceView::reportResult(const utils::Result<void>& result) {
     if (!result.hasValue()) {
-        emit operationFailed(result.error().detail.isEmpty() ? result.error().message : result.error().detail);
+        emit operationFailed(fileSystemFailureMessage(result.error(), m_host));
     }
 }
 

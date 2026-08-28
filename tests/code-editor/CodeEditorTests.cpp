@@ -7,6 +7,7 @@
 #include "CodeWorkspaceView.h"
 #include "EditorConfig.h"
 #include "FileFinder.h"
+#include "FileSystemFailure.h"
 #include "LanguageRegistry.h"
 #include "TestFuture.h"
 #include "TestPluginHost.h"
@@ -3106,6 +3107,30 @@ TEST(LanguageServerClientTest, SurvivesBeingDestroyedWhileAnAnswerIsStillBeingDe
         client.reset();
         QCoreApplication::processEvents();
     }
+}
+
+// A toast never shows the diagnostic of the filesystem, so every condition the reader reaches carries a sentence of the catalog.
+TEST(FileSystemFailureTest, SaysWhatFailedInTheLanguageOfTheReaderAndNamesThePath) {
+    test::TestPluginHost host;
+    host.translations.insert(QStringLiteral("code-editor.error.destination-exists"), QStringLiteral("O destino ja existe"));
+    host.translations.insert(QStringLiteral("code-editor.error.write-failed"), QStringLiteral("O arquivo nao pode ser salvo"));
+    host.translations.insert(QStringLiteral("code-editor.error.folder-unavailable"), QStringLiteral("A pasta nao pode ser aberta"));
+
+    // The sentence names the path the failure happened to, because the reader has more than one file open.
+    EXPECT_EQ(fileSystemFailureMessage({"filesystem_destination_exists", QStringLiteral("The destination already exists"), QStringLiteral("/tmp/taken.txt")}, host), QStringLiteral("O destino ja existe\n/tmp/taken.txt"));
+    EXPECT_EQ(fileSystemFailureMessage({"filesystem_write_failed", QStringLiteral("The file could not be written atomically"), {}}, host), QStringLiteral("O arquivo nao pode ser salvo"));
+    EXPECT_EQ(fileSystemFailureMessage({"code_editor_workspace_invalid", QStringLiteral("The code editor workspace is unavailable"), QStringLiteral("/tmp/gone")}, host), QStringLiteral("A pasta nao pode ser aberta\n/tmp/gone"));
+
+    // Every condition the service reports has a sentence, so none of them reaches a card as the text written for the log.
+    const QStringList reported{QStringLiteral("filesystem_copy_failed"), QStringLiteral("filesystem_create_directory_failed"), QStringLiteral("filesystem_create_file_failed"), QStringLiteral("filesystem_destination_exists"), QStringLiteral("filesystem_directory_missing"), QStringLiteral("filesystem_directory_unavailable"), QStringLiteral("filesystem_file_missing"), QStringLiteral("filesystem_file_too_large"), QStringLiteral("filesystem_file_unavailable"), QStringLiteral("filesystem_move_failed"), QStringLiteral("filesystem_move_invalid"), QStringLiteral("filesystem_parent_unavailable"), QStringLiteral("filesystem_path_invalid"), QStringLiteral("filesystem_path_unsafe"), QStringLiteral("filesystem_read_failed"), QStringLiteral("filesystem_remove_directory_failed"), QStringLiteral("filesystem_remove_file_failed"), QStringLiteral("filesystem_source_unavailable"), QStringLiteral("filesystem_write_failed")};
+
+    for (const QString& code : reported) {
+        const QString diagnostic = QStringLiteral("a diagnostic nobody translates");
+        EXPECT_NE(fileSystemFailureMessage({code.toUtf8().constData(), diagnostic, {}}, host), diagnostic) << code.toStdString();
+    }
+
+    // A limit the interface never asks for keeps the text written for the log.
+    EXPECT_EQ(fileSystemFailureMessage({"filesystem_read_limit_invalid", QStringLiteral("The file read limit is invalid"), {}}, host), QStringLiteral("The file read limit is invalid"));
 }
 
 } // namespace slotdeck::plugins::codeeditor

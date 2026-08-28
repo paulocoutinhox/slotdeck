@@ -1,4 +1,5 @@
 #include "CodeEditorView.h"
+#include "FileSystemFailure.h"
 
 #include "ui/Components.h"
 #include "ui/Icons.h"
@@ -52,7 +53,7 @@ void CodeEditorView::chooseWorkspace() {
     const auto result = m_plugin.openWorkspace(path);
 
     if (!result.hasValue()) {
-        reportError(result.error().detail.isEmpty() ? result.error().message : result.error().detail);
+        reportError(fileSystemFailureMessage(result.error(), m_plugin.host()));
     }
 }
 

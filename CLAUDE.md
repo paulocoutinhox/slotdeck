@@ -995,6 +995,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Every watched path is rearmed when its notification arrives, because macOS reports a watched file only once and the second external edit would otherwise never be seen even though the path is still listed as watched.
 - A watched file can still change without the platform reporting it at all, so returning to the application looks at every open document again rather than trusting that a notification was delivered.
 - The core filesystem service serializes filesystem work on a dedicated worker and exposes asynchronous reads, atomic writes, creation, movement and removal through the scoped plugin host.
+- That service writes its diagnostics for the log, so the editor says every condition it reports as a sentence of its own catalog followed by the path it happened to, because a reader told only a path learns nothing.
+- A condition of that service the interface never asks for keeps its diagnostic, which is what a limit checked in code is.
 - File creation, directory creation, rename, move and confirmed permanent removal validate absolute targets and never overwrite an existing destination.
 - Workspace policy resolves canonical paths and rejects traversal or symbolic-link escape before any file is opened or created.
 - Path containment always compares against the forward slash that `QDir::cleanPath` produces so a workspace behaves identically on every platform.
@@ -1708,6 +1710,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Every argument the installed command line agents are given is accepted by them, which removed the three flags Kimi does not declare after its own parser refused the first of them.
 - [x] A command line provider whose argument list never carries the model is refused from text, so the model the reader chose can never be dropped in silence.
 - [x] A command that timed out, overflowed its output, found no working directory, did not start or ended abnormally reads on the card in the language of the interface rather than in the English of the log.
+- [x] Every condition the filesystem service reports reads in the editor as a sentence of its catalog naming the path, proven for the complete set the service can answer with.
 - [x] A command task runs a real process for both endings, moving to Done on a zero exit code and back to the board with its reason on any other, and the directory it ran in is proven by a command that only succeeds beside a file that directory holds.
 - [x] A paste the reader refused writes nothing to the shell, a confirmed one reaches it, text that only wraps is never asked about and the setting turned off writes without asking, all driven through the key a reader presses.
 - [x] A selection is indented and unindented as whole lines, leaving a line nobody selected alone and answering a document resolved to tabs with a tab.

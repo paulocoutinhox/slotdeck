@@ -1,4 +1,5 @@
 #include "CodeDocument.h"
+#include "FileSystemFailure.h"
 
 #include "FileWatch.h"
 
@@ -381,7 +382,7 @@ void CodeDocument::reload() {
         }
         m_loading = false;
         if (!result.hasValue()) {
-            emit operationFailed(result.error().detail.isEmpty() ? result.error().message : result.error().detail);
+            emit operationFailed(fileSystemFailureMessage(result.error(), m_host));
             return;
         }
         applyContent(result.value());
@@ -420,7 +421,7 @@ void CodeDocument::writeContent() {
         m_saving = false;
         const bool requestedAgain = std::exchange(m_saveRequested, false);
         if (!result.hasValue()) {
-            emit operationFailed(result.error().detail.isEmpty() ? result.error().message : result.error().detail);
+            emit operationFailed(fileSystemFailureMessage(result.error(), m_host));
             return;
         }
         m_storedDigest = digest;

@@ -23,6 +23,8 @@ qt_add_library(
     EditorConfig.h
     FileFinder.cpp
     FileFinder.h
+    FileSystemFailure.cpp
+    FileSystemFailure.h
     FileWatch.cpp
     FileWatch.h
     LanguageRegistry.cpp
