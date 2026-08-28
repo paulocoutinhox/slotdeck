@@ -1766,6 +1766,50 @@ TEST(CodeEditorPluginTest, WritesWhatItHoldsWhenTheProductClosesBeforeThePersist
     EXPECT_EQ(rows.value().first().value(QStringLiteral("root_path")).toString(), QFileInfo(root.path()).canonicalFilePath());
 }
 
+// A write that answers after a newer one commits nothing, otherwise a later failure rolls the reader back to a setting they already changed.
+TEST(CodeEditorPluginTest, KeepsTheSettingWrittenLastWhenTwoSavesAnswerOutOfOrder) {
+    test::TestPluginHost host;
+    filesystem::FileSystemService files;
+    host.useFileSystem(files);
+    QVector<std::shared_ptr<QPromise<utils::Result<void>>>> held;
+    // clang-format off
+    host.settingsFutureHandler = [&held](const QJsonObject&) {
+        auto pending = std::make_shared<QPromise<utils::Result<void>>>();
+        pending->start();
+        held.append(pending);
+        return pending->future();
+    };
+    // clang-format on
+
+    CodeEditorPlugin plugin;
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    plugin.setEditorFontSize(14);
+    plugin.setEditorFontSize(18);
+    ASSERT_EQ(held.size(), 2);
+
+    // The newer write answers first and the older one after it.
+    held.constLast()->addResult(utils::Result<void>::success());
+    held.constLast()->finish();
+    held.constFirst()->addResult(utils::Result<void>::success());
+    held.constFirst()->finish();
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&plugin]() { return plugin.editorFont().size == 18; }));
+    // clang-format on
+
+    // A write that fails now rolls back to what really reached storage rather than to the size the older answer carried.
+    held.clear();
+    const qsizetype told = host.notifications.size();
+    plugin.setEditorFontSize(22);
+    ASSERT_EQ(held.size(), 1);
+    held.constFirst()->addResult(utils::Result<void>::failure({"code_editor_persistence", "no", {}}));
+    held.constFirst()->finish();
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&host, told]() { return host.notifications.size() > told; }));
+    // clang-format on
+    EXPECT_EQ(plugin.editorFont().size, 18);
+    plugin.shutdown();
+}
+
 TEST(CodeEditorPluginTest, PublishesMetadataAndManagesFolderTabs) {
     test::TestPluginHost host;
     CodeEditorPlugin plugin;

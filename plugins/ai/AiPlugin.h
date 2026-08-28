@@ -213,6 +213,7 @@ class AiPlugin final : public QObject, public PluginInterface {
     AiProviderScope m_providerScope;
     AiSettings m_committedSettings;
     quint64 m_settingsRevision{0};
+    quint64 m_committedSettingsRevision{0};
     QHash<QString, AiMcpClient*> m_mcpClients;
     QChronoTimer m_scheduleTimer;
     ChatClientFactory m_clientFactory;

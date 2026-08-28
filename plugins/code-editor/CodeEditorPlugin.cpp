@@ -379,7 +379,10 @@ void CodeEditorPlugin::persistSettings() {
     // clang-format off
     future.then(m_asyncContext.get(), [this, next, revision](utils::Result<void> result) {
         if (result.hasValue()) {
-            m_committedSettings = next;
+            if (revision > m_committedSettingsRevision) {
+                m_committedSettings = next;
+                m_committedSettingsRevision = revision;
+            }
             return;
         }
         if (revision != m_settingsRevision) {

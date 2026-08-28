@@ -80,6 +80,7 @@ class CodeEditorPlugin final : public QObject, public PluginInterface {
     CodeColorScheme m_colorScheme;
     CodeEditorSettings m_committedSettings;
     quint64 m_settingsRevision{0};
+    quint64 m_committedSettingsRevision{0};
     QVector<ResolvedLanguageServer> m_languageServers;
     QFuture<QVector<ResolvedLanguageServer>> m_languageServerDiscoveryFuture;
     std::unique_ptr<QObject> m_asyncContext;

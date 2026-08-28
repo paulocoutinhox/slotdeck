@@ -622,7 +622,10 @@ QFuture<utils::Result<void>> AiPlugin::persistSettings(AiSettings next) {
     // clang-format off
     return future.then(m_asyncContext.get(), [this, candidate, revision](utils::Result<void> result) {
         if (result.hasValue()) {
-            m_committedSettings = candidate;
+            if (revision > m_committedSettingsRevision) {
+                m_committedSettings = candidate;
+                m_committedSettingsRevision = revision;
+            }
         } else if (revision == m_settingsRevision) {
             m_settings = m_committedSettings;
         }

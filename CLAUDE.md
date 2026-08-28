@@ -155,6 +155,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - User changes update presentation state immediately and persist asynchronously.
 - Failed persistence rolls back the latest optimistic value to the last committed state and reports the error.
 - A successful write commits the value that was written rather than whatever the owner holds when the answer arrives, and a failure rolls back only while it is still the latest operation, because two overlapping saves would otherwise commit a value that never reached storage.
+- A write that answers after a newer one commits nothing at all, so the committed copy is never older than what reached storage and a later failure cannot roll the reader back to a value they already changed.
 
 ## Application theme architecture
 
@@ -1540,6 +1541,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A workspace that comes back without the terminal a server was created from drops that link and keeps the server, with its name, its root and its port as they were.
 - [x] Two snapshots of the tabs answering out of order leave the later one standing, and a failure after them rolls back to it rather than to the earlier one.
 - [x] Every write still waiting when the executor is destroyed reaches the disk, and a folder opened the moment before the product closes is there when it opens again.
+- [x] Every owner that keeps a committed copy guards it by revision, proven for the editor and for the AI by cases that roll back to the older value without that guard.
 - [x] The cost of a run reaches the reader in the execution history, proven through the fake that answers the columns the real schema has.
 - [x] The price of every model the catalog carries reaches it, a model nobody priced reports no cost, and a price of the wrong shape or below zero rejects the plugin.
 - [x] The view follows the reader instead of dragging them to the end of every message that arrives.

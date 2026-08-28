@@ -1251,6 +1251,53 @@ TEST(AiPluginTest, SummarizesTheTurnsThatNoLongerFitInsteadOfLosingThem) {
     plugin.shutdown();
 }
 
+// A write that answers after a newer one commits nothing, otherwise a later failure rolls the reader back to a setting they already changed.
+TEST(AiPluginTest, KeepsTheExecutionSettingWrittenLastWhenTwoSavesAnswerOutOfOrder) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    AiTestsHelper::installAiRows(host, {}, {}, {});
+    QVector<std::shared_ptr<QPromise<utils::Result<void>>>> held;
+    // clang-format off
+    host.settingsFutureHandler = [&held](const QJsonObject&) {
+        auto pending = std::make_shared<QPromise<utils::Result<void>>>();
+        pending->start();
+        held.append(pending);
+        return pending->future();
+    };
+    // clang-format on
+
+    AiPlugin plugin;
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    ExecutionSettings settings = plugin.executionSettings();
+    settings.maximumIterations = 12;
+    [[maybe_unused]] auto older = plugin.saveExecutionSettings(settings);
+    settings.maximumIterations = 20;
+    [[maybe_unused]] auto newer = plugin.saveExecutionSettings(settings);
+    ASSERT_EQ(held.size(), 2);
+
+    // The newer write answers first and the older one after it.
+    held.constLast()->addResult(utils::Result<void>::success());
+    held.constLast()->finish();
+    held.constFirst()->addResult(utils::Result<void>::success());
+    held.constFirst()->finish();
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&plugin]() { return plugin.executionSettings().maximumIterations == 20; }));
+    // clang-format on
+
+    // A write that fails now rolls back to what really reached storage rather than to the value the older answer carried.
+    held.clear();
+    settings.maximumIterations = 30;
+    [[maybe_unused]] auto failing = plugin.saveExecutionSettings(settings);
+    ASSERT_EQ(held.size(), 1);
+    held.constFirst()->addResult(utils::Result<void>::failure({"ai_settings", "no", {}}));
+    held.constFirst()->finish();
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&plugin]() { return plugin.executionSettings().maximumIterations != 30; }));
+    // clang-format on
+    EXPECT_EQ(plugin.executionSettings().maximumIterations, 20);
+    plugin.shutdown();
+}
+
 TEST(AiPluginTest, RunsATaskOnItsOwnConnectionEvenWhenTheDefaultMoves) {
     test::TestPluginHost host;
     host.translations = translations::english();
