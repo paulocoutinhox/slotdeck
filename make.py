@@ -334,6 +334,43 @@ def inherited_catalogs() -> list[str]:
     return found
 
 
+def unused_declarations() -> list[str]:
+    signals: dict[str, str] = {}
+    values: dict[str, str] = {}
+
+    for directory in ("src", "plugins"):
+        for path in sorted((ROOT / directory).rglob("*.h")):
+            text = path.read_text(encoding="utf-8")
+            where = str(path.relative_to(ROOT))
+
+            for block in re.findall(r"signals:(.*?)(?:\n\s*(?:public|private|protected|};))", text, re.S):
+                for name in re.findall(r"\bvoid\s+(\w+)\s*\(", block):
+                    signals[name] = where
+
+            for name, body in re.findall(r"enum\s+class\s+(\w+)[^{]*\{(.*?)\}", text, re.S):
+                for value in re.findall(r"\b([A-Z]\w*)\s*(?:=[^,}]*)?\s*(?:,|$)", body):
+                    values[f"{name}::{value}"] = where
+
+    sources = ""
+
+    for directory in ("src", "plugins", "tests"):
+        for path in sorted((ROOT / directory).rglob("*")):
+            if path.suffix in (".cpp", ".h"):
+                sources += path.read_text(encoding="utf-8", errors="ignore")
+
+    found = []
+
+    for name, where in sorted(signals.items()):
+        if not re.search(r"::" + re.escape(name) + r"\b", sources) and not re.search(r"\bemit\s+" + re.escape(name) + r"\b", sources):
+            found.append(f"the signal {name} in {where} is emitted by nothing and connected to nothing")
+
+    for qualified, where in sorted(values.items()):
+        if not re.search(r"\b" + re.escape(qualified) + r"\b", sources):
+            found.append(f"the value {qualified} in {where} is named by nothing")
+
+    return found
+
+
 def mismatched_theme_tokens() -> list[str]:
     theme = (ROOT / "src" / "ui" / "Theme.cpp").read_text(encoding="utf-8")
     block = re.search(r"const QVector<QPair<QString, QString>> tokens\{(.*?)\n    \};", theme, re.S)
@@ -472,6 +509,11 @@ def task_lint(_: Context) -> None:
 
     if inherited:
         raise RuntimeError("Every language declares the keys it spells, because a catalog built from another one cannot be told from one that forgot a sentence:\n  " + "\n  ".join(inherited))
+
+    unused = unused_declarations()
+
+    if unused:
+        raise RuntimeError("A declaration nothing reaches is one the reader never meets, so it is removed rather than kept:\n  " + "\n  ".join(unused))
 
     mismatched = mismatched_theme_tokens()
 

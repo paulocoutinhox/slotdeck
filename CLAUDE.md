@@ -1262,6 +1262,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The lint command refuses a translation catalog whose language is built from another one, because no case reading the finished map can tell that apart.
 - The lint command refuses a translation key nothing reaches, accepting one the code names itself and one composed from a family the code names, because a sentence no caller asks for is one the reader never sees.
 - The lint command refuses a theme token no style sheet consumes and a token a style sheet writes that nothing substitutes, because the second one reaches the screen spelled as itself.
+- The lint command refuses a signal nothing emits or connects and a value of a closed set nothing names, because a declaration the reader never meets is one nobody removed.
 - The lint command refuses a future continuation that captures something without naming the object it reaches, because that object is what cancels it.
 - The lint command refuses a call whose arguments do not match the sentence it formats, counting what each call really passes and holding both branches of a call that chooses between two sentences to the same count.
 - Complex methods use short intent comments only at important responsibility boundaries.
@@ -1624,7 +1625,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] The smoke test starts a terminal and shuts down cleanly.
 - [x] Test targets reuse production implementations and contain deterministic boundary doubles only.
 - [x] A document announces its first load only after its caller could connect, proven with a read that is already finished when the continuation is attached.
-- [x] The project has no connection, continuation or timer without an owning context, no blocking wait outside teardown, no unused function, member, signal, enum value, translation key, theme token or icon.
+- [x] The project has no connection, continuation or timer without an owning context, no blocking wait outside teardown, no unused function, member, signal, enum value, translation key, theme token or icon, and the lint command now holds the signals, the closed value sets, the keys, the tokens and the icons to that rather than leaving it to a reading.
 
 ## Current architecture verification
 
