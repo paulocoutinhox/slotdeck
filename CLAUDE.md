@@ -74,6 +74,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - That border is declared by the component for its own class rather than for an object name, because every surface renames the widget it owns.
 - A dialog form keeps one label column for every row it shows, so a field that appears with the selected kind still aligns with the fields above it.
 - A field that fills itself when it is left empty says so under itself, and that hint is the shared component, so its ink is the muted colour of the active theme and its size is the caption role rather than a colour and a size of its own.
+- That hint belongs inside the row of the field it explains rather than on a row of its own, so it starts where the field starts and sits against it by one shared metric.
 - A field the selected kind has nothing to do with is absent rather than present and closed, because a control nobody may type in still asks the reader what it is for.
 - Every tabbed surface uses the shared tab bar and its close button, so AI workspaces, browser tabs, editor workspaces, editor documents, terminal workspaces and dialog pages look identical and no surface installs its own tab button.
 - A view that owns the content area starts with a shared page header, keeps its content flush with the surrounding edges and separates surfaces with one single-pixel border.

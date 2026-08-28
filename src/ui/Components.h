@@ -279,8 +279,8 @@ void addSettingsRow(QFormLayout* form, const QString& label, QWidget* field);
 
 // A field that fills itself when it is left empty says so under itself, in the muted ink and the caption size of the active theme.
 [[nodiscard]] QLabel* hintLabel(const QString& text, QWidget* parent);
+[[nodiscard]] QWidget* fieldWithHint(QWidget* field, const QString& hint, QWidget* parent);
 void addSettingsRow(QFormLayout* form, const QString& label, QWidget* field, const QString& hint);
-void addFormHint(QFormLayout* form, const QString& text, QWidget* parent);
 [[nodiscard]] QToolButton* chipButton(const QString& text, const Theme& theme, QWidget* parent);
 [[nodiscard]] QWidget* stepperRow(QAbstractSpinBox* box, const Theme& theme, QWidget* parent);
 [[nodiscard]] QWidget* settingsActionRow(QWidget* parent);

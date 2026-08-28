@@ -109,8 +109,7 @@ AiAgentDialog::AiAgentDialog(PluginHost& host, AiAgent agent, QStringList takenI
     // clang-format on
 
     form->addRow(m_host.translate(QStringLiteral("ai.agent.name")), m_name);
-    form->addRow(m_host.translate(QStringLiteral("ai.agent.identifier")), m_identifier);
-    ui::addFormHint(form, m_host.translate(QStringLiteral("ai.agent.identifier-hint")), this);
+    form->addRow(m_host.translate(QStringLiteral("ai.agent.identifier")), ui::fieldWithHint(m_identifier, m_host.translate(QStringLiteral("ai.agent.identifier-hint")), this));
     form->addRow(m_host.translate(QStringLiteral("ai.agent.description")), m_description);
     form->addRow(m_host.translate(QStringLiteral("ai.agent.connection")), m_connection);
     form->addRow(m_host.translate(QStringLiteral("ai.agent.maximum-iterations")), ui::stepperRow(m_maximumIterations, m_host.theme(), this));

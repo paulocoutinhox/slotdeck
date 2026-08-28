@@ -826,12 +826,15 @@ QLabel* hintLabel(const QString& text, QWidget* parent) {
     return note;
 }
 
-void addFormHint(QFormLayout* form, const QString& text, QWidget* parent) {
-    if (text.isEmpty()) {
-        return;
-    }
-
-    form->addRow(QString{}, hintLabel(text, parent));
+// The hint belongs under the field it explains rather than on a row of its own, so it starts where the field starts and sits against it.
+QWidget* fieldWithHint(QWidget* field, const QString& hint, QWidget* parent) {
+    auto* stacked = new QWidget(parent);
+    auto* stackedLayout = new QVBoxLayout(stacked);
+    stackedLayout->setContentsMargins(0, 0, 0, 0);
+    stackedLayout->setSpacing(themeManager().theme().metric(ThemeMetric::ControlVerticalPadding));
+    stackedLayout->addWidget(field);
+    stackedLayout->addWidget(hintLabel(hint, stacked));
+    return stacked;
 }
 
 void addSettingsRow(QFormLayout* form, const QString& label, QWidget* field, const QString& hint) {

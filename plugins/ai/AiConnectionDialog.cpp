@@ -102,8 +102,7 @@ AiConnectionDialog::AiConnectionDialog(PluginHost& host, const ModelConnection& 
 
     m_form->addRow(m_host.translate(QStringLiteral("ai.settings.provider")), m_provider);
     m_form->addRow(m_host.translate(QStringLiteral("ai.settings.model")), modelRow);
-    m_form->addRow(m_host.translate(QStringLiteral("ai.connection.display-name")), m_displayName);
-    ui::addFormHint(m_form, m_host.translate(QStringLiteral("ai.connection.display-name-hint")), this);
+    m_form->addRow(m_host.translate(QStringLiteral("ai.connection.display-name")), ui::fieldWithHint(m_displayName, m_host.translate(QStringLiteral("ai.connection.display-name-hint")), this));
     m_form->addRow(m_host.translate(QStringLiteral("ai.settings.api-key")), m_apiKey);
     m_apiKeyRow = m_form->rowCount() - 1;
     m_form->addRow(m_host.translate(QStringLiteral("ai.connection.address")), m_address);

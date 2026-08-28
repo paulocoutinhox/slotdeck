@@ -991,6 +991,14 @@ TEST(AiConnectionDialogTest, HidesTheCredentialAProviderDoesNotUseAndSaysWhichFi
     const slotdeck::ui::Theme& theme = slotdeck::ui::themeManager().theme();
     EXPECT_EQ(hint->palette().color(QPalette::WindowText), theme.color(slotdeck::ui::ThemeColor::TextMuted));
     EXPECT_EQ(hint->font().pointSize(), theme.font(slotdeck::ui::ThemeFont::Caption).pointSize());
+
+    // The hint sits under the field it explains and starts where that field starts, rather than on a row of its own.
+    auto* named = dialog.findChild<QLineEdit*>(QStringLiteral("aiConnectionDisplayName"));
+    ASSERT_NE(named, nullptr);
+    EXPECT_EQ(hint->parentWidget(), named->parentWidget());
+    EXPECT_EQ(hint->x(), named->x());
+    EXPECT_GT(hint->y(), named->y());
+    EXPECT_LE(hint->y() - (named->y() + named->height()), theme.metric(slotdeck::ui::ThemeMetric::ControlVerticalPadding));
 }
 
 TEST(AiConnectionDialogTest, OffersNeitherModelDiscoveryNorExtraParametersToACommandLineAgent) {
