@@ -223,6 +223,24 @@ def unprotected_lambdas() -> list[str]:
     return found
 
 
+def unguarded_continuations() -> list[str]:
+    found: list[str] = []
+
+    for directory in ("src", "plugins"):
+        for path in sorted((ROOT / directory).rglob("*")):
+            if path.suffix not in (".cpp", ".h"):
+                continue
+
+            lines = path.read_text(encoding="utf-8").split("\n")
+
+            for number, line in enumerate(lines, 1):
+                for match in re.finditer(r"\.then\(\s*\[([^\]]*)\]", line):
+                    if match.group(1).strip():
+                        found.append(f"{path.relative_to(ROOT)}:{number}")
+
+    return found
+
+
 def unlisted_icons() -> list[str]:
     declaration = (ROOT / "src" / "ui" / "Icons.h").read_text(encoding="utf-8")
     accessor = (ROOT / "src" / "ui" / "Icons.cpp").read_text(encoding="utf-8")
@@ -295,6 +313,11 @@ def task_lint(_: Context) -> None:
 
     if stray:
         raise RuntimeError("Every comment is a complete sentence sitting on what it explains:\n  " + "\n  ".join(stray))
+
+    unguarded = unguarded_continuations()
+
+    if unguarded:
+        raise RuntimeError("A continuation that reaches anything is given the object it reaches as its context, so destroying that object cancels it:\n  " + "\n  ".join(unguarded))
 
     unlisted = unlisted_icons()
 

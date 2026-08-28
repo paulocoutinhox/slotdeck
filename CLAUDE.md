@@ -270,6 +270,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Web-server lifecycle commands are queued to the server thread and completion is reported through futures.
 - Plugin requests, events and replies remain queued and never invoke another plugin synchronously.
 - Future continuations that access a QObject use that QObject as their context so destruction cancels delivery safely.
+- A continuation that captures nothing reaches nothing, so it needs no context, and the lint command refuses every other one that names none.
 - A continuation attached to a future that already finished runs immediately, so an object never starts its own asynchronous work inside its constructor and announces the result to a caller that could not connect yet.
 - Plugins with direct asynchronous continuations bind them to a runtime context they own, created during initialization and destroyed before shutdown state is released, either a dedicated context object or the runtime object the continuation mutates.
 - Runtime state a signal can reach is held behind a shared pointer rather than inside the container that indexes it, because a container that grows while a signal is being delivered invalidates every reference into it.
@@ -1221,6 +1222,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A comment sits on the declaration it explains, so a comment followed by a blank line explains nothing and does not exist in the project.
 - The lint command refuses a comment separated from what it explains, a comment dividing a sentence with a semicolon and a comment that does not end its sentence, across the sources and the suite alike.
 - The lint command refuses a translation catalog whose language is built from another one, because no case reading the finished map can tell that apart.
+- The lint command refuses a future continuation that captures something without naming the object it reaches, because that object is what cancels it.
 - Complex methods use short intent comments only at important responsibility boundaries.
 - Validation, mutation, side effects and returns are visually separated.
 - Methods have a visually clear beginning, middle and end.
@@ -1542,6 +1544,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Two snapshots of the tabs answering out of order leave the later one standing, and a failure after them rolls back to it rather than to the earlier one.
 - [x] Every write still waiting when the executor is destroyed reaches the disk, and a folder opened the moment before the product closes is there when it opens again.
 - [x] Every owner that keeps a committed copy guards it by revision, proven for the editor and for the AI by cases that roll back to the older value without that guard.
+- [x] Every one of the hundred and twenty eight continuations names the object it reaches or reaches nothing at all, and the lint command now refuses any other.
 - [x] The cost of a run reaches the reader in the execution history, proven through the fake that answers the columns the real schema has.
 - [x] The price of every model the catalog carries reaches it, a model nobody priced reports no cost, and a price of the wrong shape or below zero rejects the plugin.
 - [x] The view follows the reader instead of dragging them to the end of every message that arrives.
