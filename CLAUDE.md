@@ -334,7 +334,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A key nobody declares changes nothing, so a document written by another version of the product still opens.
 - An entry of a stored collection that the owner cannot use is left out and every other entry still loads.
 - The shared `slotdeck::plugins` settings readers are the only implementation of that contract, covering the text, the integer, the boolean, the object, the object list and the text list, so a container of the wrong type is the declared default exactly like a scalar of the wrong type.
-- `SettingsReader` is the convenience over those readers for an owner that ignores each result, so it carries a method only while an owner reads that shape through it.
+- The `SettingsReader` is the convenience over those readers for an owner that ignores each result, so it carries a method only while an owner reads that shape through it.
 - A reference that names nothing is cleared rather than kept, because every later reader resolves it.
 - The core reads its own settings document through those same readers, because a shell that reads its stored values loosely accepts what it refuses from every plugin.
 - Core owns only lifecycle state, the settings documents and plugin schema versions.
@@ -1791,6 +1791,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 ## Documentation writing standard
 
 - A sentence never begins with code, a path or a fenced block, so a line always opens with a word.
+- The lint command refuses a line of this file, of the backlog or of the README that opens with code, because prose nobody audits drifts exactly like code nobody audits.
 - Prose never divides sentences with semicolons and never repeats what the code already says.
 
 ## Prohibited implementation patterns

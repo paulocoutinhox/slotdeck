@@ -335,6 +335,21 @@ def inherited_catalogs() -> list[str]:
     return found
 
 
+def prose_opening_with_code() -> list[str]:
+    found: list[str] = []
+
+    for name in ("CLAUDE.md", "BACKLOG.md", "README.md"):
+        path = ROOT / name
+        if not path.exists():
+            continue
+
+        for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):
+            if re.match(r"^\s*(?:[-*]|\d+\.)\s+`", line):
+                found.append(f"{name}:{number} opens its sentence with code")
+
+    return found
+
+
 def wrapped_statements() -> list[str]:
     found: list[str] = []
 
@@ -665,6 +680,11 @@ def task_audit(_: Context) -> None:
 
     if inherited:
         raise RuntimeError("Every language declares the keys it spells, because a catalog built from another one cannot be told from one that forgot a sentence:\n  " + "\n  ".join(inherited))
+
+    opening = prose_opening_with_code()
+
+    if opening:
+        raise RuntimeError("A sentence never begins with code or a path, so a line always opens with a word:\n  " + "\n  ".join(opening))
 
     wrapped = wrapped_statements()
 
