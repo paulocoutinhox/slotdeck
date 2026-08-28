@@ -1902,6 +1902,61 @@ TEST(AiChatClientTest, WithdrawsFromTheQueueWhenTheRunIsStoppedBeforeItsTurnCame
     EXPECT_FALSE(waiting.running());
 }
 
+// The size of a page is decided by whoever serves it, and the model chooses which one to fetch.
+TEST(AiToolRegistryTest, StopsFetchingAPageLargerThanTheBoundInsteadOfHoldingItWhole) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    filesystem::FileSystemService files;
+    host.useFileSystem(files);
+    AiToolRegistry registry(host);
+
+    QTemporaryDir root;
+    ASSERT_TRUE(root.isValid());
+    const QString sandbox = QDir(root.path()).canonicalPath();
+
+    QTcpServer generous;
+    ASSERT_TRUE(generous.listen(QHostAddress::LocalHost, 0));
+    const QByteArray padding(256 * 1024, 'a');
+    constexpr int offeredChunks = 16;
+    int sentChunks = 0;
+    // clang-format off
+    QObject::connect(&generous, &QTcpServer::newConnection, &generous, [&generous, &sentChunks, &padding]() {
+        QTcpSocket* socket = generous.nextPendingConnection();
+        QObject::connect(socket, &QTcpSocket::readyRead, socket, [socket, &sentChunks, &padding]() {
+            socket->readAll();
+            socket->write(QByteArrayLiteral("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n"));
+            socket->write(padding);
+            ++sentChunks;
+        });
+        QObject::connect(socket, &QTcpSocket::bytesWritten, socket, [socket, &sentChunks, &padding]() {
+            if (sentChunks >= offeredChunks || socket->state() != QAbstractSocket::ConnectedState) {
+                return;
+            }
+            socket->write(padding);
+            ++sentChunks;
+        });
+    });
+    // clang-format on
+
+    QVector<ToolResult> results;
+    // clang-format off
+    const auto collect = [&results](ToolResult result) { results.append(std::move(result)); };
+    // clang-format on
+    const QString address = QStringLiteral("http://127.0.0.1:%1/big").arg(generous.serverPort());
+
+    registry.invoke({QStringLiteral("f1"), QStringLiteral("fetch_url"), QJsonObject{{QStringLiteral("url"), address}}}, sandbox, collect);
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&results]() { return results.size() == 1; }, 20000));
+    // clang-format on
+
+    // The page was answered from what the bound allowed.
+    EXPECT_FALSE(results.first().failed) << results.first().text.toStdString();
+    EXPECT_FALSE(results.first().text.isEmpty());
+
+    // The transfer stopped where the bound is rather than running to the end of what the server was willing to send.
+    EXPECT_LT(sentChunks, offeredChunks) << "the server sent everything it offered";
+}
+
 // A tool that reads bytes it cannot decode would answer the model with what the decoding lost, and an edit would write that loss back to the file.
 TEST(AiToolRegistryTest, RefusesAFileThatIsNotTextInsteadOfRewritingWhatItHolds) {
     test::TestPluginHost host;

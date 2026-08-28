@@ -1,5 +1,7 @@
 #include "AiModelDiscovery.h"
 
+#include "AiNetwork.h"
+
 #include "AiProviderCatalog.h"
 
 #include <QJsonDocument>
@@ -79,13 +81,15 @@ void AiModelDiscovery::discover(const QString& providerId, const QString& apiKey
     }
 
     m_reply = m_network.get(request);
+    auto answer = boundReply(m_reply, maximumCatalogBytes);
     // clang-format off
-    connect(m_reply, &QNetworkReply::finished, this, [this]() {
+    connect(m_reply, &QNetworkReply::finished, this, [this, answer]() {
         QNetworkReply* reply = m_reply;
         m_reply = nullptr;
         reply->deleteLater();
-        const QByteArray payload = reply->read(maximumCatalogBytes);
-        if (reply->error() != QNetworkReply::NoError) {
+        answer->bytes.append(reply->read(maximumCatalogBytes - answer->bytes.size()));
+        const QByteArray payload = answer->bytes;
+        if (!answer->truncated && reply->error() != QNetworkReply::NoError) {
             emit failed({"ai_model_discovery_failed", reply->errorString(), QString::fromUtf8(payload.left(512))});
             return;
         }

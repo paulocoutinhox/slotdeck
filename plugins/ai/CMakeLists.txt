@@ -25,6 +25,8 @@ qt_add_library(
     AiMcpTransport.h
     AiModelConnection.cpp
     AiModelConnection.h
+    AiNetwork.cpp
+    AiNetwork.h
     AiModelDiscovery.cpp
     AiModelDiscovery.h
     AiPlugin.cpp

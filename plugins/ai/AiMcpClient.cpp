@@ -1,6 +1,7 @@
 #include "AiMcpClient.h"
 
 #include "AiMcpTransport.h"
+#include "AiNetwork.h"
 #include "AiProviderCatalog.h"
 
 #include <QCoreApplication>
@@ -21,11 +22,6 @@
 #include <utility>
 
 namespace slotdeck::plugins::ai {
-
-struct HttpAnswer final {
-    QByteArray bytes;
-    bool refused{false};
-};
 
 constexpr int methodNotFound = -32601;
 constexpr int internalError = -32603;
@@ -424,22 +420,15 @@ void AiMcpClient::post(const QJsonObject& message) {
     }
 
     QNetworkReply* reply = m_network.post(request, QJsonDocument(message).toJson(QJsonDocument::Compact));
-    auto answer = std::make_shared<HttpAnswer>();
+    auto answer = boundReply(reply, mcpMaximumMessageBytes);
     // clang-format off
-    // The size of the answer is decided by the server, so the bound holds while the bytes arrive rather than once they all have.
-    connect(reply, &QNetworkReply::readyRead, this, [this, reply, answer]() {
-        answer->bytes.append(reply->readAll());
-        if (answer->bytes.size() > mcpMaximumMessageBytes) {
-            const utils::Error error{"ai_mcp_answer_too_large", "The MCP server answered with more than the permitted size", m_descriptor.id};
-            answer->refused = true;
-            reply->abort();
-            reportFailure(error);
-            completeAll(error);
-        }
-    });
     connect(reply, &QNetworkReply::finished, this, [this, reply, answer]() {
         reply->deleteLater();
-        if (answer->refused) {
+        // An answer larger than the bound was stopped while it arrived, so nothing of it is dispatched.
+        if (answer->truncated) {
+            const utils::Error error{"ai_mcp_answer_too_large", "The MCP server answered with more than the permitted size", m_descriptor.id};
+            reportFailure(error);
+            completeAll(error);
             return;
         }
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
@@ -461,7 +450,7 @@ void AiMcpClient::post(const QJsonObject& message) {
             completeAll(error);
             return;
         }
-        answer->bytes.append(reply->readAll());
+        answer->bytes.append(reply->read(mcpMaximumMessageBytes - answer->bytes.size()));
         consumeHttpPayload(reply->rawHeader(QByteArrayLiteral("content-type")), answer->bytes);
     });
     // clang-format on

@@ -655,6 +655,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Every pending request completes when the server stops or exits, so a callback is never leaked.
 - Bounded message size, a start timeout and escalated termination apply to the MCP transport as they do to every other child process.
 - Both transports of one client hold an answer to the same bound, and the HTTP one holds it while the bytes arrive rather than once they all have, because the size of that answer is decided by the server.
+- Every answer the plugin reads from the network is bounded while it arrives by the one shared contract, covering the servers, the model catalog, the pages the agent fetches, the pictures it generates and the speech it asks for, because reading the first bytes of a body already held whole bounds nothing.
 - A command task runs in its own absolute working directory, streams its merged output, succeeds on a zero exit code and fails on any other.
 - A shell draws colors, cursor moves and progress rewrites, so only the readable text of the merged output reaches the execution record and a sequence split across two reads is completed by the next one.
 - A character split across two reads is completed the same way, because whoever writes to a pipe decides where a chunk ends and decoding each one alone turns that character into the marks that stand for what was lost.
@@ -1671,6 +1672,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] The web server, the provider stream and the settings reader answer every hostile input a seeded generator produces.
 - [x] Both framing transports answer every malformed frame a fixture writes on purpose instead of reading past it.
 - [x] An MCP server answering with more than the permitted size is stopped while the bytes arrive, proven against the read that held whatever the server sent.
+- [x] A page larger than the fetch bound stops the transfer rather than being held whole, proven by a server that could not send everything it offered.
 - [x] An outline nested deeper than the declared bound is read to that bound rather than to the depth the server chose.
 - [x] A client that outlives its transport asks it for nothing.
 - [x] A completed plugin request leaves no guard on its context, proven through a request a loaded plugin really makes.

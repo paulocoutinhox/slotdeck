@@ -1,4 +1,6 @@
 #include "AiToolRegistry.h"
+
+#include "AiNetwork.h"
 #include "persistence/StoredValues.h"
 
 #include <QDir>
@@ -1214,11 +1216,13 @@ void AiToolRegistry::fetchUrl(const ToolCall& call, const ToolCompletion& comple
     request.setTransferTimeout(fetchTimeoutMs);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     QNetworkReply* reply = m_network.get(request);
+    auto answer = boundReply(reply, maximumFetchBytes);
     // clang-format off
-    connect(reply, &QNetworkReply::finished, this, [this, call, completion, reply]() {
+    connect(reply, &QNetworkReply::finished, this, [this, call, completion, reply, answer]() {
         reply->deleteLater();
-        const QByteArray payload = reply->read(maximumFetchBytes);
-        if (reply->error() != QNetworkReply::NoError) {
+        answer->bytes.append(reply->read(maximumFetchBytes - answer->bytes.size()));
+        const QByteArray payload = answer->bytes;
+        if (!answer->truncated && reply->error() != QNetworkReply::NoError) {
             completion(AiToolRegistryHelper::failure(call, AiToolRegistryHelper::serviceErrorMessage(payload, reply->errorString())));
             return;
         }
@@ -1299,11 +1303,13 @@ void AiToolRegistry::searchWeb(const ToolCall& call, const ToolCompletion& compl
         reply = m_network.get(request);
     }
 
+    auto answer = boundReply(reply, maximumFetchBytes);
     // clang-format off
-    connect(reply, &QNetworkReply::finished, this, [this, call, completion, reply, count]() {
+    connect(reply, &QNetworkReply::finished, this, [this, call, completion, reply, count, answer]() {
         reply->deleteLater();
-        const QByteArray payload = reply->read(maximumFetchBytes);
-        if (reply->error() != QNetworkReply::NoError) {
+        answer->bytes.append(reply->read(maximumFetchBytes - answer->bytes.size()));
+        const QByteArray payload = answer->bytes;
+        if (!answer->truncated && reply->error() != QNetworkReply::NoError) {
             completion(AiToolRegistryHelper::failure(call, AiToolRegistryHelper::serviceErrorMessage(payload, reply->errorString())));
             return;
         }
@@ -1353,11 +1359,13 @@ void AiToolRegistry::generateImage(const ToolCall& call, const QString& sandboxR
     }
 
     QNetworkReply* reply = m_network.post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
+    auto answer = boundReply(reply, maximumImageBytes);
     // clang-format off
-    connect(reply, &QNetworkReply::finished, this, [this, call, completion, reply, path = destination.value()]() {
+    connect(reply, &QNetworkReply::finished, this, [this, call, completion, reply, answer, path = destination.value()]() {
         reply->deleteLater();
-        const QByteArray payload = reply->read(maximumImageBytes);
-        if (reply->error() != QNetworkReply::NoError) {
+        answer->bytes.append(reply->read(maximumImageBytes - answer->bytes.size()));
+        const QByteArray payload = answer->bytes;
+        if (!answer->truncated && reply->error() != QNetworkReply::NoError) {
             const QJsonObject error = QJsonDocument::fromJson(payload).object().value(QStringLiteral("error")).toObject();
             completion(AiToolRegistryHelper::failure(call, error.value(QStringLiteral("message")).toString(reply->errorString())));
             return;
@@ -1425,11 +1433,13 @@ void AiToolRegistry::generateSpeech(const ToolCall& call, const QString& sandbox
 
     const QJsonObject body = openAi ? QJsonObject{{QStringLiteral("model"), QStringLiteral("gpt-4o-mini-tts")}, {QStringLiteral("voice"), voice}, {QStringLiteral("input"), text}} : QJsonObject{{QStringLiteral("text"), text}};
     QNetworkReply* reply = m_network.post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
+    auto answer = boundReply(reply, maximumImageBytes);
     // clang-format off
-    connect(reply, &QNetworkReply::finished, this, [this, call, completion, reply, path = destination.value()]() {
+    connect(reply, &QNetworkReply::finished, this, [this, call, completion, reply, answer, path = destination.value()]() {
         reply->deleteLater();
-        const QByteArray payload = reply->read(maximumImageBytes);
-        if (reply->error() != QNetworkReply::NoError) {
+        answer->bytes.append(reply->read(maximumImageBytes - answer->bytes.size()));
+        const QByteArray payload = answer->bytes;
+        if (!answer->truncated && reply->error() != QNetworkReply::NoError) {
             completion(AiToolRegistryHelper::failure(call, AiToolRegistryHelper::serviceErrorMessage(payload, reply->errorString())));
             return;
         }
@@ -1472,11 +1482,13 @@ void AiToolRegistry::listVoices(const ToolCall& call, const ToolCompletion& comp
     request.setRawHeader(QByteArrayLiteral("xi-api-key"), apiKey.value().toUtf8());
 
     QNetworkReply* reply = m_network.get(request);
+    auto answer = boundReply(reply, maximumFetchBytes);
     // clang-format off
-    connect(reply, &QNetworkReply::finished, this, [this, call, completion, reply]() {
+    connect(reply, &QNetworkReply::finished, this, [this, call, completion, reply, answer]() {
         reply->deleteLater();
-        const QByteArray payload = reply->read(maximumFetchBytes);
-        if (reply->error() != QNetworkReply::NoError) {
+        answer->bytes.append(reply->read(maximumFetchBytes - answer->bytes.size()));
+        const QByteArray payload = answer->bytes;
+        if (!answer->truncated && reply->error() != QNetworkReply::NoError) {
             completion(AiToolRegistryHelper::failure(call, AiToolRegistryHelper::serviceErrorMessage(payload, reply->errorString())));
             return;
         }
