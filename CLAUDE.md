@@ -1234,6 +1234,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The anonymous namespace is never used, so every constant, type and function belongs to a named namespace.
 - Every definition lives inside the project namespace and no function is ever left loose in a file.
 - A helper that belongs to one file is a static member of a `<File>Helper` class declared and defined in that file, so every function has an owner and the header of the file stays free of its implementation details.
+- A free function in a source file is therefore one its own header declares, because anything else belongs to that helper class.
 - A constant or a type that belongs to one implementation file is declared in the project namespace of that file, and its name is unique in the project because nothing hides it from the other files any more.
 - A header carries no comment that describes what a declaration does, and carries a one line comment only when it records a decision the declaration cannot express.
 - A comment above an implementation inside a header follows the same rules as a comment inside an implementation file.

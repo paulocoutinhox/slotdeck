@@ -16,6 +16,8 @@ constexpr qint64 charactersPerEstimatedToken = 4;
 class AiCliChatClientHelper final {
   public:
     static QString roleHeading(const QString& role);
+    static const QStringList& searchDirectoryNames();
+    static qint64 estimatedTokens(const QString& text);
 };
 
 QString AiCliChatClientHelper::roleHeading(const QString& role) {
@@ -29,7 +31,7 @@ QString AiCliChatClientHelper::roleHeading(const QString& role) {
     return QStringLiteral("User");
 }
 
-const QStringList& commandLineSearchDirectoryNames() {
+const QStringList& AiCliChatClientHelper::searchDirectoryNames() {
     // clang-format off
     static const QStringList directories{QStringLiteral("/opt/homebrew/bin"), QStringLiteral("/usr/local/bin"), QStringLiteral("/usr/bin"), QStringLiteral("/opt/local/bin"), QStringLiteral("/snap/bin"), QStringLiteral(".local/bin"), QStringLiteral(".bun/bin"), QStringLiteral(".deno/bin"), QStringLiteral(".cargo/bin"), QStringLiteral(".npm-global/bin"), QStringLiteral("AppData/Local/Programs"), QStringLiteral("AppData/Roaming/npm")};
     // clang-format on
@@ -39,7 +41,7 @@ const QStringList& commandLineSearchDirectoryNames() {
 QStringList commandLineSearchDirectories() {
     QStringList resolved;
 
-    for (const auto& directory : commandLineSearchDirectoryNames()) {
+    for (const auto& directory : AiCliChatClientHelper::searchDirectoryNames()) {
         const QString absolute = QDir::isAbsolutePath(directory) ? directory : QDir(QDir::homePath()).filePath(directory);
 
         if (QFileInfo(absolute).isDir()) {
@@ -83,7 +85,7 @@ QStringList commandLineArguments(const CommandLineDescriptor& descriptor, const 
 }
 
 // No command line agent reports what it spent, so a token is counted as the four characters one averages and the number is an estimate rather than a measurement.
-qint64 estimatedTokens(const QString& text) {
+qint64 AiCliChatClientHelper::estimatedTokens(const QString& text) {
     return static_cast<qint64>(text.size()) / charactersPerEstimatedToken;
 }
 
@@ -158,7 +160,7 @@ void AiCliChatClient::completeRun(int exitCode, const QString& output) {
 
     // A command line agent reports no usage, so what it was given and what it answered are counted at the four characters a token averages.
     const QString answer = output.trimmed();
-    const ChatUsage estimated{estimatedTokens(m_prompt), estimatedTokens(answer)};
+    const ChatUsage estimated{AiCliChatClientHelper::estimatedTokens(m_prompt), AiCliChatClientHelper::estimatedTokens(answer)};
     emit finished(answer, {}, estimated, QStringLiteral("stop"));
 }
 

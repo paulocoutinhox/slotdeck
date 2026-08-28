@@ -21,6 +21,8 @@ class LanguageRegistryHelper final {
     static QVector<HighlightPattern> sharedPatterns(const QJsonObject& catalog, const QString& key, utils::Result<void>& outcome);
     static QStringList sharedKeywords(const QJsonObject& catalog, const QString& key, utils::Result<void>& outcome);
     static QMap<QString, HighlightRole> createSemanticRoles(const QJsonObject& catalog, utils::Result<void>& outcome);
+    static const QVector<QPair<QString, HighlightRole>>& roleTable();
+    static const LanguageCatalog& parsedCatalog();
     static EditorLimits createLimits(const QJsonObject& catalog, utils::Result<void>& outcome);
     static QStringList textList(const QJsonObject& entry, const QString& key, bool& valid);
     static std::optional<HighlightRole> roleFromIdentifier(const QString& identifier);
@@ -86,7 +88,7 @@ QStringList LanguageRegistryHelper::textList(const QJsonObject& entry, const QSt
 }
 
 // The complete role set is answered here, so a role is added in one place and every reader of it follows.
-const QVector<QPair<QString, HighlightRole>>& roleTable() {
+const QVector<QPair<QString, HighlightRole>>& LanguageRegistryHelper::roleTable() {
     // clang-format off
     static const QVector<QPair<QString, HighlightRole>> table{{QStringLiteral("text"), HighlightRole::Text}, {QStringLiteral("keyword"), HighlightRole::Keyword}, {QStringLiteral("controlFlow"), HighlightRole::ControlFlow}, {QStringLiteral("primitiveType"), HighlightRole::PrimitiveType}, {QStringLiteral("type"), HighlightRole::Type}, {QStringLiteral("namespace"), HighlightRole::Namespace}, {QStringLiteral("enumeration"), HighlightRole::Enumeration}, {QStringLiteral("constant"), HighlightRole::Constant}, {QStringLiteral("function"), HighlightRole::Function}, {QStringLiteral("method"), HighlightRole::Method}, {QStringLiteral("macro"), HighlightRole::Macro}, {QStringLiteral("parameter"), HighlightRole::Parameter}, {QStringLiteral("variable"), HighlightRole::Variable}, {QStringLiteral("property"), HighlightRole::Property}, {QStringLiteral("number"), HighlightRole::Number}, {QStringLiteral("string"), HighlightRole::String}, {QStringLiteral("regexp"), HighlightRole::Regexp}, {QStringLiteral("comment"), HighlightRole::Comment}, {QStringLiteral("operator"), HighlightRole::Operator}, {QStringLiteral("preprocessor"), HighlightRole::Preprocessor}, {QStringLiteral("label"), HighlightRole::Label}, {QStringLiteral("decorator"), HighlightRole::Decorator}, {QStringLiteral("attribute"), HighlightRole::Attribute}, {QStringLiteral("heading"), HighlightRole::Heading}, {QStringLiteral("emphasis"), HighlightRole::Emphasis}, {QStringLiteral("strong"), HighlightRole::Strong}, {QStringLiteral("link"), HighlightRole::Link}, {QStringLiteral("markup"), HighlightRole::Markup}, {QStringLiteral("codeSpan"), HighlightRole::CodeSpan}};
     // clang-format on
@@ -97,7 +99,7 @@ const QVector<HighlightRole>& highlightRoles() {
     // clang-format off
     static const QVector<HighlightRole> values = [] {
         QVector<HighlightRole> roles;
-        for (const auto& entry : roleTable()) {
+        for (const auto& entry : LanguageRegistryHelper::roleTable()) {
             roles.append(entry.second);
         }
         return roles;
@@ -107,7 +109,7 @@ const QVector<HighlightRole>& highlightRoles() {
 }
 
 QString highlightRoleIdentifier(HighlightRole role) {
-    for (const auto& entry : roleTable()) {
+    for (const auto& entry : LanguageRegistryHelper::roleTable()) {
         if (entry.second == role) {
             return entry.first;
         }
@@ -117,7 +119,7 @@ QString highlightRoleIdentifier(HighlightRole role) {
 }
 
 std::optional<HighlightRole> LanguageRegistryHelper::roleFromIdentifier(const QString& identifier) {
-    for (const auto& entry : roleTable()) {
+    for (const auto& entry : LanguageRegistryHelper::roleTable()) {
         if (entry.first == identifier) {
             return entry.second;
         }
@@ -230,8 +232,6 @@ QVector<LanguageServerDefinition> LanguageRegistryHelper::createLanguageServers(
     return servers;
 }
 
-[[nodiscard]] const LanguageCatalog& parsedCatalog();
-
 utils::Result<void>& LanguageRegistry::mutableCatalogError() {
     static utils::Result<void> outcome = utils::Result<void>::success();
     return outcome;
@@ -240,7 +240,7 @@ utils::Result<void>& LanguageRegistry::mutableCatalogError() {
 // Both lists are read from the same file, so asking for the outcome builds whichever of them has not been built yet.
 const utils::Result<void>& LanguageRegistry::catalogError() {
     // clang-format off
-    static const bool built = [] { return !parsedCatalog().languages.isEmpty(); }();
+    static const bool built = [] { return !LanguageRegistryHelper::parsedCatalog().languages.isEmpty(); }();
     // clang-format on
     Q_UNUSED(built);
     return mutableCatalogError();
@@ -335,7 +335,7 @@ LanguageCatalog LanguageRegistry::parse(const QByteArray& text, utils::Result<vo
 }
 
 // The catalog is data, so a language, a server or a tunable is added by one entry in the file and never by interface code.
-const LanguageCatalog& parsedCatalog() {
+const LanguageCatalog& LanguageRegistryHelper::parsedCatalog() {
     // clang-format off
     static const LanguageCatalog value = [] {
         utils::Result<void>& outcome = LanguageRegistry::mutableCatalogError();
@@ -353,27 +353,27 @@ const LanguageCatalog& parsedCatalog() {
 }
 
 const QVector<HighlightPattern>& LanguageRegistry::patternsBeforeKeywords() {
-    return parsedCatalog().beforeKeywords;
+    return LanguageRegistryHelper::parsedCatalog().beforeKeywords;
 }
 
 const QVector<HighlightPattern>& LanguageRegistry::patternsAfterKeywords() {
-    return parsedCatalog().afterKeywords;
+    return LanguageRegistryHelper::parsedCatalog().afterKeywords;
 }
 
 const QStringList& LanguageRegistry::controlFlowKeywords() {
-    return parsedCatalog().controlFlowKeywords;
+    return LanguageRegistryHelper::parsedCatalog().controlFlowKeywords;
 }
 
 const QStringList& LanguageRegistry::primitiveTypeKeywords() {
-    return parsedCatalog().primitiveTypeKeywords;
+    return LanguageRegistryHelper::parsedCatalog().primitiveTypeKeywords;
 }
 
 const QMap<QString, HighlightRole>& LanguageRegistry::semanticRoles() {
-    return parsedCatalog().semanticRoles;
+    return LanguageRegistryHelper::parsedCatalog().semanticRoles;
 }
 
 const EditorLimits& LanguageRegistry::limits() {
-    return parsedCatalog().limits;
+    return LanguageRegistryHelper::parsedCatalog().limits;
 }
 
 const LanguageDefinition* LanguageRegistry::languageForId(const QString& languageId) {
@@ -387,11 +387,11 @@ const LanguageDefinition* LanguageRegistry::languageForId(const QString& languag
 }
 
 const QVector<LanguageDefinition>& LanguageRegistry::languages() {
-    return parsedCatalog().languages;
+    return LanguageRegistryHelper::parsedCatalog().languages;
 }
 
 const QVector<LanguageServerDefinition>& LanguageRegistry::languageServers() {
-    return parsedCatalog().servers;
+    return LanguageRegistryHelper::parsedCatalog().servers;
 }
 
 const LanguageDefinition& LanguageRegistry::languageForPath(const QString& path) {
