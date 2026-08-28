@@ -312,6 +312,38 @@ TEST(AiCommandRunnerTest, KeepsOnlyTheReadableTextOfACommandThatDrawsInTheTermin
 }
 
 // Asking for the whole window as an answer leaves the conversation none of it, so that budget is refused where it is typed rather than compacting every turn away.
+// A reader configuring a command line agent picks the provider and a model it offers, so every one of those opens without asking for anything else.
+TEST(AiModelConnectionTest, OpensAConnectionToEveryCommandLineProviderFromWhatItOffers) {
+    qsizetype checked = 0;
+
+    for (const auto& provider : providerCatalog()) {
+        if (provider.protocol != WireProtocol::CommandLine) {
+            continue;
+        }
+
+        ASSERT_FALSE(provider.models.isEmpty()) << provider.id.toStdString();
+        ASSERT_FALSE(provider.preferredModels.isEmpty()) << provider.id.toStdString();
+
+        // What the provider opens with is a model it really offers.
+        for (const auto& preferred : provider.preferredModels) {
+            EXPECT_NE(findModel(provider, preferred), nullptr) << provider.id.toStdString() << " / " << preferred.toStdString();
+        }
+
+        for (const auto& model : provider.models) {
+            const ModelConnection connection = declaredConnection(provider, model.id);
+            const auto opened = validateConnection(connection);
+            ASSERT_TRUE(opened.hasValue()) << provider.id.toStdString() << " / " << model.id.toStdString() << " " << opened.error().message.toStdString();
+            EXPECT_EQ(connectionKey(opened.value()), provider.id + QLatin1Char('/') + model.id);
+            // A command line agent signs in on its own, so nothing it opens with carries a credential or an address.
+            EXPECT_TRUE(opened.value().apiKey.isEmpty());
+            EXPECT_TRUE(opened.value().address.isEmpty());
+            ++checked;
+        }
+    }
+
+    EXPECT_GT(checked, 0);
+}
+
 TEST(AiModelConnectionTest, RefusesAnAnswerBudgetOfZeroOnAModelWhoseMaximumIsItsWholeWindow) {
     const ProviderDescriptor* provider = findProvider(QStringLiteral("xai"));
     ASSERT_NE(provider, nullptr);

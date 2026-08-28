@@ -1576,6 +1576,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Every model a command line provider offers carries the window and the output bound its own service publishes.
 - [x] A conversation bound for a command line agent keeps the whole window of its model, proven against a model whose published output equals that window.
 - [x] An answer budget of zero is refused on a model whose maximum is its whole window, and a number the reader chooses opens that connection.
+- [x] A connection opens to every model every command line provider offers, carrying neither a credential nor an address, and what each opens with is a model it really offers.
 - [x] Every plugin releases what it already took before returning a failure from initialization, checked against all eight.
 - [x] The cost of a run reaches the reader in the execution history, proven through the fake that answers the columns the real schema has.
 - [x] The price of every model the catalog carries reaches it, a model nobody priced reports no cost, and a price of the wrong shape or below zero rejects the plugin.
