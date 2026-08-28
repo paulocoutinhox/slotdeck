@@ -1358,6 +1358,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Tests must be independent, repeatable and valid in any execution order or parallel schedule.
 - AddressSanitizer and UndefinedBehaviorSanitizer execute the complete registered suite when the
   selected toolchain supports them.
+- The thread sanitizer is not part of that set, because Qt is consumed as a shared build it never instrumented and every report it produces is a handoff whose synchronization it cannot see, which `BACKLOG.md` records as the decision it is.
 - Coverage instrumentation applies to first-party core and plugin targets while excluding external
   dependencies and test implementation code.
 - The counters of the previous run are cleared before the suite starts, because a report merged with counters belonging to the sources as they were then describes neither build, and a case that starts a child of the test binary reads that merge as output the child produced.

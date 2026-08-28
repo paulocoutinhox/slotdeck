@@ -42,6 +42,22 @@ Every item below is read-only analysis. None of them changes a file.
   shared implementation that must edit several files atomically, including files that are not open,
   with a single undo step and without breaking the language server synchronization.
 
+## The thread sanitizer
+
+Running the registered suite under `-fsanitize=thread` on 2026-08-28 reported 298 warnings and
+every one of them has the same shape: an object this project constructs on one thread and hands to
+Qt, which uses it on another. The write is our constructor or our lambda, the read is
+`QThreadPool::run`, `QObject::event` or a future continuation, and the happens-before edge between
+them lives inside QtCore.
+
+Qt is consumed as a shared build that was not compiled with the thread sanitizer, so the tool cannot
+see the mutexes and atomics that publish those objects and reports the handoff as a race. Reading
+one report of each shape found no access this project makes without the synchronization Qt provides.
+
+Using the tool here would need a thread-sanitized Qt, which is not what the product ships against,
+so the sanitizer configuration stays AddressSanitizer with UndefinedBehaviorSanitizer. If the
+question returns, the step is to instrument Qt rather than to read these reports again.
+
 ## Unexplained intermittent failure
 
 - `CodeWorkspaceViewTest.SurvivesManyDocumentsOpenedEditedSavedAndClosedInOneWorkspace` ended with
