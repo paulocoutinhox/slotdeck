@@ -433,6 +433,9 @@ QString AiConnectionDialog::validationMessage(const utils::Error& error) const {
     if (error.code == QStringLiteral("ai_output_budget_unknown")) {
         return m_host.translate(QStringLiteral("ai.validation.output-budget-unknown")).arg(error.detail);
     }
+    if (error.code == QStringLiteral("ai_output_budget_whole_window")) {
+        return m_host.translate(QStringLiteral("ai.validation.output-budget-whole-window")).arg(error.detail);
+    }
     if (error.code == QStringLiteral("ai_address_invalid")) {
         return m_host.translate(QStringLiteral("ai.validation.connection-address"));
     }

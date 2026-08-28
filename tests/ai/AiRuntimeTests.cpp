@@ -311,6 +311,30 @@ TEST(AiCommandRunnerTest, KeepsOnlyTheReadableTextOfACommandThatDrawsInTheTermin
     EXPECT_EQ(plainCommandOutput(pending, QStringLiteral("kept\ttabs\n")), QStringLiteral("kept\ttabs\n"));
 }
 
+// Asking for the whole window as an answer leaves the conversation none of it, so that budget is refused where it is typed rather than compacting every turn away.
+TEST(AiModelConnectionTest, RefusesAnAnswerBudgetOfZeroOnAModelWhoseMaximumIsItsWholeWindow) {
+    const ProviderDescriptor* provider = findProvider(QStringLiteral("xai"));
+    ASSERT_NE(provider, nullptr);
+    const auto budget = outputBudgetParameter(*provider, QStringLiteral("grok-4.6"));
+    ASSERT_TRUE(budget.has_value());
+
+    const ModelDescriptor* whole = findModel(*provider, QStringLiteral("grok-4.6"));
+    ASSERT_NE(whole, nullptr);
+    ASSERT_GE(whole->maximumOutputTokens, whole->contextWindow);
+
+    ModelConnection connection = declaredConnection(*provider, QStringLiteral("grok-4.6"));
+    connection.apiKey = QStringLiteral("a-key");
+    connection.parameters.insert(budget->id, 0);
+    const auto refused = validateConnection(connection);
+    ASSERT_FALSE(refused.hasValue());
+    EXPECT_EQ(refused.error().code, QStringLiteral("ai_output_budget_whole_window"));
+    EXPECT_EQ(refused.error().detail, QStringLiteral("grok-4.6"));
+
+    // A number the reader chooses opens that connection, because it leaves the conversation what remains.
+    connection.parameters.insert(budget->id, 8192);
+    EXPECT_TRUE(validateConnection(connection).hasValue());
+}
+
 TEST(AiProviderCatalogTest, BoundsTheOutputBudgetByWhatTheSelectedModelAccepts) {
     const ProviderDescriptor* anthropic = findProvider(QStringLiteral("anthropic"));
     ASSERT_NE(anthropic, nullptr);

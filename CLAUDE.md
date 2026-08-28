@@ -574,6 +574,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A limit of zero means unlimited, for the agent iteration count, the command time limit and the answer budget.
 - An answer budget of zero asks for everything the model allows, so the maximum that model declares is what reaches the service, because more than one service requires that field and an absence fails there.
 - A zero on a model the catalog does not declare has no answer, so it is refused where it is typed rather than reaching the service as an absence, while the declared budget opens that connection like any other.
+- A zero on a model whose declared maximum is its whole window is refused the same way, because asking for all of it leaves the conversation none and every turn would compact away what came before.
 - A connection opens with the values a request is written with, which are a temperature of one, a nucleus of ninety-five hundredths and an answer budget of eight thousand one hundred and ninety-two tokens.
 - That budget is bounded by the maximum the selected model declares, so no connection opens outside the range its own model accepts.
 - An agent that repeats the same tool with the same arguments beyond the permitted count ends the run with the repetition as its reason instead of looping forever, keeping what the earlier turns produced.
@@ -1574,6 +1575,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A command line agent is given the model the connection names and reports an estimate of what it spent, since it reports nothing itself.
 - [x] Every model a command line provider offers carries the window and the output bound its own service publishes.
 - [x] A conversation bound for a command line agent keeps the whole window of its model, proven against a model whose published output equals that window.
+- [x] An answer budget of zero is refused on a model whose maximum is its whole window, and a number the reader chooses opens that connection.
 - [x] Every plugin releases what it already took before returning a failure from initialization, checked against all eight.
 - [x] The cost of a run reaches the reader in the execution history, proven through the fake that answers the columns the real schema has.
 - [x] The price of every model the catalog carries reaches it, a model nobody priced reports no cost, and a price of the wrong shape or below zero rejects the plugin.

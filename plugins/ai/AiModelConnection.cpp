@@ -212,9 +212,15 @@ utils::Result<ModelConnection> validateConnection(const ModelConnection& connect
     }
     // Asking for the maximum of a model the catalog does not declare has no answer, so it is refused where it is typed.
     const auto budget = outputBudgetParameter(*provider, validated.modelId);
+    const ModelDescriptor* chosen = findModel(*provider, validated.modelId);
+    const bool asksForTheMaximum = budget.has_value() && budget->modelMaximumWhenZero && validated.parameters.value(budget->id).toInteger(0) == 0;
 
-    if (budget.has_value() && budget->modelMaximumWhenZero && validated.parameters.value(budget->id).toInteger(0) == 0 && findModel(*provider, validated.modelId) == nullptr) {
+    if (asksForTheMaximum && chosen == nullptr) {
         return utils::Result<ModelConnection>::failure({"ai_output_budget_unknown", "The catalog does not declare this model, so its answer budget has to be a number", validated.modelId});
+    }
+    // A service may publish the same number for what a model reads and for what it may answer, and asking for all of it leaves the conversation none.
+    if (asksForTheMaximum && chosen != nullptr && chosen->maximumOutputTokens >= chosen->contextWindow) {
+        return utils::Result<ModelConnection>::failure({"ai_output_budget_whole_window", "The maximum this model declares is its whole window, so its answer budget has to be a number", validated.modelId});
     }
 
     const auto extra = validateExtraParameters(validated.extraParameters);
