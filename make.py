@@ -634,6 +634,17 @@ def unreachable_translations() -> list[str]:
     return unreachable
 
 
+def anonymous_namespaces() -> list[str]:
+    found = []
+
+    for name in source_files():
+        for number, line in enumerate(Path(name).read_text(encoding="utf-8").splitlines(), start=1):
+            if re.match(r"^\s*namespace\s*\{\s*$", line):
+                found.append(f"{name}:{number}")
+
+    return found
+
+
 def divergent_backend_conditions() -> list[str]:
     backends = (
         ROOT / "src" / "terminal" / "platform" / "posix" / "PosixPtyBackend.cpp",
@@ -781,6 +792,11 @@ def task_audit(_: Context) -> None:
 
     if unreachable:
         raise RuntimeError("A sentence nothing reaches is one the reader never sees, so every key is named by the code or composed from a family it names:\n  " + "\n  ".join(unreachable))
+
+    anonymous = anonymous_namespaces()
+
+    if anonymous:
+        raise RuntimeError("Every constant, type and function belongs to a named namespace, because nothing is hidden from the other files:\n  " + "\n  ".join(anonymous))
 
     divergent = divergent_backend_conditions()
 

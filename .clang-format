@@ -13,6 +13,7 @@ BreakBeforeBraces: Attach
 BreakBeforeBinaryOperators: None
 BreakArrays: false
 ColumnLimit: 1000000
+MaxEmptyLinesToKeep: 1
 ConstructorInitializerIndentWidth: 4
 IndentWidth: 4
 NamespaceIndentation: None

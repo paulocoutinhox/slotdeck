@@ -1237,6 +1237,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 ## C++ implementation standard
 
 - The anonymous namespace is never used, so every constant, type and function belongs to a named namespace.
+- The lint command refuses an anonymous namespace, because a rule that hides nothing from the other files is one nobody notices being broken.
 - Every definition lives inside the project namespace and no function is ever left loose in a file.
 - A helper that belongs to one file is a static member of a `<File>Helper` class declared and defined in that file, so every function has an owner and the header of the file stays free of its implementation details.
 - A free function in a source file is therefore one its own header declares, because anything else belongs to that helper class.
@@ -1253,7 +1254,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The formatter owns the order inside a group, so the sorting is the case-sensitive one it applies and never a hand-made ordering.
 - The lint command refuses a group that mixes two of those kinds and a file whose groups fall out of that order, because the formatter sorts inside a group and never moves an include between them.
 - A header is included once per file, and the only repeated include is one the preprocessor selects between alternative branches.
-- Two blank lines never follow each other.
+- Two blank lines never follow each other, which the formatter itself keeps rather than a reading, because it is the one tool that already visits every line.
 
 - All code, identifiers, error text and code comments are written in English.
 - A member variable carries the `m_` prefix and no identifier begins or ends with an underscore.
