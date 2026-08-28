@@ -61,6 +61,7 @@ class CodeWorkspaceView final : public QWidget {
     void applyEncodingChoice(QAction* action);
     void updateDocumentTitle(CodeDocument* document);
     void applyFileFilter();
+    void narrowLoadedTree(const QString& path);
     bool narrowTree(const QModelIndex& parent, int depth);
     void revealInTree(int index);
     void updateDocumentPaths(const QString& source, const QString& destination);

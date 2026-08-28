@@ -223,7 +223,7 @@ CodeWorkspaceView::CodeWorkspaceView(CodeWorkspaceState state, QVector<ResolvedL
     // clang-format off
     connect(m_tree, &QTreeView::doubleClicked, this, [this](const QModelIndex& index) { const QString path = m_fileModel->filePath(index); if (QFileInfo(path).isFile()) { openFile(path); } });
     connect(m_fileFilter, &ui::FilterField::filterChanged, this, [this](const QString& text) { m_fileNeedle = text; applyFileFilter(); if (!text.isEmpty()) { m_tree->expandAll(); } });
-    connect(m_fileModel, &QFileSystemModel::directoryLoaded, this, [this](const QString&) { applyFileFilter(); });
+    connect(m_fileModel, &QFileSystemModel::directoryLoaded, this, [this](const QString& loaded) { narrowLoadedTree(loaded); });
     connect(m_tree, &QTreeView::customContextMenuRequested, this, [this](const QPoint& position) { showContextMenu(position); });
     connect(m_documents, &QTabWidget::tabCloseRequested, this, [this](int index) { closeDocument(index); });
     connect(m_documents, &QTabWidget::currentChanged, this, [this](int) { updateStatusBar(); refreshSymbolPanel(); emit stateChanged(); });
@@ -876,6 +876,38 @@ void CodeWorkspaceView::updateDocumentTitle(CodeDocument* document) {
 // The tree follows the document the reader points at, so a double click on its tab selects the file it belongs to.
 void CodeWorkspaceView::applyFileFilter() {
     narrowTree(m_fileModel->index(m_initialState.rootPath), 0);
+}
+
+// A folder that finished loading narrows itself and the path that leads to it, because narrowing the whole tree once per folder that arrives costs the tree squared.
+void CodeWorkspaceView::narrowLoadedTree(const QString& path) {
+    const QModelIndex root = m_fileModel->index(m_initialState.rootPath);
+    const QModelIndex loaded = m_fileModel->index(path);
+    QModelIndex ancestor = loaded;
+    int depth = 0;
+
+    while (ancestor.isValid() && ancestor != root && depth <= maximumTreeDepth) {
+        ancestor = ancestor.parent();
+        ++depth;
+    }
+
+    if (!loaded.isValid() || ancestor != root) {
+        return;
+    }
+
+    if (loaded == root) {
+        narrowTree(root, 0);
+        return;
+    }
+
+    const bool named = loaded.data(Qt::DisplayRole).toString().contains(m_fileNeedle, Qt::CaseInsensitive);
+    const bool leadsToOne = narrowTree(loaded, depth);
+    const bool visible = m_fileNeedle.isEmpty() || named || leadsToOne;
+    m_tree->setRowHidden(loaded.row(), loaded.parent(), !visible);
+
+    // Loading a folder only ever adds names the filter can match, so the folders above it can only become visible.
+    for (QModelIndex entry = loaded.parent(); visible && entry.isValid() && entry != root; entry = entry.parent()) {
+        m_tree->setRowHidden(entry.row(), entry.parent(), false);
+    }
 }
 
 // A folder that leads to a name the filter matched stays, because a match nobody can reach is not a result.

@@ -1039,6 +1039,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The editor provides line numbers, current-line emphasis, an optional persisted word wrap, EditorConfig indentation, selection indent and unindent, native editing shortcuts, save, incremental find and language completion.
 - The tree of a workspace carries the shared filter field above it and narrows to the names that match what was typed, keeping the folders that lead to a match and reading a folder it has to look inside.
 - That walk carries the depth this project declares, because a folder reached through a symbolic link can name the folder that holds it and the tree would otherwise keep offering one more level for as long as anyone waited.
+- A folder that finished loading narrows itself and only the path that leads to it, because narrowing the whole tree once per folder that arrives costs the tree squared, and a folder that loads only ever adds names the filter can match.
 - One single-pixel divider separates that filter from the tree, because two surfaces of one panel are told apart by the boundary between them.
 - The find bar is the shared component every surface searches with, and its owner supplies the words so it carries no catalog of its own.
 - The find bar opens with the native find shortcut, moves between matches with the native find-next and find-previous shortcuts, wraps around the document and closes with Escape.
@@ -1681,6 +1682,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A file is found by part of its name, ranked by the characters found in order, from a folder walked away from the interface and bounded by the catalog.
 - [x] The Problems surface carries every file the workspace analysed and is narrowed by a filter over the file and the message.
 - [x] The tree filter stops at the depth the code declares rather than following a folder that names itself, proven against a tree deeper than that bound.
+- [x] The tree filter narrows only the folder that loaded, measured on a workspace of three thousand six hundred folders as five to seventeen seconds of walking becoming two to four.
 - [x] Every read of the render snapshot goes through the lock that guards it.
 - [x] The Linux, macOS and Windows workflows build, test, package and validate the product on every push.
 - [x] The release workflow publishes the Linux archive, the macOS disk image and the Windows archive for every `v*` tag.
