@@ -965,6 +965,13 @@ void AiPlugin::continueWhenAnswerIsPending(const QString& taskId, qint64 deliver
     // clang-format on
 }
 
+void AiPlugin::recordAgentRemoved(const QString& taskId, const QString& agentId) {
+    m_lastStatuses.insert(taskId, ExecutionStatus::Failed);
+    m_lastStopReasons.insert(taskId, AgentStopReason::Failed);
+    m_lastErrors.insert(taskId, m_host->translate(QStringLiteral("ai.error.agent-removed")).arg(agentId));
+    emit taskRunStateChanged(taskId);
+}
+
 void AiPlugin::stopOrphanedTasks(const QStringList& taskIds) {
     for (const auto& taskId : taskIds) {
         const auto* orphan = task(taskId);
@@ -972,17 +979,14 @@ void AiPlugin::stopOrphanedTasks(const QStringList& taskIds) {
             continue;
         }
 
-        const QString message = m_host->translate(QStringLiteral("ai.error.agent-removed")).arg(orphan->agentId);
         if (runState(taskId) != TaskRunState::Idle) {
             auto stopped = stopTask(taskId);
             // clang-format off
             stopped.then(m_asyncContext.get(), [](utils::Result<void>) {});
             // clang-format on
         }
-        m_lastStatuses.insert(taskId, ExecutionStatus::Failed);
-        m_lastStopReasons.insert(taskId, AgentStopReason::Failed);
-        m_lastErrors.insert(taskId, message);
-        emit taskRunStateChanged(taskId);
+
+        recordAgentRemoved(taskId, orphan->agentId);
     }
 }
 
@@ -1239,6 +1243,8 @@ QFuture<utils::Result<void>> AiPlugin::startTask(const QString& taskId) {
     if (started->executionKind == TaskExecutionKind::Agent) {
         const auto agent = agentForTask(*started);
         if (!agent.hasValue()) {
+            // The card keeps the reason it could not start, because a task handed to an agent that is gone explains nothing by itself.
+            recordAgentRemoved(taskId, started->agentId);
             return QtFuture::makeReadyValueFuture(utils::Result<void>::failure(agent.error()));
         }
         const auto connection = connectionForAgent(agent.value());

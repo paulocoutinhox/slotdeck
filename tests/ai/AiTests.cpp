@@ -1,5 +1,6 @@
 #include "AiCliChatClient.h"
 #include "AiConversationView.h"
+#include "AiTasksView.h"
 #include "AiTestSupport.h"
 
 #include "TestTranslations.h"
@@ -1528,6 +1529,35 @@ TEST(AiPluginTest, FitsTheConversationToTheModelTheRunDeclaresAndNotToALaterSele
     EXPECT_GT(widerLimit, runLimit);
     EXPECT_LT(estimateTokens(clients.at(1)->sentMessages), widerLimit);
     plugin.shutdown();
+}
+
+// A card dropped into Doing starts the task, so a task whose agent is gone says that rather than reading as a card that could not be saved.
+TEST(AiTasksViewTest, SaysTheAgentIsGoneWhenACardWithNoneIsDroppedIntoDoing) {
+    test::TestPluginHost host;
+    host.translations = translations::english();
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const AiWorkspace workspace{QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, true, now, now};
+    AiTask orphan = AiTestsHelper::makeTask(QStringLiteral("task-1"), workspace.id);
+    orphan.agentId = QStringLiteral("an-agent-nobody-configured");
+    AiTestsHelper::installAiRows(host, {workspace}, {orphan}, {});
+
+    // clang-format off
+    AiPlugin plugin([](AiRequestGate&, const ModelConnection&) { return std::make_unique<FakeChatClient>(); });
+    // clang-format on
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    std::unique_ptr<QWidget> view(plugin.createNavigationView(QStringLiteral("tasks"), nullptr));
+    ASSERT_NE(view, nullptr);
+    view->show();
+
+    const qsizetype told = host.notifications.size();
+    const auto moved = test::awaitFuture(plugin.moveTask(orphan.id, TaskColumn::Doing));
+    ASSERT_FALSE(moved.hasValue());
+    EXPECT_EQ(moved.error().code, QStringLiteral("ai_agent_unknown"));
+
+    // The card keeps which agent is missing rather than reading as a card that could not be written.
+    EXPECT_EQ(plugin.lastError(orphan.id), host.translate(QStringLiteral("ai.error.agent-removed")).arg(orphan.agentId));
+    EXPECT_NE(plugin.lastError(orphan.id), host.translate(QStringLiteral("ai.error.task-save")));
+    EXPECT_EQ(host.notifications.size(), told);
 }
 
 TEST(AiTasksViewTest, OffersTheWorkingDirectoryToTheEditorAndTheWebServerOnlyWhenTheTaskDeclaresOne) {

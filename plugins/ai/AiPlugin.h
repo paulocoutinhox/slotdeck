@@ -151,6 +151,7 @@ class AiPlugin final : public QObject, public PluginInterface {
     void startAgentExecution(const AiTask& task, const QString& executionId);
     void continueAgent(const QString& taskId);
     void summarizeDroppedTurns(const QString& taskId, const FittedConversation& fitted);
+    void recordAgentRemoved(const QString& taskId, const QString& agentId);
     void stopOrphanedTasks(const QStringList& taskIds);
     [[nodiscard]] ConversationMessage buildMessage(const QString& taskId, ConversationRole role, const QString& content, const QJsonArray& toolCalls, const QString& toolCallId);
     [[nodiscard]] QFuture<utils::Result<void>> recordConversation(const QString& taskId, const QVector<ConversationMessage>& messages);

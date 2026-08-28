@@ -25,6 +25,7 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <functional>
 #include <optional>
 #include <utility>
@@ -421,7 +422,7 @@ AiTasksView::AiTasksView(AiPlugin& plugin, PluginHost& host, QWidget* parent) : 
     kanbanLayout->setContentsMargins(0, 0, 0, 0);
     kanbanLayout->setSpacing(0);
     // clang-format off
-    const auto dropHandler = [this](const QString& taskId, TaskColumn column) { auto future = m_plugin.moveTask(taskId, column); future.then(this, [this](utils::Result<void> result) { if (!result.hasValue()) { showError(result.error(), m_host.translate(QStringLiteral("ai.error.task-save"))); } }); };
+    const auto dropHandler = [this](const QString& taskId, TaskColumn column) { auto future = m_plugin.moveTask(taskId, column); future.then(this, [this, taskId](utils::Result<void> result) { if (!result.hasValue()) { showError(result.error(), moveFailureMessage(taskId, result.error())); } }); };
     // clang-format on
     const auto boardColumns = AiTaskRepository::columns();
 
@@ -599,6 +600,20 @@ void AiTasksView::editTask(std::optional<AiTask> task) {
 }
 
 // The error carries the diagnostic and the message is the sentence the user reads, which for a request is the one the answering plugin published.
+// Dropping a card into Doing starts the task, so a run that has nobody to run it says that rather than reading as a card that could not be saved.
+QString AiTasksView::moveFailureMessage(const QString& taskId, const utils::Error& error) const {
+    if (error.code == QStringLiteral("ai_agent_unknown")) {
+        // clang-format off
+        const auto moved = std::find_if(m_plugin.tasks().constBegin(), m_plugin.tasks().constEnd(), [&taskId](const AiTask& candidate) { return candidate.id == taskId; });
+        // clang-format on
+        if (moved != m_plugin.tasks().constEnd()) {
+            return m_host.translate(QStringLiteral("ai.error.agent-removed")).arg(moved->agentId);
+        }
+    }
+
+    return m_host.translate(QStringLiteral("ai.error.task-save"));
+}
+
 void AiTasksView::showError(const utils::Error& error, const QString& message) {
     m_host.log(LogLevel::Error, QStringLiteral("ai.tasks"), error.message, {{QStringLiteral("code"), error.code}, {QStringLiteral("detail"), error.detail}});
     m_host.notify(m_host.translate(QStringLiteral("ai.error.title")), message, AlertSeverity::Error);

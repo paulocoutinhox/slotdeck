@@ -41,6 +41,7 @@ class AiTasksView final : public QWidget {
     void requestFolderDestination(const QString& pluginId, const QString& topic, const QString& path);
     void openTaskSurface(const AiTask& task, bool onConversation);
     void showError(const utils::Error& error, const QString& message);
+    [[nodiscard]] QString moveFailureMessage(const QString& taskId, const utils::Error& error) const;
     [[nodiscard]] QString activeWorkspaceId() const;
     [[nodiscard]] TaskCard* createCard(const AiTask& task);
 

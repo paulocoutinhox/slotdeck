@@ -895,6 +895,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Editing and removing are rejected while a task is queued or running.
 - A task card presents the message of its last failed run and clears it when the task starts again.
 - A card whose run ended without answering names what stopped it, so a reader never has to open the surface to learn that the limit was reached.
+- A card that could not start because the agent it was handed to is gone names that agent, and the same sentence is written by one place whether the agent went while the task waited or while it was running.
+- Dropping a card into Doing starts the task, so a failure there reads as the run that could not start rather than as a card that could not be written.
 - A restart restores what happened to every task by reading the newest run each one recorded, because a card showing idle for a task that failed tells the user nothing, and reading it back keeps the outcome in one place instead of storing it a second time on the task.
 - Notifications present the error message and never the identifier carried as the error detail.
 - Queued tasks are ordered by their persisted queue timestamp and start as soon as the provider has capacity.
@@ -1563,6 +1565,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A provider that needs no credential shows no field for one, and the hint under a field that fills itself reads in the muted ink and the caption size of the theme.
 - [x] Every call that formats a sentence passes exactly what that sentence declares, and the lint command refuses any other, including the shape where one branch takes an argument and the other does not.
 - [x] An agent saved with no identifier is given one spelled from its name, and nothing is written into that field while the name is typed.
+- [x] A card dropped into Doing whose agent is gone names that agent, proven against the message about a card that could not be saved.
 - [x] Every plugin releases what it already took before returning a failure from initialization, checked against all eight.
 - [x] The cost of a run reaches the reader in the execution history, proven through the fake that answers the columns the real schema has.
 - [x] The price of every model the catalog carries reaches it, a model nobody priced reports no cost, and a price of the wrong shape or below zero rejects the plugin.
