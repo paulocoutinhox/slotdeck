@@ -3,6 +3,7 @@
 #include "CodeEditorPlugin.h"
 #include "CodeEditorRepository.h"
 #include "CodeEditorTranslations.h"
+#include "CodeEditorView.h"
 #include "CodeSyntaxHighlighter.h"
 #include "CodeWorkspaceView.h"
 #include "EditorConfig.h"
@@ -1282,6 +1283,70 @@ TEST(CodeWorkspaceViewTest, AnalysesADocumentAgainWhenTheServerFinishesStartingL
     ASSERT_TRUE(test::waitUntil([&]() { return symbols->topLevelItemCount() == 1; }));
     // clang-format on
     EXPECT_EQ(symbols->topLevelItem(0)->text(0), QStringLiteral("main  int ()"));
+}
+
+// A workspace that stays keeps the widget the reader is working in, because a rebuild would take it away under their hands.
+TEST(CodeEditorViewTest, ReconcilesItsWorkspaceTabsInsteadOfBuildingThemAgain) {
+    test::TestPluginHost host;
+    filesystem::FileSystemService service;
+    host.useFileSystem(service);
+    CodeEditorTestsHelper::installSettingsDocument(host, false, defaultEditorFontSize, false);
+    QTemporaryDir first;
+    QTemporaryDir second;
+    ASSERT_TRUE(first.isValid());
+    ASSERT_TRUE(second.isValid());
+    CodeEditorPlugin plugin;
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    const auto kept = plugin.openWorkspace(first.path());
+    const auto closed = plugin.openWorkspace(second.path());
+    ASSERT_TRUE(kept.hasValue());
+    ASSERT_TRUE(closed.hasValue());
+
+    CodeEditorView view(plugin);
+    auto* tabs = view.findChild<ui::TabWidget*>();
+    ASSERT_NE(tabs, nullptr);
+    ASSERT_EQ(tabs->count(), 2);
+
+    QWidget* survivor = nullptr;
+    for (int index = 0; index < tabs->count(); ++index) {
+        if (qobject_cast<CodeWorkspaceView*>(tabs->widget(index))->workspaceId() == kept.value()) {
+            survivor = tabs->widget(index);
+        }
+    }
+    ASSERT_NE(survivor, nullptr);
+    QSignalSpy destroyed(survivor, &QObject::destroyed);
+
+    ASSERT_TRUE(plugin.closeWorkspace(closed.value()).hasValue());
+    QCoreApplication::processEvents();
+
+    ASSERT_EQ(tabs->count(), 1);
+    EXPECT_EQ(qobject_cast<CodeWorkspaceView*>(tabs->widget(0))->workspaceId(), kept.value());
+    EXPECT_EQ(destroyed.count(), 0) << "the workspace the reader kept was built again";
+
+    // A workspace that appears joins the tabs beside the one that was already there.
+    QTemporaryDir third;
+    ASSERT_TRUE(third.isValid());
+    const auto added = plugin.openWorkspace(third.path());
+    ASSERT_TRUE(added.hasValue());
+    QCoreApplication::processEvents();
+    ASSERT_EQ(tabs->count(), 2);
+    EXPECT_EQ(destroyed.count(), 0) << "the workspace the reader kept was built again";
+
+    // Moving a tab is the reader reordering their own tabs, so the plugin follows the view rather than announcing it back.
+    ASSERT_TRUE(plugin.moveWorkspace(1, 0).hasValue());
+
+    // The next synchronization places every tab where the plugin says it belongs.
+    QTemporaryDir fourth;
+    ASSERT_TRUE(fourth.isValid());
+    const auto last = plugin.openWorkspace(fourth.path());
+    ASSERT_TRUE(last.hasValue());
+    QCoreApplication::processEvents();
+
+    ASSERT_EQ(tabs->count(), 3);
+    EXPECT_EQ(qobject_cast<CodeWorkspaceView*>(tabs->widget(0))->workspaceId(), added.value());
+    EXPECT_EQ(qobject_cast<CodeWorkspaceView*>(tabs->widget(1))->workspaceId(), kept.value());
+    EXPECT_EQ(qobject_cast<CodeWorkspaceView*>(tabs->widget(2))->workspaceId(), last.value());
+    EXPECT_EQ(destroyed.count(), 0) << "the workspace the reader kept was built again";
 }
 
 TEST(CodeEditorPluginTest, OpensAFolderOnceAndRevealsItselfWhenAnotherPluginAsks) {
