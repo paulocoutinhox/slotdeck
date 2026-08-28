@@ -18,6 +18,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Windows uses ConPTY with RAII handle ownership.
 - SQLite through Qt SQL is the only application persistence engine.
 - Build warnings are errors for first-party targets, except the GCC possibly-uninitialized report for standard optional payloads reached through a future continuation.
+- The GCC and Clang warning set adds the two polymorphism reports that neither `-Wall` nor `-Wextra` turns on, so a base class with virtual methods and a non-virtual destructor is refused rather than left to a reading, because deleting through such a base is undefined behavior.
 
 ## Plugin-first architecture
 

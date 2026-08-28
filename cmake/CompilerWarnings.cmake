@@ -14,6 +14,8 @@ function(slotdeck_set_warnings target)
             -Wshadow
             -Wformat=2
             -Wundef
+            -Wnon-virtual-dtor
+            -Woverloaded-virtual
             -Werror
     )
 
