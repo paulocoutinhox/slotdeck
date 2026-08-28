@@ -6,13 +6,17 @@
 #include "TestTranslations.h"
 #include "ui/Icons.h"
 
+#include <QComboBox>
 #include <QCoreApplication>
+#include <QDialog>
 #include <QDir>
+#include <QLineEdit>
 #include <QPromise>
 #include <QPushButton>
 #include <QSignalSpy>
 #include <QStackedWidget>
 #include <QTabWidget>
+#include <QTimer>
 #include <QTreeWidget>
 
 #include <gtest/gtest.h>
@@ -572,6 +576,49 @@ TEST(BrowserBookmarksViewTest, TurnsWhatWasDraggedInTheTreeIntoTheLayoutThePlugi
     auto* rebuilt = groupItem(QStringLiteral("Reading"));
     ASSERT_NE(rebuilt, nullptr);
     EXPECT_EQ(rebuilt->childCount(), 1);
+}
+
+// A list that opens with the choice meaning none keeps that choice first and sorts every name after it.
+TEST(BrowserBookmarksViewTest, OffersTheUngroupedChoiceFirstAndTheGroupsSortedAfterIt) {
+    auto host = BrowserTestsHelper::browserHost();
+    BrowserPlugin plugin;
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    ASSERT_TRUE(plugin.createBookmarkGroup(QStringLiteral("Zeta")).hasValue());
+    const auto beta = plugin.createBookmarkGroup(QStringLiteral("beta"));
+    ASSERT_TRUE(beta.hasValue());
+    ASSERT_TRUE(plugin.createBookmarkGroup(QStringLiteral("Alpha")).hasValue());
+
+    BrowserBookmarksView view(plugin);
+    QStringList offered;
+    // clang-format off
+    QTimer::singleShot(0, qApp, [&offered, &beta]() {
+        auto* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+        ASSERT_NE(dialog, nullptr);
+        auto* group = dialog->findChild<QComboBox*>(QStringLiteral("browserBookmarkGroup"));
+        auto* name = dialog->findChild<QLineEdit*>(QStringLiteral("browserBookmarkName"));
+        auto* save = dialog->findChild<QPushButton*>(QStringLiteral("primaryButton"));
+        ASSERT_NE(group, nullptr);
+        ASSERT_NE(name, nullptr);
+        ASSERT_NE(save, nullptr);
+        for (int index = 0; index < group->count(); ++index) {
+            offered.append(group->itemText(index));
+        }
+        group->setCurrentIndex(group->findData(beta.value()));
+        name->setText(QStringLiteral("Docs"));
+        save->click();
+    });
+    // clang-format on
+
+    view.beginAddBookmark(QStringLiteral("Docs"), QUrl(QStringLiteral("https://qt.io")));
+
+    // The choice that means none opens the list, and the names after it are ordered by folding their case.
+    EXPECT_EQ(offered, QStringList({host.translate(QStringLiteral("browser.bookmarks.ungrouped")), QStringLiteral("Alpha"), QStringLiteral("beta"), QStringLiteral("Zeta")}));
+
+    // What was typed reached the plugin as a bookmark of the group that was chosen.
+    ASSERT_EQ(plugin.bookmarks().size(), 1);
+    EXPECT_EQ(plugin.bookmarks().first().name, QStringLiteral("Docs"));
+    EXPECT_EQ(plugin.bookmarks().first().url, QUrl(QStringLiteral("https://qt.io")));
+    EXPECT_EQ(plugin.bookmarks().first().groupId, beta.value());
 }
 
 test::TestPluginHost BrowserTestsHelper::browserHost() {
