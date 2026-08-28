@@ -95,6 +95,7 @@ python3 make.py run --configuration Debug
 | Task | Purpose |
 | --- | --- |
 | **all** | Check formatting, build and run the registered test suites |
+| **audit** | Run the audits this project declares for itself |
 | **build** | Compile the selected configuration |
 | **clean** | Clean the selected build directory |
 | **configure** | Generate Ninja build files with CMake |
@@ -103,7 +104,7 @@ python3 make.py run --configuration Debug
 | **doctor** | Locate required and optional development tools |
 | **format** | Format first-party C and C++ sources |
 | **format-check** | Validate formatting without changing files |
-| **lint** | Run Cppcheck warning, performance and portability analysis |
+| **lint** | Run those audits and then Cppcheck warning, performance and portability analysis |
 | **models** | Rewrite the AI model catalog from a LiteLLM checkout |
 | **package** | Create the native release package |
 | **reset-data** | Remove the application database and every plugin state |
@@ -120,7 +121,7 @@ resolves directory requests through `index.html` or `index.htm`, serves assets w
 MIME type and rejects paths outside the configured document root.
 
 A server may optionally link to one terminal session as an integration source. Closing that terminal
-removes only the link and preserves the server configuration and its running instance. The Server
+removes only the link and preserves the server configuration and its running instance. The Web Server
 view lists existing instances and provides status, lifecycle controls and request activity.
 
 ## 🧱 Architecture

@@ -335,6 +335,17 @@ def inherited_catalogs() -> list[str]:
     return found
 
 
+def undocumented_commands() -> list[str]:
+    readme = ROOT / "README.md"
+
+    if not readme.exists():
+        return []
+
+    declared = set(re.findall(r'"([a-z-]+)":\s*task_', (ROOT / "make.py").read_text(encoding="utf-8")))
+    listed = set(re.findall(r"\|\s*\*\*([a-z-]+)\*\*\s*\|", readme.read_text(encoding="utf-8")))
+    return [f"{name} is a command the README never names" for name in sorted(declared - listed)]
+
+
 def prose_opening_with_code() -> list[str]:
     found: list[str] = []
 
@@ -680,6 +691,11 @@ def task_audit(_: Context) -> None:
 
     if inherited:
         raise RuntimeError("Every language declares the keys it spells, because a catalog built from another one cannot be told from one that forgot a sentence:\n  " + "\n  ".join(inherited))
+
+    undocumented = undocumented_commands()
+
+    if undocumented:
+        raise RuntimeError("The README lists the commands this repository answers, because a reader looks for them there:\n  " + "\n  ".join(undocumented))
 
     opening = prose_opening_with_code()
 

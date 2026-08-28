@@ -1711,7 +1711,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A request that was given its turn and stopped before hearing about it returns that turn, so a provider limited to one request at a time keeps admitting.
 - [x] Forty rounds of holders that withdraw, are destroyed mid-wait or release the ordinary way leave the gate holding nothing and still admitting, proven against a withdraw that keeps the place.
 - [x] No source is compiled by more than one target and every consumer links `SlotDeckUi` for the shared visual primitives.
-- [x] The README describes the plugin-first product, the SQLite persistence and the current repository commands.
+- [x] The README describes the plugin-first product, the SQLite persistence and the current repository commands, and the lint command refuses a command it never names.
 - [x] A plugin reveals its own navigation destination through the scoped host and the shell refuses a destination that plugin does not declare.
 - [x] A task that declares a working directory offers it to the Code Editor and to the Web Server, and the terminal offers the directory its shell stands in.
 - [x] Neither destination holds one folder twice, and the Web Server configures a folder through the same form that validates every other server.
