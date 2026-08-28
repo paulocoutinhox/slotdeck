@@ -1,7 +1,9 @@
 #include "AiCliChatClient.h"
 #include "AiConversationView.h"
 #include "AiTestSupport.h"
+
 #include "TestTranslations.h"
+#include "persistence/StoredValues.h"
 #include "ui/Components.h"
 
 #include <QScrollArea>
@@ -79,6 +81,56 @@ TEST(CronExpressionTest, AppliesPOSIXDayMatchingAndRejectsExtensionsOrMalformedF
     EXPECT_EQ(CronExpression::parse(QStringLiteral("0 0 * *")).error().code, QStringLiteral("ai_tasks_cron_field_count_invalid"));
     EXPECT_EQ(CronExpression::parse(QStringLiteral("0 0 31-1 * *")).error().code, QStringLiteral("ai_tasks_cron_range_invalid"));
     EXPECT_EQ(CronExpression::parse(QStringLiteral("60 * * * *")).error().code, QStringLiteral("ai_tasks_cron_value_invalid"));
+}
+
+// A reader upgrading the product keeps the workspaces and tasks they already have, because the version that records what a run spoke to only adds columns.
+TEST(AiTaskRepositoryTest, KeepsTheWorkspacesAndTasksAReaderAlreadyHasWhenTheSchemaGainsItsSecondVersion) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    persistence::StateStore store(directory.filePath(QStringLiteral("slotdeck.sqlite3")));
+    ASSERT_TRUE(store.initialize().hasValue());
+
+    QVector<persistence::DatabaseMigration> declared;
+    {
+        test::TestPluginHost collecting;
+        AiTaskRepository reading(collecting);
+        ASSERT_TRUE(reading.initialize().hasValue());
+        declared = collecting.appliedMigrations;
+    }
+
+    ASSERT_EQ(declared.size(), 2);
+
+    // The database as the previous version of the product left it, carrying a workspace, a task and a run.
+    ASSERT_TRUE(store.migratePluginDatabase(QStringLiteral("ai"), {declared.first()}).hasValue());
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const QString stamp = persistence::storedTimestamp(now);
+    ASSERT_TRUE(store.executePluginDatabase(QStringLiteral("ai"), QStringLiteral("INSERT INTO ai_tasks_workspaces(id, name, position, active, created_at_utc, updated_at_utc) VALUES(?, ?, ?, ?, ?, ?)"), {QStringLiteral("workspace-1"), QStringLiteral("Product"), 0, 1, stamp, stamp}).hasValue());
+    ASSERT_TRUE(store.executePluginDatabase(QStringLiteral("ai"), QStringLiteral("INSERT INTO ai_tasks_tasks(id, workspace_id, title, description, prompt, issue_url, agent_id, execution_kind, workdir, command, command_timeout_seconds, column_name, position, created_at_utc, updated_at_utc) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"), {QStringLiteral("task-1"), QStringLiteral("workspace-1"), QStringLiteral("Ship it"), persistence::storedText({}), QStringLiteral("do the thing"), persistence::storedText({}), QStringLiteral("agent-1"), QStringLiteral("agent"), persistence::storedText({}), persistence::storedText({}), 0, QStringLiteral("todo"), 0, stamp, stamp}).hasValue());
+    ASSERT_TRUE(store.executePluginDatabase(QStringLiteral("ai"), QStringLiteral("INSERT INTO ai_tasks_executions(id, task_id, status, started_at_utc, finished_at_utc, input_tokens, output_tokens, finish_reason, error_message, content, stop_reason) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"), {QStringLiteral("execution-1"), QStringLiteral("task-1"), QStringLiteral("succeeded"), stamp, stamp, 10, 20, QStringLiteral("stop"), persistence::storedText({}), QStringLiteral("done"), QStringLiteral("answered")}).hasValue());
+
+    // The product opens against that database and the version it declares now reaches two.
+    test::TestPluginHost host;
+    host.useDatabase(store, QStringLiteral("ai"));
+    AiTaskRepository repository(host);
+    ASSERT_TRUE(repository.initialize().hasValue());
+    EXPECT_EQ(store.pluginSchemaVersion(QStringLiteral("ai")).value(), 2);
+
+    const auto workspaces = store.queryPluginDatabase(QStringLiteral("ai"), QStringLiteral("SELECT id, name FROM ai_tasks_workspaces"), {});
+    ASSERT_TRUE(workspaces.hasValue()) << workspaces.error().message.toStdString();
+    ASSERT_EQ(workspaces.value().size(), 1);
+    EXPECT_EQ(workspaces.value().first().value(QStringLiteral("name")).toString(), QStringLiteral("Product"));
+
+    const auto tasks = store.queryPluginDatabase(QStringLiteral("ai"), QStringLiteral("SELECT id, prompt FROM ai_tasks_tasks"), {});
+    ASSERT_TRUE(tasks.hasValue());
+    ASSERT_EQ(tasks.value().size(), 1);
+    EXPECT_EQ(tasks.value().first().value(QStringLiteral("prompt")).toString(), QStringLiteral("do the thing"));
+
+    // The run recorded before the change is still there, and the columns the change added are empty for it.
+    const auto runs = store.queryPluginDatabase(QStringLiteral("ai"), QStringLiteral("SELECT id, content, provider_id, model_id FROM ai_tasks_executions"), {});
+    ASSERT_TRUE(runs.hasValue());
+    ASSERT_EQ(runs.value().size(), 1);
+    EXPECT_EQ(runs.value().first().value(QStringLiteral("content")).toString(), QStringLiteral("done"));
+    EXPECT_TRUE(runs.value().first().value(QStringLiteral("provider_id")).toString().isEmpty());
 }
 
 TEST(AiTaskRepositoryTest, DeclaresConsecutiveMigrationsAndRoundTripsWorkspacesTasksAndQueue) {
