@@ -509,6 +509,71 @@ TEST(BrowserBookmarksViewTest, PresentsGroupsAndOpensTheSelectedBookmarkInEither
     EXPECT_TRUE(opened.at(1).at(1).toBool());
 }
 
+// The tree is where a drag becomes a layout, so what the reader dragged is what the plugin is asked to keep.
+TEST(BrowserBookmarksViewTest, TurnsWhatWasDraggedInTheTreeIntoTheLayoutThePluginKeeps) {
+    auto host = BrowserTestsHelper::browserHost();
+    BrowserPlugin plugin;
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    const auto work = plugin.createBookmarkGroup(QStringLiteral("Work"));
+    const auto reading = plugin.createBookmarkGroup(QStringLiteral("Reading"));
+    ASSERT_TRUE(work.hasValue());
+    ASSERT_TRUE(reading.hasValue());
+    const auto qt = plugin.createBookmark(QStringLiteral("Qt"), QStringLiteral("https://qt.io"), work.value());
+    const auto news = plugin.createBookmark(QStringLiteral("News"), QStringLiteral("https://example.com"), work.value());
+    ASSERT_TRUE(qt.hasValue());
+    ASSERT_TRUE(news.hasValue());
+
+    BrowserBookmarksView view(plugin);
+    auto* tree = view.findChild<QTreeWidget*>(QStringLiteral("browserBookmarksTree"));
+    ASSERT_NE(tree, nullptr);
+
+    // clang-format off
+    const auto groupItem = [tree](const QString& title) -> QTreeWidgetItem* {
+        for (int index = 0; index < tree->topLevelItemCount(); ++index) {
+            if (tree->topLevelItem(index)->text(0) == title) {
+                return tree->topLevelItem(index);
+            }
+        }
+        return nullptr;
+    };
+    const auto groupOf = [&plugin](const QString& bookmarkId) {
+        QString found;
+        for (const auto& bookmark : plugin.bookmarks()) {
+            if (bookmark.id == bookmarkId) {
+                found = bookmark.groupId;
+            }
+        }
+        return found;
+    };
+    // clang-format on
+
+    QTreeWidgetItem* source = groupItem(QStringLiteral("Work"));
+    QTreeWidgetItem* destination = groupItem(QStringLiteral("Reading"));
+    ASSERT_NE(source, nullptr);
+    ASSERT_NE(destination, nullptr);
+    ASSERT_EQ(source->childCount(), 2);
+
+    // The reader drags the second bookmark of one group into another, which is what a drop leaves behind.
+    destination->addChild(source->takeChild(1));
+    ASSERT_TRUE(QMetaObject::invokeMethod(&view, "applyTreeLayout"));
+
+    EXPECT_EQ(groupOf(news.value()), reading.value());
+    EXPECT_EQ(groupOf(qt.value()), work.value());
+
+    // A tree that lost a bookmark is not a layout, so the stored one is kept and the panel is built again from it.
+    QTreeWidgetItem* moved = groupItem(QStringLiteral("Reading"));
+    ASSERT_NE(moved, nullptr);
+    ASSERT_EQ(moved->childCount(), 1);
+    delete moved->takeChild(0);
+    ASSERT_TRUE(QMetaObject::invokeMethod(&view, "applyTreeLayout"));
+
+    EXPECT_EQ(groupOf(news.value()), reading.value());
+    EXPECT_EQ(plugin.bookmarks().size(), 2);
+    auto* rebuilt = groupItem(QStringLiteral("Reading"));
+    ASSERT_NE(rebuilt, nullptr);
+    EXPECT_EQ(rebuilt->childCount(), 1);
+}
+
 test::TestPluginHost BrowserTestsHelper::browserHost() {
     test::TestPluginHost host;
     host.dataPath = QDir::tempPath();
