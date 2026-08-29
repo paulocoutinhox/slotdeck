@@ -57,7 +57,7 @@ struct SearchSettings final {
 [[nodiscard]] QString searchProviderKeyVariable(SearchProvider provider);
 [[nodiscard]] SearchSettings declaredSearchSettings(SearchProvider provider);
 
-constexpr int defaultChatFontSize = 12;
+constexpr int defaultChatFontSize = 10;
 
 struct ExecutionSettings final {
     int maximumIterations{8};

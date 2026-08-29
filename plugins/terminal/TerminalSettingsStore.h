@@ -6,7 +6,7 @@
 
 namespace slotdeck::plugins::terminalplugin {
 
-inline constexpr int defaultTerminalFontSize = 12;
+inline constexpr int defaultTerminalFontSize = 10;
 
 struct TerminalSettings final {
     QString fontFamily;

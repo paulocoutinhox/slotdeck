@@ -69,6 +69,14 @@ slotdeck_enable_sanitizers(SlotDeckCore)
 
 qt_add_executable(SlotDeck MACOSX_BUNDLE WIN32 main.cpp ${TERMINAL_PLATFORM_ICON})
 
+# Qt names an application com.yourcompany when nothing declares it, and that name reaches the macOS bundle and the Windows manifest.
+set_target_properties(
+    SlotDeck
+    PROPERTIES
+        MACOSX_BUNDLE_GUI_IDENTIFIER "${SLOTDECK_BUNDLE_IDENTIFIER}"
+        QT_WINDOWS_APP_PROJECT_IDENTIFIER "${SLOTDECK_BUNDLE_IDENTIFIER}"
+)
+
 if(APPLE)
     set_target_properties(SlotDeck PROPERTIES MACOSX_BUNDLE_ICON_FILE "logo.icns")
 endif()

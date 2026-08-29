@@ -148,7 +148,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The terminal plugin owns terminal font family, terminal font size, terminal theme, paste confirmation and whether a program may write to the clipboard, all of them in its settings document.
 - The code-editor plugin owns the editor font family, the editor font size, the word wrap preference, the selected code colour scheme and whether language servers are enabled.
 - Every content surface owns and persists its own font size and its own default, because a terminal and an editor do not share a conventional reading size.
-- The terminal, the editor and the chat all open at twelve points, which is the reading size of every content surface.
+- The terminal, the editor and the chat all open at ten points, which is the reading size of every content surface.
+- Ten rather than twelve, because a point is a physical size while the interface font is not, so twelve read a third larger than everything around it on a platform whose interface font is nine points and merely blended on one whose interface font is thirteen.
 - Font sizes outside the shared range of eight to thirty-six points are rejected by settings, by the stored value contract and by the font step.
 - The native zoom-in, zoom-out and reset shortcuts stay at application scope and broadcast the `slotdeck.appearance.font-step` core event with an explicit increase, decrease or reset value.
 - Zooming answers the plain equal, minus and zero keys of the market convention, so increasing and decreasing take the same number of keys.
@@ -1441,6 +1442,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The macOS install step applies the hardened runtime and a secure timestamp only when a real signing identity is selected.
 - Tag pushes matching `v*` build every platform and publish one release containing the Linux archive, the macOS disk image and the Windows archive.
 - The application version lives only in the root `project()` declaration, reaches the application through the generated `BuildInfo.h` and is shown in the application settings.
+- The bundle identifier is declared once beside the version and reaches both the macOS bundle and the Windows manifest, because Qt names an application after a company nobody owns when nothing declares it.
 
 ## Build and packaging invariants
 

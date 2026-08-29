@@ -15,7 +15,7 @@ struct OpenDocumentState final {
     bool active{false};
 };
 
-inline constexpr int defaultEditorFontSize = 12;
+inline constexpr int defaultEditorFontSize = 10;
 
 struct CodeEditorFont final {
     QString family;
