@@ -175,7 +175,7 @@ TEST(TerminalShortcutsTest, SeparatesPluginApplicationAndTerminalOwnedInput) {
     EXPECT_TRUE(terminalcore::shortcuts::isReservedForApplication(newTerminalEvent));
     EXPECT_FALSE(terminalcore::shortcuts::isTerminalOwned(newTerminalEvent));
 
-    const QKeyCombination quitCombination = QKeySequence(QKeySequence::Quit)[0];
+    const QKeyCombination quitCombination = ui::shortcuts::quit()[0];
     QKeyEvent quitEvent(QEvent::KeyPress, quitCombination.key(), quitCombination.keyboardModifiers());
     EXPECT_TRUE(terminalcore::shortcuts::isReservedForApplication(quitEvent));
     EXPECT_FALSE(terminalcore::shortcuts::isTerminalOwned(quitEvent));
@@ -247,8 +247,10 @@ TEST(TerminalShortcutsTest, SeparatesPluginApplicationAndTerminalOwnedInput) {
     const QList<QKeySequence> applicationSequences{ui::shortcuts::increaseContentFont(), ui::shortcuts::decreaseContentFont(), ui::shortcuts::resetContentFont(), ui::shortcuts::quit()};
 
     for (const auto& sequence : applicationSequences) {
-        ASSERT_GT(sequence.count(), 0);
+        ASSERT_GT(sequence.count(), 0) << sequence.toString().toStdString();
         const QKeyCombination combination = sequence[0];
+        // A combination without a modifier is a media key nobody can press, which is what the Quit standard key answers outside macOS.
+        EXPECT_NE(combination.keyboardModifiers(), Qt::NoModifier) << sequence.toString().toStdString();
         QKeyEvent applicationEvent(QEvent::KeyPress, combination.key(), combination.keyboardModifiers());
         EXPECT_TRUE(terminalcore::shortcuts::isReservedForApplication(applicationEvent)) << sequence.toString().toStdString();
         EXPECT_FALSE(terminalcore::shortcuts::isTerminalOwned(applicationEvent)) << sequence.toString().toStdString();

@@ -859,6 +859,20 @@ TEST(ToastOverlayTest, DismissesTheToastFromItsOwnCloseButton) {
     EXPECT_FALSE(overlay->isVisible());
 }
 
+// Qt answers the Quit standard key with a media key nobody can press, so the application declares the combination instead of asking for that one.
+TEST(ApplicationShortcutsTest, QuitsWithACombinationEveryKeyboardCarries) {
+    const QKeySequence quit = ui::shortcuts::quit();
+    ASSERT_EQ(quit.count(), 1);
+    EXPECT_EQ(quit, QKeySequence(Qt::CTRL | Qt::Key_Q));
+
+    // The control modifier is what Qt maps to the native key, which is Command on macOS and Control everywhere else.
+    EXPECT_EQ(quit[0].keyboardModifiers(), Qt::ControlModifier);
+    EXPECT_EQ(quit[0].key(), Qt::Key_Q);
+
+    // The standard key answers Qt::Key_Exit outside macOS and nothing at all under some platform themes, which is why it is not used.
+    EXPECT_NE(quit[0].key(), Qt::Key_Exit);
+}
+
 TEST(ApplicationShortcutsTest, ZoomsWithThePlainKeysOfTheMarketConvention) {
     const QKeySequence increase = ui::shortcuts::increaseContentFont();
     const QKeySequence decrease = ui::shortcuts::decreaseContentFont();
@@ -2308,7 +2322,7 @@ TEST(PluginManagerIntegrationTest, DiscoversInitializesAndBuildsThePluginDrivenI
 
         auto* quitAction = window.findChild<QAction*>(QStringLiteral("applicationQuitAction"));
         ASSERT_NE(quitAction, nullptr);
-        EXPECT_EQ(quitAction->shortcut(), QKeySequence(QKeySequence::Quit));
+        EXPECT_EQ(quitAction->shortcut(), ui::shortcuts::quit());
         EXPECT_EQ(quitAction->shortcutContext(), Qt::ApplicationShortcut);
         EXPECT_EQ(quitAction->menuRole(), QAction::QuitRole);
 

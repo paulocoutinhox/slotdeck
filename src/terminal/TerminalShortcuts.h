@@ -133,7 +133,7 @@ inline bool isFindPrevious(const QKeyEvent& event) {
 }
 
 inline bool isReservedForApplication(const QKeyEvent& event) {
-    if (event.matches(QKeySequence::Preferences) || event.matches(QKeySequence::Quit) || matches(event, newTerminal()) || matches(event, newTab()) || matches(event, layout())) {
+    if (matches(event, ui::shortcuts::quit()) || matches(event, newTerminal()) || matches(event, newTab()) || matches(event, layout())) {
         return true;
     }
     if (matches(event, ui::shortcuts::increaseContentFont()) || matches(event, ui::shortcuts::decreaseContentFont()) || matches(event, ui::shortcuts::resetContentFont())) {

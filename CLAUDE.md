@@ -303,6 +303,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Shortcut definitions live with their owning core or plugin source and are never duplicated as unrelated key checks.
 - Every shortcut uses the native platform combination appropriate to macOS, Windows and Linux.
 - Standard application operations use `QKeySequence` standard keys when Qt provides the required platform mapping.
+- Quitting declares its own combination rather than asking for that standard key, because Qt answers it with the `Exit` media key outside macOS and with nothing at all under some platform themes, so the shortcut the product promises would silently not exist.
+- The control modifier is what carries a declared application combination, because Qt maps it to Command on macOS and to Control everywhere else, so one declaration is native on all three platforms.
 - Core application shortcuts use application scope only when their behavior is intentionally valid from every focused plugin.
 - The core shortcut contract lives in the shared UI layer so the terminal engine reserves every application combination without depending on the application composition.
 - Every application-scoped shortcut is listed as reserved by the terminal, otherwise a platform where the terminal owns that modifier swallows it.
@@ -1568,6 +1570,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Every catalog spells every key in English and in Portuguese, proven by one case per owner.
 - [x] The translated mode bar expands to its longest word and wraps only at word boundaries.
 - [x] Core and plugin shortcuts are owned separately and use platform-specific combinations.
+- [x] Quitting answers a combination every keyboard carries, measured against a real Windows build where the standard key resolved to the `Exit` media key and the promised shortcut therefore did nothing.
+- [x] The terminal reserves the quit combination through the shared contract rather than through the standard key, and no longer reserves a preferences combination the application never registers.
 - [x] Plugin shortcuts are scoped to their focused view and cannot act on a hidden terminal.
 - [x] Window close, platform Quit and the core Quit shortcut share a translated cancellable confirmation.
 - [x] Plugin-specific styles are supplied by the owning plugin.
@@ -1674,7 +1678,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 448 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 449 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] That number is held to what the suite really registers by the lint command, because a number nobody keeps is a number nobody believes.
 - [x] Every case holds in a random order, proven across five schedules of the whole suite, three of them parallel and two one case at a time, which nothing had exercised before.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
