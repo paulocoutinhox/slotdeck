@@ -67,11 +67,15 @@ TEST(RequestLogModelTest, AssignsMonotonicSequencesPagesCapsAndClearsEntries) {
 TEST(RequestLogModelTest, SupportsConcurrentWritersAndReaders) {
     plugins::webserver::RequestLogModel model(500);
     std::atomic_bool reading{true};
+    // A GoogleTest assertion is only thread safe where pthreads are, so the reader records what it saw and the assertion happens once it has joined.
+    std::atomic_bool readPastTheBound{false};
     // clang-format off
-    const auto readEntries = [&model, &reading]() {
+    const auto readEntries = [&model, &reading, &readPastTheBound]() {
         while (reading.load(std::memory_order_acquire)) {
             const auto batch = model.entriesSince(0, 500);
-            EXPECT_LE(batch.entries.size(), 500);
+            if (batch.entries.size() > 500) {
+                readPastTheBound.store(true, std::memory_order_release);
+            }
         }
     };
     // clang-format on
@@ -83,6 +87,7 @@ TEST(RequestLogModelTest, SupportsConcurrentWritersAndReaders) {
 
     reading.store(false, std::memory_order_release);
     reader.join();
+    EXPECT_FALSE(readPastTheBound.load(std::memory_order_acquire));
     const auto batch = model.entriesSince(0, 500);
     ASSERT_EQ(batch.entries.size(), 500);
     EXPECT_EQ(batch.entries.first().sequence, 501U);

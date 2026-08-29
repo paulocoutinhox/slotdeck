@@ -1352,6 +1352,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A test that runs a command uses the shell of the running platform, because the runner starts the native one.
 - Concurrency tests synchronize through observable conditions and never depend on arbitrary sleeps.
 - Asynchronous waiting uses `slotdeck::test::waitUntil` inside a GoogleTest assertion so an expired condition fails the test instead of ending it silently.
+- A thread a case starts records what it saw and the case asserts it after joining, because a GoogleTest assertion is only thread safe where pthreads are and asserting from a second thread is undefined on Windows.
 - The asynchronous wait budget scales with the toolchain so an instrumented build waits longer for the same condition instead of relaxing the assertion.
 - A wait whose condition is many operations carries a budget measured by that count rather than the default one condition gets, because a case sitting at the edge of its budget fails whenever the machine is busy and teaches nobody anything.
 - A case that waits for work to finish reports what the work said when it failed, so a real failure is never read as slowness.
@@ -1653,6 +1654,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] The task Information dialog presents the execution history, the logs of the selected execution and its returned content.
 - [x] Stopping an AI task always returns the card to To Do and records the execution as cancelled.
 - [x] Asynchronous test waiting fails the surrounding assertion instead of ending the test silently.
+- [x] No case asserts from a thread it started, found by a Windows debug build where the one that did died with an access violation while the same code passed on every other platform.
 - [x] Every C++ lambda has lowercase clang-format protection markers.
 - [x] Comments satisfy language, case, sentence and single-line rules.
 - [x] Formatting and format verification pass.
