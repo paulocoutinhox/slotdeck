@@ -3283,8 +3283,9 @@ TEST(LanguageServerClientTest, SurvivesBeingDestroyedWhileAnAnswerIsStillBeingDe
 
         // The client goes while forty thousand candidates are still being read, in a round the platform decides.
         if (round % 3 == 0) {
+            // Forty thousand candidates are produced by a child, framed, read and decoded away from this thread, so the wait is measured by that work rather than by the one condition a default budget covers.
             // clang-format off
-            ASSERT_TRUE(test::waitUntil([&answers]() { return answers > 0; }));
+            ASSERT_TRUE(test::waitUntil([&answers]() { return answers > 0; }, test::defaultWaitTimeoutMilliseconds * 2));
             // clang-format on
         }
 
