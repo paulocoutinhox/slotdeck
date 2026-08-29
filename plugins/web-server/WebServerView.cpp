@@ -820,9 +820,14 @@ void WebServerView::stopServer() {
 }
 
 void WebServerView::openServerInBrowser() {
-    const QString serverId = sender()->property("serverId").toString();
+    const auto* button = qobject_cast<QToolButton*>(sender());
+
+    if (button == nullptr) {
+        return;
+    }
+
     // clang-format off
-    m_plugin.openWebServerInBrowser(serverId, *this, [this](utils::Result<QJsonObject> result) { if (!result.hasValue()) { m_plugin.host().notify(m_plugin.host().translate(QStringLiteral("web-server.plugin.title")), m_plugin.host().translate(QStringLiteral("web-server.error.browser-message")), plugins::AlertSeverity::Error); } });
+    m_plugin.openWebServerInBrowser(button->property("serverId").toString(), *this, [this](utils::Result<QJsonObject> result) { if (!result.hasValue()) { m_plugin.host().notify(m_plugin.host().translate(QStringLiteral("web-server.plugin.title")), m_plugin.host().translate(QStringLiteral("web-server.error.browser-message")), plugins::AlertSeverity::Error); } });
     // clang-format on
 }
 

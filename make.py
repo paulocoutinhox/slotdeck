@@ -699,6 +699,20 @@ def contextless_deferred_work() -> list[str]:
     return sorted(found)
 
 
+def dereferenced_senders() -> list[str]:
+    found = []
+
+    for name in source_files():
+        if not name.endswith((".cpp", ".h")):
+            continue
+
+        for number, line in enumerate(Path(name).read_text(encoding="utf-8").splitlines(), start=1):
+            if "sender()->" in line:
+                found.append(f"{name}:{number}")
+
+    return found
+
+
 def divergent_backend_conditions() -> list[str]:
     backends = (
         ROOT / "src" / "terminal" / "platform" / "posix" / "PosixPtyBackend.cpp",
@@ -856,6 +870,11 @@ def task_audit(_: Context) -> None:
 
     if contextless:
         raise RuntimeError("A connection or a timer whose lambda captures anything is given the object it reaches as its context, so destroying that object cancels it:\n  " + "\n  ".join(contextless))
+
+    dereferenced = dereferenced_senders()
+
+    if dereferenced:
+        raise RuntimeError("A slot reaches its sender through a cast it checks, because a slot called directly answers with nothing:\n  " + "\n  ".join(dereferenced))
 
     divergent = divergent_backend_conditions()
 
