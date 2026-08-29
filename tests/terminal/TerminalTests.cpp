@@ -473,9 +473,13 @@ TEST(ConPtyBackendTest, DeliversWhatAProgramWroteBeforeItReportsThatItEnded) {
     const terminalcore::ShellProfile profile = terminalcore::ShellProfileResolver::systemDefault();
     // The marker is spelled by the shell rather than typed, because the terminal echoes what was written to it.
     const bool powerShell = profile.executable.contains(QStringLiteral("powershell"), Qt::CaseInsensitive) || profile.executable.contains(QStringLiteral("pwsh"), Qt::CaseInsensitive);
-    const QByteArray command = powerShell ? QByteArrayLiteral("Write-Output (\"SD\" + \"MARK\")\r\nexit 0\r\n") : QByteArrayLiteral("echo SD%SLOTDECK_UNSET%MARK\r\nexit 0\r\n");
+    const QByteArray command = powerShell ? QByteArrayLiteral("Write-Output (\"SD\" + \"MARK\")\rexit 0\r") : QByteArrayLiteral("echo SD%SLOTDECK_UNSET%MARK\rexit 0\r");
     ASSERT_TRUE(backend.start(profile, directory.path(), directory.filePath(QStringLiteral("history")), 80, 24).hasValue());
     ASSERT_TRUE(backend.running());
+    // A shell discards what is typed while it is still starting, so the command waits until it has prompted.
+    // clang-format off
+    ASSERT_TRUE(test::waitUntil([&received]() { return received.contains('>'); }));
+    // clang-format on
     ASSERT_TRUE(backend.write(command).hasValue());
     // clang-format off
     ASSERT_TRUE(test::waitUntil([&]() { return exited; }));
