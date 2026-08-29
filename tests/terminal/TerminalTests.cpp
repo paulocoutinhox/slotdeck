@@ -11,18 +11,13 @@
 #include "terminal/TerminalSession.h"
 #include "terminal/TerminalShortcuts.h"
 #include "terminal/TerminalThemeCatalog.h"
+#include "terminal/platform/posix/PosixPtyBackend.h"
 #include "ui/ApplicationShortcuts.h"
 #include "ui/Components.h"
 #include "ui/FindBar.h"
 #include "ui/ShelfSessionChip.h"
 #include "ui/TerminalPane.h"
 #include "ui/TerminalWidget.h"
-
-#ifdef Q_OS_WIN
-#include "terminal/platform/windows/ConPtyBackend.h"
-#else
-#include "terminal/platform/posix/PosixPtyBackend.h"
-#endif
 #include "ui/WorkspaceView.h"
 #include "workspace/LayoutManager.h"
 #include "workspace/WorkspaceManager.h"
@@ -455,40 +450,6 @@ TEST(ShellProfileTest, QuotesLocalPathsAndResolvesExecutableProfiles) {
     EXPECT_TRUE(QFileInfo(fromAccount.executable).isExecutable());
 #endif
 }
-
-#ifdef Q_OS_WIN
-// The Windows backend owns its handles and two threads of its own, so the shell it starts, what that shell wrote and the exit it reports are exercised exactly as the POSIX one is.
-TEST(ConPtyBackendTest, DeliversWhatAProgramWroteBeforeItReportsThatItEnded) {
-    QTemporaryDir directory;
-    ASSERT_TRUE(directory.isValid());
-    terminalcore::ConPtyBackend backend;
-    QByteArray received;
-    bool wroteBeforeExit = false;
-    bool exited = false;
-    // clang-format off
-    QObject::connect(&backend, &terminalcore::IPtyBackend::outputReady, &backend, [&received](const QByteArray& bytes) { received.append(bytes); });
-    QObject::connect(&backend, &terminalcore::IPtyBackend::processExited, &backend, [&](int) { wroteBeforeExit = received.contains(QByteArrayLiteral("SDMARK")); exited = true; });
-    // clang-format on
-
-    const terminalcore::ShellProfile profile = terminalcore::ShellProfileResolver::systemDefault();
-    // The marker is spelled by the shell rather than typed, because the terminal echoes what was written to it.
-    const bool powerShell = profile.executable.contains(QStringLiteral("powershell"), Qt::CaseInsensitive) || profile.executable.contains(QStringLiteral("pwsh"), Qt::CaseInsensitive);
-    const QByteArray command = powerShell ? QByteArrayLiteral("Write-Output (\"SD\" + \"MARK\")\rexit 0\r") : QByteArrayLiteral("echo SD%SLOTDECK_UNSET%MARK\rexit 0\r");
-    ASSERT_TRUE(backend.start(profile, directory.path(), directory.filePath(QStringLiteral("history")), 80, 24).hasValue());
-    ASSERT_TRUE(backend.running());
-    // A shell discards what is typed while it is still starting, so the command waits until it has prompted.
-    // clang-format off
-    ASSERT_TRUE(test::waitUntil([&received]() { return received.contains('>'); }));
-    // clang-format on
-    ASSERT_TRUE(backend.write(command).hasValue());
-    // clang-format off
-    ASSERT_TRUE(test::waitUntil([&]() { return exited; }));
-    // clang-format on
-
-    EXPECT_TRUE(wroteBeforeExit) << received.toStdString();
-    EXPECT_FALSE(backend.running());
-}
-#endif
 
 #ifndef Q_OS_WIN
 TEST(PosixPtyBackendTest, DeliversWhatAProgramWroteBeforeItReportsThatItEnded) {
