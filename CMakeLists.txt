@@ -24,13 +24,13 @@ include(Dependencies)
 include(Platform)
 include(Version)
 
-find_package(Qt6 6.11 REQUIRED COMPONENTS Concurrent Core Gui Network Sql WebEngineCore WebEngineWidgets Widgets)
+find_package(Qt6 6.11.2 REQUIRED COMPONENTS Concurrent Core Gui Network Sql WebEngineCore WebEngineWidgets Widgets)
 
 if(NOT QT6_IS_SHARED_LIBS_BUILD)
     message(FATAL_ERROR "SlotDeck requires a shared Qt 6 build and does not support static Qt libraries")
 endif()
 
-qt_standard_project_setup(REQUIRES 6.11)
+qt_standard_project_setup(REQUIRES 6.11.2)
 
 add_subdirectory(src/ui)
 add_subdirectory(src/terminal)

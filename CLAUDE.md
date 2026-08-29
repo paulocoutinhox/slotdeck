@@ -7,7 +7,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 ## Product and technology baseline
 
 - The product is a native desktop application named SlotDeck.
-- The implementation uses C++20, Qt 6.11 or newer and Qt Widgets.
+- The implementation uses C++20, Qt 6.11.2 or newer and Qt Widgets.
+- That minimum is 6.11.2 rather than 6.11 because `QImage::toCGImage` crashes inside `CGImageCreate` for an image carrying its own colour space, which a web page reaches on macOS by asking for a cursor of its own, and the crash takes the whole application with it.
 - Qt 6 must always be consumed as shared libraries and CMake configuration must reject static Qt builds.
 - The build uses CMake and Ninja through the repository task runner in `make.py`.
 - Automated tests use the pinned GoogleTest 1.17.0 release and CTest discovery.
@@ -1426,7 +1427,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 ## Continuous integration and release
 
 - Every push to the default branch and every pull request builds Linux, macOS and Windows through reusable GitHub Actions workflows.
-- Each platform workflow installs the pinned Qt 6.11 shared build with Qt WebEngine, installs Zig for the pinned Ghostty dependency, configures with Ninja, builds, runs the registered CTest suite and produces the platform package.
+- Each platform workflow installs the pinned Qt 6.11.2 shared build with Qt WebEngine, installs Zig for the pinned Ghostty dependency, configures with Ninja, builds, runs the registered CTest suite and produces the platform package.
 - The Linux workflow runs the audits before it builds, because they are the rules this project writes for itself and they need no tool whose version the runner decides.
 - The formatting check and Cppcheck stay local, because the runner ships versions two releases apart from the ones the project is written against and either would refuse code that is correct.
 - Every platform workflow validates the produced package before uploading its artifact.

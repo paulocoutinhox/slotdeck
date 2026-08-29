@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://isocpp.org"><img src="https://img.shields.io/badge/C%2B%2B-20-00599C.svg" alt="C++ 20"></a>
-  <a href="https://www.qt.io"><img src="https://img.shields.io/badge/Qt-6.11-41CD52.svg" alt="Qt 6.11"></a>
+  <a href="https://www.qt.io"><img src="https://img.shields.io/badge/Qt-6.11.2-41CD52.svg" alt="Qt 6.11.2"></a>
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-555555.svg" alt="Supported platforms">
 </p>
 
@@ -64,7 +64,7 @@ database under the platform local data directory and restored when the applicati
 | Component | Requirement |
 | --- | --- |
 | C++ toolchain | C++20 support |
-| Qt | Version 6.11 or newer, shared build, with Concurrent, Core, Gui, Network, Sql, WebEngine and Widgets |
+| Qt | Version 6.11.2 or newer, shared build, with Concurrent, Core, Gui, Network, Sql, WebEngine and Widgets |
 | CMake | Version 3.28 or newer |
 | Ninja | Current stable release |
 | Zig | Required to build the pinned Ghostty dependency |
