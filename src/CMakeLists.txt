@@ -184,6 +184,22 @@ endif()
 
 install(TARGETS SlotDeck BUNDLE DESTINATION . RUNTIME DESTINATION bin)
 
+if(WIN32)
+    # A Windows loader resolves a dependent library beside the executable, and nothing else installs these.
+    install(
+        FILES
+            "$<TARGET_FILE:hwinfo_battery>"
+            "$<TARGET_FILE:hwinfo_cpu>"
+            "$<TARGET_FILE:hwinfo_disk>"
+            "$<TARGET_FILE:hwinfo_gpu>"
+            "$<TARGET_FILE:hwinfo_mainboard>"
+            "$<TARGET_FILE:hwinfo_os>"
+            "$<TARGET_FILE:hwinfo_ram>"
+            "$<TARGET_FILE:hwinfo_network>"
+        DESTINATION bin
+    )
+endif()
+
 if(APPLE)
     find_program(SLOTDECK_MACDEPLOYQT_EXECUTABLE macdeployqt REQUIRED)
     find_program(SLOTDECK_CODESIGN_EXECUTABLE codesign REQUIRED)

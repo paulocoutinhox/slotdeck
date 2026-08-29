@@ -9,6 +9,9 @@ import re
 import shutil
 import subprocess
 import sys
+import tarfile
+import tempfile
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -960,6 +963,7 @@ def task_version(_: Context, value: str | None = None) -> None:
 
 
 BUNDLED_PLUGIN_COUNT = 8
+HARDWARE_COMPONENT_COUNT = 8
 
 
 def macos_staged_bundle(build_dir: Path) -> Path:
@@ -983,6 +987,39 @@ def validate_macos_bundle(bundle: Path) -> None:
         raise RuntimeError("The application executable does not link Qt 6 dynamically")
 
 
+def validate_portable_package(package: Path) -> None:
+    with tempfile.TemporaryDirectory() as staging:
+        opened = zipfile.ZipFile(package) if package.suffix == ".zip" else tarfile.open(package)
+        with opened as archive:
+            archive.extractall(staging)
+
+        roots = [entry for entry in Path(staging).iterdir() if entry.is_dir()]
+        if len(roots) != 1:
+            raise RuntimeError(f"The package holds {len(roots)} top level directories instead of one")
+
+        executables = [name for name in ("SlotDeck.exe", "SlotDeck") if (roots[0] / "bin" / name).exists()]
+        if not executables:
+            raise RuntimeError("The package holds no application executable in its bin directory")
+
+        # The application looks for its own plugins beside the executable, so a package that puts them anywhere else cannot start.
+        directory = roots[0] / "bin" / "plugins"
+        plugins = sorted(directory.glob("slotdeck-*.dll")) + sorted(directory.glob("libslotdeck-*.so"))
+        if len(plugins) != BUNDLED_PLUGIN_COUNT:
+            raise RuntimeError(f"The package holds {len(plugins)} plugins in {directory} instead of {BUNDLED_PLUGIN_COUNT}")
+
+        helpers = list(roots[0].rglob("QtWebEngineProcess*"))
+        if not helpers:
+            raise RuntimeError("The package does not contain the Qt WebEngine helper process")
+
+        libraries = list(roots[0].rglob("Qt6Core.dll")) + list(roots[0].rglob("libQt6Core.so*"))
+        if not libraries:
+            raise RuntimeError("The package does not ship Qt 6 as a shared library")
+
+        components = list(roots[0].rglob("hwinfo_*.dll")) + list(roots[0].rglob("libhwinfo_*.so"))
+        if len(components) != HARDWARE_COMPONENT_COUNT:
+            raise RuntimeError(f"The package holds {len(components)} hardware components instead of {HARDWARE_COMPONENT_COUNT}")
+
+
 def task_validate_package(context: Context) -> None:
     package_context = Context("Release", ROOT / "build" / "release", context.jobs, context.verbose)
     if sys.platform == "darwin":
@@ -992,6 +1029,7 @@ def task_validate_package(context: Context) -> None:
         packages = sorted(package_context.build_dir.glob(f"SlotDeck-*{suffix}"))
         if not packages:
             raise RuntimeError(f"No SlotDeck package with the {suffix} extension was produced")
+        validate_portable_package(packages[-1])
     print("Package validation succeeded")
 
 

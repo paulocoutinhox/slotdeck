@@ -24,5 +24,5 @@ slotdeck_enable_coverage(SlotDeckBrowserPlugin)
 slotdeck_enable_sanitizers(SlotDeckBrowserPlugin)
 
 if(NOT APPLE)
-    install(TARGETS SlotDeckBrowserPlugin LIBRARY DESTINATION plugins RUNTIME DESTINATION plugins)
+    install(TARGETS SlotDeckBrowserPlugin LIBRARY DESTINATION bin/plugins RUNTIME DESTINATION bin/plugins)
 endif()

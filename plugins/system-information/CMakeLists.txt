@@ -23,7 +23,7 @@ set_target_properties(SlotDeckSystemInformationPlugin PROPERTIES OUTPUT_NAME slo
 if(APPLE)
     set_target_properties(SlotDeckSystemInformationPlugin PROPERTIES BUILD_RPATH "@loader_path/../Frameworks")
 elseif(UNIX)
-    set_target_properties(SlotDeckSystemInformationPlugin PROPERTIES BUILD_RPATH "$ORIGIN/.." INSTALL_RPATH "$ORIGIN/../lib;$ORIGIN/../bin")
+    set_target_properties(SlotDeckSystemInformationPlugin PROPERTIES BUILD_RPATH "$ORIGIN/.." INSTALL_RPATH "$ORIGIN/../../lib;$ORIGIN/..")
 endif()
 
 slotdeck_set_warnings(SlotDeckSystemInformationPlugin)
@@ -31,5 +31,5 @@ slotdeck_enable_coverage(SlotDeckSystemInformationPlugin)
 slotdeck_enable_sanitizers(SlotDeckSystemInformationPlugin)
 
 if(NOT APPLE)
-    install(TARGETS SlotDeckSystemInformationPlugin LIBRARY DESTINATION plugins RUNTIME DESTINATION plugins)
+    install(TARGETS SlotDeckSystemInformationPlugin LIBRARY DESTINATION bin/plugins RUNTIME DESTINATION bin/plugins)
 endif()
