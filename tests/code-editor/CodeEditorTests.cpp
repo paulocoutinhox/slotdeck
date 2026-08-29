@@ -1863,7 +1863,9 @@ TEST(CodeWorkspaceViewTest, ReportsCursorLocationAndClosesDocumentsWithTheNative
 
     auto* closeAction = view.findChild<QAction*>(QStringLiteral("codeEditorCloseDocument"));
     ASSERT_NE(closeAction, nullptr);
-    EXPECT_EQ(closeAction->shortcut(), QKeySequence(QKeySequence::Close));
+    // Every binding the platform declares is registered, because Windows names Ctrl+W second and taking the first alone loses it.
+    EXPECT_EQ(closeAction->shortcuts(), QKeySequence::keyBindings(QKeySequence::Close));
+    EXPECT_GT(closeAction->shortcuts().size(), 1);
     EXPECT_EQ(closeAction->shortcutContext(), Qt::WidgetWithChildrenShortcut);
     closeAction->trigger();
     EXPECT_EQ(documents->count(), 0);

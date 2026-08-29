@@ -192,7 +192,7 @@ AiTaskInfoDialog::AiTaskInfoDialog(AiPlugin& plugin, PluginHost& host, const AiT
     // clang-format on
     auto* closeAction = new QAction(m_host.translate(QStringLiteral("ai.conversation.back")), this);
     closeAction->setObjectName(QStringLiteral("aiTaskSurfaceClose"));
-    closeAction->setShortcut(QKeySequence::Close);
+    closeAction->setShortcuts(QKeySequence::keyBindings(QKeySequence::Close));
     closeAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
     addAction(closeAction);
     // clang-format off

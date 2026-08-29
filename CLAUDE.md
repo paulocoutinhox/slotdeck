@@ -1055,6 +1055,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The find bar reports the position of the current match inside the total, marks every match in the text and offers the case-sensitive and whole-word options.
 - Match counting and marking stop at a bound and the count says so, because a query matching a whole large file must not freeze the interface that is searching it.
 - The native close shortcut closes the focused document tab in the Code Editor and the focused tab in the Browser.
+- An action built from a standard key registers every binding that key declares rather than the first one, because Windows names the close key as the function combination first and the one every reader presses second, and taking only the first leaves that one doing nothing.
 - The workspace status bar reports the cursor line and column, the resolved indentation, the line ending, the character set and the word wrap toggle.
 - EditorConfig resolution walks from the document directory to the workspace root, stops at the first `root = true` file, applies the farthest file first and supports the documented `*`, `**`, `?`, `[seq]`, `[!seq]`, `{a,b}` and `{num1..num2}` patterns.
 - The glob answers the cases the EditorConfig core test suite defines, so a section behaves here exactly as it does in every conforming editor.
@@ -1588,7 +1589,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] The Code Editor reports the cursor line and column, the indentation, the line ending, the character set and the word wrap state in its status bar.
 - [x] The Code Editor word wrap preference is persisted and shared by every open workspace.
 - [x] The Code Editor find bar supports the native find, find-next and find-previous shortcuts and wraps around the document.
-- [x] The native close shortcut closes the focused Code Editor document tab and the focused Browser tab.
+- [x] The native close shortcut closes the focused Code Editor document tab and the focused Browser tab, through every binding the platform declares rather than the first one, measured on real Windows where the second binding is the one readers press.
 - [x] An agent is created, edited and removed in its own settings group, carrying its identifier, name, description, connection, iteration limit and system prompt.
 - [x] The system prompt accepts only the tags the catalog declares, offers the template and the tag list, and refuses an unknown tag where it is written.
 - [x] A model without the system role receives the instructions as the first user message, decided from the capability the model catalog carries.

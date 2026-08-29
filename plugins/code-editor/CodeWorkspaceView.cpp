@@ -210,7 +210,7 @@ CodeWorkspaceView::CodeWorkspaceView(CodeWorkspaceState state, QVector<ResolvedL
 
     auto* closeDocumentAction = new QAction(this);
     closeDocumentAction->setObjectName(QStringLiteral("codeEditorCloseDocument"));
-    closeDocumentAction->setShortcut(QKeySequence::Close);
+    closeDocumentAction->setShortcuts(QKeySequence::keyBindings(QKeySequence::Close));
     closeDocumentAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
     auto* findFileAction = new QAction(m_host.translate(QStringLiteral("code-editor.finder.title")), this);
     findFileAction->setObjectName(QStringLiteral("codeEditorFindFileAction"));

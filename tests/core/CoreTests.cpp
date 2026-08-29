@@ -2297,7 +2297,9 @@ TEST(PluginManagerIntegrationTest, DiscoversInitializesAndBuildsThePluginDrivenI
         EXPECT_EQ(browserTabs->count(), 1);
         auto* browserCloseTab = window.findChild<QAction*>(QStringLiteral("browserCloseTab"));
         ASSERT_NE(browserCloseTab, nullptr);
-        EXPECT_EQ(browserCloseTab->shortcut(), QKeySequence(QKeySequence::Close));
+        // Windows declares Ctrl+F4 first and Ctrl+W second for closing, so taking only the first leaves the key every reader presses doing nothing.
+        EXPECT_EQ(browserCloseTab->shortcuts(), QKeySequence::keyBindings(QKeySequence::Close));
+        EXPECT_GT(browserCloseTab->shortcuts().size(), 1);
         EXPECT_EQ(browserCloseTab->shortcutContext(), Qt::WidgetWithChildrenShortcut);
         auto* donateButton = window.findChild<QWidget*>(QStringLiteral("donate/support"));
         auto* settingsButton = window.findChild<QWidget*>(QStringLiteral("slotdeck/settings"));

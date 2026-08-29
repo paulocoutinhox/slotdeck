@@ -114,7 +114,7 @@ BrowserView::BrowserView(BrowserPlugin& plugin, QWidget* parent) : QWidget(paren
 
     auto* closeTabAction = new QAction(m_plugin.host().translate(QStringLiteral("browser.actions.close-tab")), this);
     closeTabAction->setObjectName(QStringLiteral("browserCloseTab"));
-    closeTabAction->setShortcut(QKeySequence::Close);
+    closeTabAction->setShortcuts(QKeySequence::keyBindings(QKeySequence::Close));
     closeTabAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
     addAction(closeTabAction);
 
