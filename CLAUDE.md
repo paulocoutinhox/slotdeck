@@ -1681,7 +1681,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 449 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 450 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations, and each platform registers the 449 it compiles because the two pseudo-terminal backends carry one case each.
 - [x] That number is held to what the suite really registers by the lint command, because a number nobody keeps is a number nobody believes.
 - [x] Every case holds in a random order, proven across five schedules of the whole suite, three of them parallel and two one case at a time, which nothing had exercised before.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
@@ -1710,7 +1710,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] A second save asked for while the first is still being written reaches the file.
 - [x] A connection that bursts more than any request may occupy is refused and the server keeps serving.
 - [x] A client that opens a request and never finishes it is closed at the deadline the server declares, and the next request is answered.
-- [x] The real pseudo-terminal starts a shell, delivers what it wrote and reports its exit after it.
+- [x] The real pseudo-terminal starts a shell, delivers what it wrote and reports its exit after it, on Windows as well as on the POSIX platforms, which had carried no case of its own.
 - [x] Nothing destroys a socket notifier from inside the read that notifier is delivering.
 - [x] A completed plugin request leaves no guard behind on the context it was given.
 - [x] The restart after an import destroys nothing while the request that asked for it is still on the stack.
