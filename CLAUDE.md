@@ -1449,8 +1449,11 @@ Newer explicit product requirements take precedence when they intentionally repl
 - macOS assembly places all eight plugins and the shared `hwinfo` component libraries in the application bundle before Qt deployment analyzes runtime dependencies.
 - macOS deployment includes the shared Qt frameworks, the Cocoa platform plugin, WebEngine frameworks, WebEngine resources and the WebEngine helper process.
 - Windows and Linux deployment analyze every plugin library in addition to the core executable so plugin-only Qt modules are never omitted.
+- Every plugin is installed beside the executable rather than beside the package root, because that is where the application looks for its own plugins and where the development build already puts them, and a package that puts them anywhere else opens nothing at all.
+- Windows ships the shared `hwinfo` components beside the executable, because a Windows loader resolves a dependent library from there and a plugin that cannot load stops the whole start.
 - Release packaging signs the assembled macOS application only after dependency paths and bundle contents are finalized.
-- Package validation checks the application signature, plugin count, WebEngine helper and dynamic Qt linkage.
+- Package validation opens the package it produced and checks the executable, the plugins beside it, the WebEngine helper, Qt shipped as a shared library and the hardware components, and on macOS the assembled signature as well.
+- That validation reads the package rather than its file name, because a check that only asks whether an archive exists certifies one that cannot start.
 
 ## Detailed completion checklist
 
@@ -1688,7 +1691,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] Every translation key in every catalog is reachable from product code, directly or through a key the code composes from a closed value set or the asset catalogs declare, and the lint command refuses any other rather than leaving it to a reading.
 - [x] Cppcheck completed warning, performance and portability analysis without findings.
 - [x] Package staging contains all eight plugins, all eight shared `hwinfo` components, shared Qt frameworks, Qt WebEngine resources and a valid assembled application signature.
-- [x] The repository package validation command verifies the signature, the plugin count, the WebEngine helper and the dynamic Qt linkage.
+- [x] The repository package validation command opens the package on every platform and verifies the executable, the eight plugins beside it, the WebEngine helper, the shared Qt libraries and the eight hardware components, and the signature on macOS.
+- [x] A packaged Windows build starts, creates its schema and opens its first browser tab, which it could not do while its plugins were installed one directory above where the application looks.
 - [x] The editor reads and writes the five character sets EditorConfig declares, names the one in use in the status bar and changes it from there.
 - [x] The glob and the parser answer the cases the EditorConfig core test suite defines.
 - [x] Terminal output is selected by dragging and by double clicking a word, copied with the combination each platform uses, and the combination that interrupts the shell still reaches it.
@@ -1850,5 +1854,6 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Do not use raw owning pointers when deterministic ownership exists.
 - Do not ignore persistence, plugin lifecycle, terminal, PTY or server errors.
 - Do not end the process from product code, so no assertion, no exception and no unreachable marker is what answers a lookup that failed, because a `Q_ASSERT` reaching a release of Qt built with Clang is a trap and the reader loses the application over a state the code could have handled.
+- A failure that ends the start is shown to the reader rather than only logged, because a windowed application has no console and one that only writes to the log simply disappears.
 - A lookup that finds nothing is a state to handle, so a preset, a slot, a theme, a runtime session and a pane all answer with what they found and the caller decides.
 - Do not bind plugin-owned asynchronous state mutation to a context that survives plugin shutdown.
