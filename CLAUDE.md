@@ -1691,6 +1691,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] The tree filter stops at the depth the code declares rather than following a folder that names itself, proven against a tree deeper than that bound.
 - [x] The tree filter narrows only the folder that loaded, measured on a workspace of three thousand six hundred folders as five to seventeen seconds of walking becoming two to four.
 - [x] The wait for forty thousand candidates produced by a child, framed, read and decoded is measured by that work rather than by the one condition a default budget covers, found on a real Windows debug build where the default expired at thirty seconds and the work honestly needed longer.
+- [x] The complete suite builds and passes on real Windows hardware in the debug configuration, which continuous integration never exercises because it builds that platform in release.
 - [x] Every read of the render snapshot goes through the lock that guards it.
 - [x] The Linux, macOS and Windows workflows build, test, package and validate the product on every push.
 - [x] The release workflow publishes the Linux archive, the macOS disk image and the Windows archive for every `v*` tag.
