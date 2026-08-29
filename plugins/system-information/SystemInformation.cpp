@@ -1,5 +1,7 @@
 #include "SystemInformation.h"
 
+#include <QGuiApplication>
+#include <QScreen>
 #include <QSysInfo>
 #include <QtConcurrentRun>
 
@@ -277,6 +279,22 @@ utils::Result<SystemSnapshot> HwinfoSystemInformationProvider::collect(const std
     }
 
     return utils::Result<SystemSnapshot>::success(std::move(snapshot));
+}
+
+QVector<Display> connectedDisplays() {
+    QVector<Display> displays;
+    const QScreen* primary = QGuiApplication::primaryScreen();
+
+    for (const QScreen* screen : QGuiApplication::screens()) {
+        if (screen == nullptr) {
+            continue;
+        }
+
+        const QSize size = screen->size();
+        displays.append({screen->name(), size.width(), size.height(), screen->devicePixelRatio(), screen->logicalDotsPerInch(), screen->refreshRate(), screen == primary});
+    }
+
+    return displays;
 }
 
 SystemInformationCollection collectSystemInformation(std::shared_ptr<SystemInformationProvider> provider) {

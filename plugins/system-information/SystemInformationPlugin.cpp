@@ -137,6 +137,8 @@ void SystemInformationPlugin::completeRefresh(quint64 generation, utils::Result<
         return;
     }
 
+    // The window system owns what it knows about the screens, so they are read here rather than on the worker.
+    result.value().displays = connectedDisplays();
     m_snapshot = std::move(result.value());
     emit snapshotChanged();
 }

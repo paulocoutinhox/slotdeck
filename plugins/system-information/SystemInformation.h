@@ -121,6 +121,17 @@ struct NetworkInterface final {
     QString ipv6Address;
 };
 
+// A screen belongs to the window system rather than to the hardware probe, so it is read on the thread that owns it.
+struct Display final {
+    QString name;
+    int widthPixels{0};
+    int heightPixels{0};
+    double devicePixelRatio{0.0};
+    double logicalDotsPerInch{0.0};
+    double refreshHz{0.0};
+    bool primary{false};
+};
+
 struct SystemSnapshot final {
     QDateTime capturedAtUtc;
     OperatingSystem operatingSystem;
@@ -132,7 +143,10 @@ struct SystemSnapshot final {
     QVector<Disk> disks;
     QVector<Battery> batteries;
     QVector<NetworkInterface> networkInterfaces;
+    QVector<Display> displays;
 };
+
+[[nodiscard]] QVector<Display> connectedDisplays();
 
 class SystemInformationProvider {
   public:

@@ -84,6 +84,25 @@ TEST(SystemInformationProviderTest, CollectsAValidSnapshotFromTheCurrentMachine)
     }
 }
 
+// A reader diagnosing a surface that looks too large needs the resolution and the scale, and the window system is the only thing that knows them.
+TEST(SystemInformationProviderTest, ReadsEveryScreenTheWindowSystemOffers) {
+    const QVector<Display> displays = connectedDisplays();
+    ASSERT_EQ(displays.size(), QGuiApplication::screens().size());
+
+    int primaries = 0;
+
+    for (const auto& display : displays) {
+        EXPECT_GT(display.widthPixels, 0);
+        EXPECT_GT(display.heightPixels, 0);
+        EXPECT_GT(display.devicePixelRatio, 0.0);
+        EXPECT_GT(display.logicalDotsPerInch, 0.0);
+        primaries += display.primary ? 1 : 0;
+    }
+
+    // Exactly one screen is the primary one whenever the window system offers any.
+    EXPECT_EQ(primaries, displays.isEmpty() ? 0 : 1);
+}
+
 TEST(SystemInformationProviderTest, CancelsBeforeAccessingHardware) {
     HwinfoSystemInformationProvider provider;
     std::atomic_bool cancelled{true};

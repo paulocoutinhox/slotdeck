@@ -352,6 +352,16 @@ void SystemInformationView::render(const SystemSnapshot& snapshot) {
         SystemInformationViewHelper::addRow(graphics, m_host, QStringLiteral("system-information.field.cores"), SystemInformationViewHelper::formatInteger(m_host, graphicsProcessor.coreCount));
     }
 
+    for (qsizetype index = 0; index < snapshot.displays.size(); ++index) {
+        const auto& display = snapshot.displays.at(index);
+        SystemInformationViewHelper::addDeviceTitle(graphics, m_host.translate(QStringLiteral("system-information.common.display-name")).arg(index + 1));
+        SystemInformationViewHelper::addRow(graphics, m_host, QStringLiteral("system-information.field.model"), SystemInformationViewHelper::availableText(m_host, display.name));
+        SystemInformationViewHelper::addRow(graphics, m_host, QStringLiteral("system-information.field.resolution"), m_host.translate(QStringLiteral("system-information.common.resolution")).arg(QLocale::system().toString(display.widthPixels)).arg(QLocale::system().toString(display.heightPixels)));
+        SystemInformationViewHelper::addRow(graphics, m_host, QStringLiteral("system-information.field.scale"), m_host.translate(QStringLiteral("system-information.common.percentage")).arg(QLocale::system().toString(display.devicePixelRatio * 100.0, 'f', 0)));
+        SystemInformationViewHelper::addRow(graphics, m_host, QStringLiteral("system-information.field.pixel-density"), m_host.translate(QStringLiteral("system-information.common.dots-per-inch")).arg(QLocale::system().toString(display.logicalDotsPerInch, 'f', 0)));
+        SystemInformationViewHelper::addRow(graphics, m_host, QStringLiteral("system-information.field.refresh-rate"), m_host.translate(QStringLiteral("system-information.common.hertz")).arg(QLocale::system().toString(display.refreshHz, 'f', 0)));
+    }
+
     m_contentLayout->addWidget(graphics.frame);
 
     Section mainboard = SystemInformationViewHelper::createSection(m_content, m_host, QStringLiteral("system-information.section.mainboard"), ui::IconName::Mainboard);

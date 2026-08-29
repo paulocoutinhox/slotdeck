@@ -555,6 +555,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - Live processor utilization and per-thread measurements are shown only on platforms where the pinned dependency implements them and unsupported measurements are never represented as zero.
 - Memory data contains total, available and free capacity together with detected module identity, size and frequency.
 - Graphics data contains identity, driver, device identifiers, memory, frequency and cores when supplied by the platform.
+- Every screen the window system offers is reported beside the graphics hardware with its name, resolution, scale, pixel density and refresh rate, because a reader whose surfaces look too large is looking for exactly those.
+- Those values are read on the thread that owns the window system rather than on the collection worker, because that thread is the only one allowed to ask.
 - Mainboard, disk, mounted-volume, battery and network-interface details expose every portable field supplied by the dependency.
 - Unknown or unavailable platform fields remain explicitly unavailable and never receive inferred hardware values.
 - Every value read from a platform buffer keeps only printable characters so fixed-size padding never reaches the interface.
@@ -1688,7 +1690,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 449 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 450 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] That number is held to what the suite really registers by the lint command, because a number nobody keeps is a number nobody believes.
 - [x] Every case holds in a random order, proven across five schedules of the whole suite, three of them parallel and two one case at a time, which nothing had exercised before.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
