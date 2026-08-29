@@ -834,9 +834,12 @@ void WebServerView::openServerInBrowser() {
 void WebServerView::openServer() {
     const auto* button = qobject_cast<QToolButton*>(sender());
 
-    if (button != nullptr) {
-        const bool opened = m_plugin.openWebServer(button->property("serverId").toString());
-        Q_UNUSED(opened);
+    if (button == nullptr) {
+        return;
+    }
+
+    if (!m_plugin.openWebServer(button->property("serverId").toString())) {
+        m_plugin.host().notify(m_plugin.host().translate(QStringLiteral("web-server.plugin.title")), m_plugin.host().translate(QStringLiteral("web-server.error.open")), plugins::AlertSeverity::Error);
     }
 }
 

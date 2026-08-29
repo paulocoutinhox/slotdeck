@@ -871,6 +871,38 @@ TEST(WebServerDialogTest, ClosesItselfWhenTheServerItConfiguredIsRunning) {
     plugin.shutdown();
 }
 
+// The dialog reports a browser dispatch it could not make, so the row action beside it says the same thing rather than doing nothing at all.
+TEST(WebServerViewTest, SaysTheAddressCouldNotBeOpenedWhenTheSystemBrowserRefusesIt) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    test::TestPluginHost host;
+    WebServerTestsHelper::configureWebDatabase(host, {{{QStringLiteral("id"), QStringLiteral("server-1")}, {QStringLiteral("name"), QStringLiteral("Preview")}, {QStringLiteral("root"), directory.path()}, {QStringLiteral("bind_host"), QStringLiteral("127.0.0.1")}, {QStringLiteral("port"), 45124}, {QStringLiteral("terminal_id"), QVariant{}}}});
+
+    plugins::webserver::WebServerPlugin plugin;
+    ASSERT_TRUE(plugin.initialize(host).hasValue());
+    QApplication::processEvents();
+
+    std::unique_ptr<QWidget> navigation(plugin.createNavigationView(QStringLiteral("manager"), nullptr));
+    ASSERT_NE(navigation, nullptr);
+    host.notifications.clear();
+
+    // A server that is not running has no address, so the dispatch fails without ever reaching the desktop of the machine running this case.
+    QToolButton source(navigation.get());
+    source.setProperty("serverId", QStringLiteral("server-1"));
+    ASSERT_TRUE(QObject::connect(&source, SIGNAL(clicked(bool)), navigation.get(), SLOT(openServer())));
+    source.click();
+    QApplication::processEvents();
+
+    ASSERT_EQ(host.notifications.size(), 1);
+    EXPECT_EQ(host.notifications.constFirst().message, host.translate(QStringLiteral("web-server.error.open")));
+    EXPECT_EQ(host.notifications.constFirst().severity, plugins::AlertSeverity::Error);
+
+    // A click that reaches the slot any other way has no sender, so it asks for nothing instead of dereferencing one.
+    host.notifications.clear();
+    ASSERT_TRUE(QMetaObject::invokeMethod(navigation.get(), "openServer", Qt::DirectConnection));
+    EXPECT_TRUE(host.notifications.isEmpty());
+}
+
 TEST(WebServerViewTest, KeepsARowActionAliveWhileItIsDeliveringItsOwnClick) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());

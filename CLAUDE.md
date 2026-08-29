@@ -989,6 +989,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - A plugin answering a request to show something reveals its own destination, because a caller asking for a page or a folder wants to read it rather than to be told it exists somewhere.
 - Other plugins may open a folder in the editor only through the asynchronous `code-editor.workspace.open` request, and may configure a Web Server for a folder only through the asynchronous `web-server.instance.create` request.
 - The Web Server exposes one action that opens its address in the system browser and one that opens it in the Browser plugin through that contract.
+- Either of those actions says so when the address could not be opened, because an action that does nothing and explains nothing reads as a product that is broken.
 - The action that leaves the application carries the glyph of a link opening elsewhere and says so, and the one that stays says which plugin it opens in.
 - Browser storage failures restore the latest committed tabs or homepage and report through the shared toast overlay.
 
@@ -1672,7 +1673,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] English and Portuguese catalog selection were exercised with isolated application state.
 - [x] SQLite persisted core state and independently versioned plugin tables.
 - [x] Formatting verification, warnings-as-errors builds and registered CTest execution passed.
-- [x] The registered suite reports 447 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
+- [x] The registered suite reports 448 independent CTest cases and every case passes in the Debug and the AddressSanitizer with UndefinedBehaviorSanitizer configurations.
 - [x] That number is held to what the suite really registers by the lint command, because a number nobody keeps is a number nobody believes.
 - [x] Every case holds in a random order, proven across five schedules of the whole suite, three of them parallel and two one case at a time, which nothing had exercised before.
 - [x] A line-by-line review of the core, the shared terminal engine and every plugin removed the reaper lost wakeup, the workspace removal state corruption, the restarted task terminal binding, the immediate kanban card destruction, the immediate request timeout destruction and the unguarded monospaced family lookup.
