@@ -151,7 +151,8 @@ Newer explicit product requirements take precedence when they intentionally repl
 - The terminal, the editor and the chat all open at twelve points, which is the reading size of every content surface.
 - Font sizes outside the shared range of eight to thirty-six points are rejected by settings, by the stored value contract and by the font step.
 - The native zoom-in, zoom-out and reset shortcuts stay at application scope and broadcast the `slotdeck.appearance.font-step` core event with an explicit increase, decrease or reset value.
-- Zooming answers the plain equal, minus and zero keys of the market convention, so increasing and decreasing take the same number of keys, and the standard sequences stay registered as aliases.
+- Zooming answers the plain equal, minus and zero keys of the market convention, so increasing and decreasing take the same number of keys.
+- Each direction also answers the plus the zoom standard key names and the plus, minus and zero of a numeric keypad, because a reader reaches for whichever of them their keyboard puts in front of them, and it answers none of the shifted forms because those belong to the shell.
 - Every one of those combinations uses the control modifier, which Qt maps to the native key of the running platform.
 - Every surface applies the broadcast step to its own persisted size, clamps it to the shared range and returns to its own default on reset.
 - The core neither stores nor exposes a content font size, so no surface inherits another surface reading size.
@@ -1491,6 +1492,7 @@ Newer explicit product requirements take precedence when they intentionally repl
 - [x] The application tab system replaces the Qt tab visuals on every tabbed surface.
 - [x] AI task creation reports every invalid field as a validation message and a failed run stays visible on its card with its status badge.
 - [x] The terminal and the editor own independent font sizes with their own defaults, changed from their own settings and stepped together by the native zoom shortcuts.
+- [x] Zooming answers every combination a keyboard offers for a direction, measured on Windows where the single declared one left the plus of the keypad and the plus the standard key names doing nothing.
 - [x] Success indicators follow the active theme accent while warning and danger stay semantic.
 - [x] Every style sheet resolves its theme values through the single token substitution, no token is defined without a style sheet that consumes it and no style sheet writes one nothing substitutes, which the lint command now refuses.
 - [x] Every shared component, stored-value and payload contract has direct coverage for its success, rejection and boundary cases.

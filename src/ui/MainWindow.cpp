@@ -190,11 +190,11 @@ void MainWindow::createActions() {
     addAction(m_quitAction);
     connect(m_quitAction, &QAction::triggered, this, &MainWindow::requestApplicationQuit);
 
-    const QVector<QPair<QKeySequence, QString>> fontActions{{shortcuts::increaseContentFont(), QStringLiteral("increase")}, {shortcuts::decreaseContentFont(), QStringLiteral("decrease")}, {shortcuts::resetContentFont(), QStringLiteral("reset")}};
+    const QVector<QPair<QList<QKeySequence>, QString>> fontActions{{shortcuts::increaseContentFont(), QStringLiteral("increase")}, {shortcuts::decreaseContentFont(), QStringLiteral("decrease")}, {shortcuts::resetContentFont(), QStringLiteral("reset")}};
 
     for (const auto& fontAction : fontActions) {
         auto* action = new QAction(this);
-        action->setShortcut(fontAction.first);
+        action->setShortcuts(fontAction.first);
         action->setShortcutContext(Qt::ApplicationShortcut);
         addAction(action);
         // clang-format off

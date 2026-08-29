@@ -40,6 +40,12 @@ inline bool matches(const QKeyEvent& event, const QKeySequence& sequence) {
     return QKeySequence(event.keyCombination()) == sequence;
 }
 
+inline bool matches(const QKeyEvent& event, const QList<QKeySequence>& sequences) {
+    // clang-format off
+    return std::ranges::any_of(sequences, [&event](const QKeySequence& sequence) { return matches(event, sequence); });
+    // clang-format on
+}
+
 // Control with C interrupts what the shell is running, so only a combination the shell does not own copies the selection.
 // Control with W deletes the previous word in a shell, so only macOS closes with the plain application combination.
 inline QKeySequence closeTerminal() {

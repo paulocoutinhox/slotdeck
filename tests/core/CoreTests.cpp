@@ -873,26 +873,36 @@ TEST(ApplicationShortcutsTest, QuitsWithACombinationEveryKeyboardCarries) {
     EXPECT_NE(quit[0].key(), Qt::Key_Exit);
 }
 
-TEST(ApplicationShortcutsTest, ZoomsWithThePlainKeysOfTheMarketConvention) {
-    const QKeySequence increase = ui::shortcuts::increaseContentFont();
-    const QKeySequence decrease = ui::shortcuts::decreaseContentFont();
-    const QKeySequence reset = ui::shortcuts::resetContentFont();
+TEST(ApplicationShortcutsTest, ZoomsWithEveryKeyAKeyboardPutsInFrontOfTheReader) {
+    const QList<QKeySequence> increase = ui::shortcuts::increaseContentFont();
+    const QList<QKeySequence> decrease = ui::shortcuts::decreaseContentFont();
+    const QList<QKeySequence> reset = ui::shortcuts::resetContentFont();
 
-    // Every direction is one combination of the same shape, so increasing never needs a key that decreasing does not.
-    EXPECT_EQ(increase, QKeySequence(Qt::CTRL | Qt::Key_Equal));
-    EXPECT_EQ(decrease, QKeySequence(Qt::CTRL | Qt::Key_Minus));
-    EXPECT_EQ(reset, QKeySequence(Qt::CTRL | Qt::Key_0));
+    // The plain keys of the market convention are what each direction opens with.
+    EXPECT_EQ(increase.first(), QKeySequence(Qt::CTRL | Qt::Key_Equal));
+    EXPECT_EQ(decrease.first(), QKeySequence(Qt::CTRL | Qt::Key_Minus));
+    EXPECT_EQ(reset.first(), QKeySequence(Qt::CTRL | Qt::Key_0));
 
-    for (const auto& sequence : {increase, decrease, reset}) {
-        ASSERT_EQ(sequence.count(), 1);
-        EXPECT_EQ(sequence[0].keyboardModifiers(), Qt::ControlModifier) << sequence.toString().toStdString();
-        EXPECT_FALSE(sequence[0].keyboardModifiers().testFlag(Qt::ShiftModifier)) << sequence.toString().toStdString();
+    // A keyboard with a numeric pad puts the plus and the minus there, and that is where a reader reaches for them.
+    EXPECT_TRUE(increase.contains(QKeySequence(Qt::ControlModifier | Qt::KeypadModifier | Qt::Key_Plus)));
+    EXPECT_TRUE(decrease.contains(QKeySequence(Qt::ControlModifier | Qt::KeypadModifier | Qt::Key_Minus)));
+    EXPECT_TRUE(reset.contains(QKeySequence(Qt::ControlModifier | Qt::KeypadModifier | Qt::Key_0)));
+
+    // Qt answers the zoom standard keys with the plus and the minus, so increasing accepts the one it names.
+    EXPECT_TRUE(increase.contains(QKeySequence(Qt::CTRL | Qt::Key_Plus)));
+    EXPECT_TRUE(QKeySequence::keyBindings(QKeySequence::ZoomIn).contains(QKeySequence(Qt::CTRL | Qt::Key_Plus)));
+    EXPECT_TRUE(QKeySequence::keyBindings(QKeySequence::ZoomOut).contains(QKeySequence(Qt::CTRL | Qt::Key_Minus)));
+
+    for (const auto& direction : {increase, decrease, reset}) {
+        ASSERT_FALSE(direction.isEmpty());
+        for (const auto& sequence : direction) {
+            ASSERT_EQ(sequence.count(), 1) << sequence.toString().toStdString();
+            EXPECT_TRUE(sequence[0].keyboardModifiers().testFlag(Qt::ControlModifier)) << sequence.toString().toStdString();
+            // The shifted forms belong to the shell, so no direction takes one.
+            EXPECT_FALSE(sequence[0].keyboardModifiers().testFlag(Qt::ShiftModifier)) << sequence.toString().toStdString();
+        }
     }
-
-    // The standard sequences are not used, because the platform maps zoom in to a third key and zoom out to two.
-    EXPECT_NE(increase, QKeySequence(QKeySequence::ZoomIn));
 }
-
 TEST(SharedComponentsTest, PaintsItsOwnIndicatorOnTheSelectableField) {
     const ui::Theme& theme = ui::themeManager().theme();
     QWidget host;

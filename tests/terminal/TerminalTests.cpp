@@ -244,7 +244,10 @@ TEST(TerminalShortcutsTest, SeparatesPluginApplicationAndTerminalOwnedInput) {
     EXPECT_FALSE(terminalcore::shortcuts::isReservedForApplication(deleteWordEvent));
 #endif
 
-    const QList<QKeySequence> applicationSequences{ui::shortcuts::increaseContentFont(), ui::shortcuts::decreaseContentFont(), ui::shortcuts::resetContentFont(), ui::shortcuts::quit()};
+    QList<QKeySequence> applicationSequences{ui::shortcuts::quit()};
+    applicationSequences += ui::shortcuts::increaseContentFont();
+    applicationSequences += ui::shortcuts::decreaseContentFont();
+    applicationSequences += ui::shortcuts::resetContentFont();
 
     for (const auto& sequence : applicationSequences) {
         ASSERT_GT(sequence.count(), 0) << sequence.toString().toStdString();
