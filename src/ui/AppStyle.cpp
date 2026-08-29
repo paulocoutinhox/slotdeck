@@ -192,13 +192,13 @@ void AppStyle::drawPrimitive(PrimitiveElement element, const QStyleOption* optio
         return;
     }
 
-    if (element == PE_IndicatorArrowDown || element == PE_IndicatorArrowUp) {
-        drawChevron(option, painter, element == PE_IndicatorArrowDown);
+    if (element == PE_IndicatorArrowUp) {
+        drawChevron(option, painter);
         return;
     }
 
-    if (element == PE_IndicatorSpinUp || element == PE_IndicatorSpinPlus || element == PE_IndicatorSpinDown || element == PE_IndicatorSpinMinus) {
-        drawSpinSign(option, painter, element == PE_IndicatorSpinUp || element == PE_IndicatorSpinPlus);
+    if (element == PE_IndicatorSpinUp || element == PE_IndicatorSpinDown) {
+        drawSpinSign(option, painter, element == PE_IndicatorSpinUp);
         return;
     }
 
@@ -206,17 +206,16 @@ void AppStyle::drawPrimitive(PrimitiveElement element, const QStyleOption* optio
 }
 
 // The indicator is painted from the theme text color so it always separates itself from the control behind it.
-void AppStyle::drawChevron(const QStyleOption* option, QPainter* painter, bool pointingDown) {
-    const QRectF bounds = QRectF(option->rect).adjusted(0, 0, 0, 0);
+void AppStyle::drawChevron(const QStyleOption* option, QPainter* painter) {
+    const QRectF bounds = QRectF(option->rect);
     const qreal width = std::min<qreal>(9.0, bounds.width());
     const qreal height = width / 2.0;
     const QPointF center = bounds.center();
-    const qreal direction = pointingDown ? 1.0 : -1.0;
 
     QPainterPath chevron;
-    chevron.moveTo(center.x() - width / 2.0, center.y() - direction * height / 2.0);
-    chevron.lineTo(center.x(), center.y() + direction * height / 2.0);
-    chevron.lineTo(center.x() + width / 2.0, center.y() - direction * height / 2.0);
+    chevron.moveTo(center.x() - width / 2.0, center.y() + height / 2.0);
+    chevron.lineTo(center.x(), center.y() - height / 2.0);
+    chevron.lineTo(center.x() + width / 2.0, center.y() + height / 2.0);
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);

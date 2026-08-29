@@ -26,7 +26,7 @@ class AppStyle final : public QProxyStyle {
     void drawControl(ControlElement element, const QStyleOption* option, QPainter* painter, const QWidget* widget = nullptr) const override;
 
   private:
-    static void drawChevron(const QStyleOption* option, QPainter* painter, bool pointingDown);
+    static void drawChevron(const QStyleOption* option, QPainter* painter);
     static void drawSpinSign(const QStyleOption* option, QPainter* painter, bool plus);
     [[nodiscard]] bool drawToolButtonLabel(const QStyleOption* option, QPainter* painter, const QWidget* widget) const;
 };
